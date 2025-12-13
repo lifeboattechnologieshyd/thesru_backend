@@ -1,0 +1,6 @@
+-r base.txt
+
+# postgres
+psycopg2==2.9.*
+# http server
+gunicorn==23.0.*

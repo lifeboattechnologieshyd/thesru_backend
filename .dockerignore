@@ -1,0 +1,42 @@
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Virtual environments
+venv/
+env/
+.venv/
+
+# Environment variables
+.env
+.env.*
+!.env.example
+
+# Django runtime
+static/
+staticfiles/
+media/
+*.sqlite3
+
+# MacOS system files
+.DS_Store
+
+# IDE files
+.idea/
+.vscode/
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# Docker configs not needed in build context
+docker-compose*.yml
+
+# Packaging
+build/
+dist/
+*.egg-info/
+.eggs/

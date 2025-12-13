@@ -1,0 +1,50 @@
+# base requirements
+
+# django
+Django==5.1.*
+# rest framework
+djangorestframework==3.15.*
+# JWT Authentication
+djangorestframework-simplejwt==5.5.*
+PyJWT==2.9.*
+# CORS
+django-cors-headers==4.7.*
+# filters
+django-filter==25.*
+# storage
+django-storages==1.14.*
+boto3==1.38.*
+# global user context
+django-crum==0.7.*
+# environment variables
+python-dotenv==1.0.*
+# logging
+structlog==25.2.*
+django-structlog==9.0.*
+# timezone
+pytz==2025.1
+# documentation
+drf-spectacular==0.28.*
+# crons
+django-crontab==0.7.*
+# resource monitoring
+psutil==7.0.*
+# health check
+django-health-check==3.18.*
+# Excel processing
+pandas==2.2.*
+openpyxl==3.1.*
+# firebase
+firebase-admin==6.9.0
+# send grid
+sendgrid==6.12.0
+# text-to-speech
+gTTS==2.5.*
+
+# OpenTelemetry core packages
+opentelemetry-api==1.31.*
+opentelemetry-sdk==1.31.*
+opentelemetry-exporter-otlp==1.31.*
+opentelemetry-instrumentation-django==0.52b1
+opentelemetry-instrumentation-requests==0.52b1
+opentelemetry-instrumentation-psycopg2==0.52b1

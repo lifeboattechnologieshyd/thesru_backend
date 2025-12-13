@@ -1,0 +1,14 @@
+-r base.txt
+
+# postgres binary version
+psycopg2-binary==2.9.*
+# django silk
+django-silk==5.3.*
+# linters and formatters
+ruff
+# security linter
+bandit
+# stubs
+django-stubs
+django-stubs-ext
+djangorestframework-stubs

@@ -1,0 +1,47 @@
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Virtual environments
+venv/
+env/
+.venv/
+
+# Environment variables
+.env
+.env.*
+!.env.example
+
+# Logs & temp
+*.log
+logs/
+tmp/
+
+# SQLite DB
+db.sqlite3
+
+# Static & media
+static/
+staticfiles/
+media/
+collectstatic/
+
+# IDE / macOS
+.idea/
+.vscode/
+.DS_Store
+
+# Django migrations cache
+**/migrations/__pycache__/
+**/migrations/*.pyc
+
+# Docker
+docker-compose.override.yml
+*.pid
+
+# Packaging
+build/
+dist/
+*.egg-info/
+.eggs/
