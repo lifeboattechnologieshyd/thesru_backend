@@ -1,0 +1,62 @@
+version: "3.8"
+
+services:
+  db:
+    image: postgres:17
+    restart: always
+    environment:
+      POSTGRES_DB: sru
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "7432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks:
+      - sru
+
+  minio:
+    image: minio/minio:latest
+    container_name: minio
+    restart: always
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+      MINIO_REGION_NAME: ap-south-1
+    command: server /data --console-address ":9001"
+    ports:
+      - "10000:9000"
+      - "10001:9001"
+    volumes:
+      - minio_data:/data
+    networks:
+      - sru
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  createbucket:
+    image: minio/mc
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      sleep 5;
+      mc alias set local http://minio:9000 minioadmin minioadmin;
+      mc mb -p local/sru || true;
+      mc anonymous set download local/sru;
+      exit 0;
+      "
+    networks:
+      - sru
+
+volumes:
+  pgdata:
+  minio_data:
+
+networks:
+  sru:
+    driver: bridge

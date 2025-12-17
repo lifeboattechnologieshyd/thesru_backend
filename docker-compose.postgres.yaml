@@ -1,0 +1,24 @@
+
+services:
+  db:
+    image: postgres:17
+    restart: always
+    environment:
+      POSTGRES_DB: sru
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    networks:
+      - sru-network
+    ports:
+      - "7432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+
+volumes:
+  pgdata:
+    driver: local
+
+networks:
+  sru-network:
+    external: true
