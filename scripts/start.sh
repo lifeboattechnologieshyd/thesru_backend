@@ -99,7 +99,7 @@ echo "Deployment mode: $DEPLOYMENT_MODE"
 # Running migrations and collecting static files
 cd $PROJECT_ROOT_DIR
 python manage.py migrate
-python manage.py collectstatic --noinput
+# python manage.py collectstatic --noinput
 
 
 # Function to start cron safely across OS types
