@@ -3,6 +3,7 @@ version: "3.8"
 services:
   db:
     image: postgres:17
+    container_name: postgres
     restart: always
     environment:
       POSTGRES_DB: thesru
