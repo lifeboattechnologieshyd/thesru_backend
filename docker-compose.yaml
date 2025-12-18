@@ -5,7 +5,7 @@ services:
     image: postgres:17
     restart: always
     environment:
-      POSTGRES_DB: sru
+      POSTGRES_DB: thesru
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
     ports:
@@ -13,7 +13,7 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql/data
     networks:
-      - sru
+      - thesru
 
   minio:
     image: minio/minio:latest
@@ -30,7 +30,7 @@ services:
     volumes:
       - minio_data:/data
     networks:
-      - sru
+      - thesru
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
       interval: 5s
@@ -46,17 +46,17 @@ services:
       /bin/sh -c "
       sleep 5;
       mc alias set local http://minio:9000 minioadmin minioadmin;
-      mc mb -p local/sru || true;
-      mc anonymous set download local/sru;
+      mc mb -p local/thesru || true;
+      mc anonymous set download local/thesru;
       exit 0;
       "
     networks:
-      - sru
+      - thesru
 
 volumes:
   pgdata:
   minio_data:
 
 networks:
-  sru:
+  thesru:
     driver: bridge
