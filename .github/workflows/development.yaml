@@ -31,5 +31,5 @@ jobs:
           docker buildx build --platform linux/arm64 -t thesru-backend:development-latest --load .
           docker stop thesru-backend || true
           docker rm thesru-backend || true
-          docker run -d --name thesru-backend --env-file .env --network=thesru_backend_thesru -p 7000:8000 thesru-backend:development-latest
+          docker run -d --name thesru-backend --env-file .env --network=thesru_backend_thesru -p 6000:8000 thesru-backend:development-latest
           EOF
