@@ -99,24 +99,24 @@ class Banner(AuditModel):
         ordering = ["-created_at"]
 
 
-# class AddressMaster(AuditModel):
-#     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-#     user_id = models.UUIDField()
-#     mobile = models.CharField(max_length=20,null=True)
-#     name = models.CharField(max_length=100)
-#     address_name = models.CharField(max_length=50)
-#     address_type = models.CharField(max_length=20,choices=AddressType.choices)
-#     full_address = models.JSONField()
-#     house_number = models.CharField(max_length=50)
-#     city = models.CharField(max_length=100)
-#     country = models.CharField(max_length=100)
-#     state_name = models.CharField(max_length=25)
-#     area_name = models.CharField(max_length=100)
-#     pin_code = models.CharField(max_length=10)
-#     landmark = models.CharField(max_length=100)
-#     is_default = models.BooleanField(default=False)
-#
-#     class Meta:
-#         db_table = "address"
-#         ordering = ["-created_at"]
+class AddressMaster(AuditModel):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user_id = models.UUIDField()
+    mobile = models.CharField(max_length=20,null=True)
+    name = models.CharField(max_length=100)
+    address_name = models.CharField(max_length=50)
+    address_type = models.CharField(max_length=20,choices=AddressType.choices)
+    full_address = models.JSONField()
+    house_number = models.CharField(max_length=50)
+    city = models.CharField(max_length=100)
+    country = models.CharField(max_length=100)
+    state_name = models.CharField(max_length=25)
+    area_name = models.CharField(max_length=100)
+    pin_code = models.CharField(max_length=10)
+    landmark = models.CharField(max_length=100)
+    is_default = models.BooleanField(default=False)
+
+    class Meta:
+        db_table = "address"
+        ordering = ["-created_at"]
 
