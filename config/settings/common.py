@@ -119,7 +119,7 @@ DATABASES = {
 #################################
 #       JWT AUTH SETTINGS       #
 #################################
-# AUTH_USER_MODEL = "db.User"
+AUTH_USER_MODEL = "db.User"
 
 SIMPLE_JWT = {
     "BLACKLIST_DB_ALIAS": "default",
