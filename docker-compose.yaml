@@ -54,10 +54,16 @@ services:
     networks:
       - thesru
 
-volumes:
-  pgdata:
-  minio_data:
-
-networks:
-  thesru:
-    driver: bridge
+  backend:
+    image: thesru-backend:development-latest
+    container_name: thesru-backend
+    restart: always
+    ports:
+      - "6000:8000"
+    environment:
+      ENABLE_ALLOY: "false"   #  THIS IS THE FIX
+    depends_on:
+      - db
+      - minio
+    networks:
+      - thesru
