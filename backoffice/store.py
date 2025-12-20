@@ -6,7 +6,7 @@ from django.utils import timezone
 
 from rest_framework.permissions import IsAuthenticated
 
-from db.models import  Category, Product, DisplayProduct, Banner, Inventory
+from db.models import  Category, Product, DisplayProduct, Banner, Inventory, PinCode
 from enums.store import InventoryType
 from mixins.drf_views import CustomResponse
 
@@ -488,13 +488,12 @@ class InventoryAPIView(APIView):
                 "purchase_price":purchase_price,
             }
         )
-
     def get(self, request,id=None):
 
         queryset = Inventory.objects.all()
 
-        if inventory_id:
-            inv = queryset.filter(id=inventory_id).first()
+        if id:
+            inv = queryset.filter(id=id).first()
             if not inv:
                 return CustomResponse().errorResponse(description="Inventory not found")
 
@@ -513,8 +512,8 @@ class InventoryAPIView(APIView):
                 }
             )
 
-        if product_id:
-            queryset = queryset.filter(product_id=product_id)
+        if id:
+            queryset = queryset.filter(product_id=id)
 
         data = []
         for inv in queryset.order_by("-created_at"):
@@ -531,6 +530,8 @@ class InventoryAPIView(APIView):
             data=data,
             total=len(data)
         )
+
+
 
     def put(self, request,id=None):
         if not id:
@@ -573,3 +574,70 @@ class InventoryAPIView(APIView):
         return CustomResponse().successResponse(data={},
             description="Inventory deleted successfully"
         )
+
+class PinCodeAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self,request):
+        data = request.data
+
+        required_fields = ["pin","state","area","city"]
+        for field in required_fields:
+            if not data.get(field):
+                return CustomResponse.errorResponse(description=f"{field} is required")
+
+        PinCode.objects.create(
+            pin = data.get("pin"),
+            state = data.get("state"),
+            area = data.get("area"),
+            city = data.get("city")
+
+
+        )
+        return CustomResponse.successResponse(data={},description="pincode created successfully")
+    def get(self,request,id=None):
+        if id:
+            pin = PinCode.objects.filter(id=id).values().first()
+            if not pin:
+                return CustomResponse.errorResponse(description="pincode id required")
+            return CustomResponse.successResponse(data=[pin],total=1)
+
+        pin = PinCode.objects.all().order_by("-created_at").values()
+
+        data = list(pin)
+
+        return CustomResponse.successResponse(data=data,total=len(data))
+
+    def put(self,request,id=None):
+        if not id:
+            return CustomResponse.errorResponse(description="pincode id required")
+
+        pin = PinCode.objects.filter(id=id).first()
+
+        if not pin:
+            return CustomResponse.errorResponse(description="pincode not found")
+
+
+        for field in [
+            "pin","state","area","city"
+        ]:
+            if field in request.data:
+                setattr(pin,field,request.data.get(field))
+
+        pin.save()
+        return CustomResponse.successResponse(data={},description="pincode updated successfully")
+
+    def delete(self,request,id=None):
+        if not id:
+            return CustomResponse.errorResponse(description="pincode id required")
+
+        pin = PinCode.objects.filter(id=id).filter()
+        if not pin:
+            return CustomResponse.errorResponse(description="pincode not found")
+
+        pin.delete()
+        return CustomResponse.successResponse(data={},description="pincode deleted successfully")
+
+
+
+

@@ -3,7 +3,7 @@ from django.contrib.postgres.fields import ArrayField
 from db.mixins import AuditModel
 from django.db import models
 
-from enums.store import BannerScreen, InventoryType, AddressType
+from enums.store import BannerScreen, InventoryType, AddressType, OrderStatus, PaymentStatus
 
 
 class Product(AuditModel):
@@ -106,17 +106,112 @@ class AddressMaster(AuditModel):
     name = models.CharField(max_length=100)
     address_name = models.CharField(max_length=50)
     address_type = models.CharField(max_length=20,choices=AddressType.choices)
-    full_address = models.JSONField()
+    full_address = models.CharField(max_length=100)
     house_number = models.CharField(max_length=50)
     city = models.CharField(max_length=100)
     country = models.CharField(max_length=100)
-    state_name = models.CharField(max_length=25)
-    area_name = models.CharField(max_length=100)
+    state = models.CharField(max_length=25)
+    area = models.CharField(max_length=100)
     pin_code = models.CharField(max_length=10)
-    landmark = models.CharField(max_length=100)
+    landmark = models.CharField(max_length=100,null=True)
     is_default = models.BooleanField(default=False)
 
     class Meta:
         db_table = "address"
         ordering = ["-created_at"]
 
+class PinCode(AuditModel):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    pin = models.PositiveIntegerField()
+    state = models.CharField(max_length=25)
+    area = models.CharField(max_length=100)
+    city = models.CharField(max_length=100)
+
+    class Meta:
+        db_table = "pincode"
+
+
+class Order(AuditModel):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user_id = models.UUIDField()
+    order_id = models.CharField(unique=True, max_length=16, null=False)
+    address = models.JSONField()
+    mrp = models.DecimalField(decimal_places=2, max_digits=10)
+    selling_price = models.DecimalField(decimal_places=2, max_digits=10)
+    coupon_discount = models.DecimalField(decimal_places=2, max_digits=10)
+    wallet_paid = models.DecimalField(decimal_places=2, max_digits=10, default=0)
+    paid_online = models.DecimalField(decimal_places=2, max_digits=10, default=0)
+    cash_on_delivery = models.DecimalField(decimal_places=2, max_digits=10, default=0)
+    status = models.CharField(choices=OrderStatus.choices)
+
+    class Meta:
+        db_table = "order"
+
+class OrderProducts(AuditModel):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    order_id = models.CharField(max_length=16, null=False)
+    product_id = models.UUIDField(null=False)
+    sku = models.CharField(max_length=20,unique=True)
+    qty = models.PositiveIntegerField(default=0)
+    mrp = models.DecimalField(decimal_places=2, max_digits=10)
+    selling_price = models.DecimalField(decimal_places=2, max_digits=10)
+    Apportioned_discount = models.DecimalField(decimal_places=2, max_digits=10)
+    Apportioned_wallet = models.DecimalField(decimal_places=2, max_digits=10)
+    Apportioned_online = models.DecimalField(decimal_places=2, max_digits=10)
+    Apportioned_gst = models.DecimalField(decimal_places=2, max_digits=10)
+    rating = models.DecimalField(decimal_places=2, max_digits=10)
+    review = models.BooleanField(default=False)
+
+    class Meta:
+        db_table = "order_product"
+
+
+
+class OrderTimeLines(AuditModel):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    order_id = models.CharField(max_length=16, null=False)
+    status = models.CharField(max_length=16, null=False)
+    remarks = models.CharField(max_length=250, null=True)
+
+    class Meta:
+        db_table = "order_timeline"
+
+
+class OrderShippingDetails(AuditModel):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    order_id = models.CharField(max_length=16, null=False)
+    courier_service = models.CharField(max_length=16, null=False)
+    tracking_id = models.CharField(max_length=250, null=False)
+    tracking_url = models.CharField(max_length=250, null=False)
+    estimated_delivery_date = models.CharField(max_length=250, null=False)
+    remarks = models.CharField(max_length=1000, null=True)
+
+    class Meta:
+        db_table = "order_shipping_details"
+
+
+class Payment(AuditModel):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    order_id = models.CharField(max_length=16, null=False)
+    txn_id = models.CharField(max_length=16, null=False) #cf_order_id
+    session_id = models.CharField(max_length=16, null=False)
+    amount = models.DecimalField(decimal_places=2, max_digits=10, default=0)
+    status = models.CharField(choices=PaymentStatus.choices)
+    user_id = models.UUIDField(null=False)
+    mobile = models.CharField(null=False)
+    email = models.CharField(null=True)
+
+    class Meta:
+        db_table = "payment"
+
+
+class CashFree(AuditModel):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    store_id = models.UUIDField(null=True)
+    client_id = models.CharField(null=False, unique=True)
+    client_secret = models.CharField(null=False, unique=True)
+    webhook = models.CharField(max_length=100)
+    url = models.CharField(max_length=100)
+
+    class Meta:
+        db_table = "cashfree"

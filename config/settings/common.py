@@ -121,6 +121,12 @@ DATABASES = {
 #################################
 AUTH_USER_MODEL = "db.User"
 
+CASHFREE_URL = "https://sandbox.cashfree.com/pg/orders"
+CASHFREE_API_VERSION = "2023-08-01"
+CASHFREE_CLIENT_ID = "TEST1048858786a7530cc72f33d2ebe578588401"
+CASHFREE_CLIENT_SECRETE = "cfsk_ma_test_518795086d308808f96e63f5d5db8c71_784dd231"
+CASHFREE_WEBHOOK = "https://dev-api.sru.ai/payment/paymentWebhook"
+
 SIMPLE_JWT = {
     "BLACKLIST_DB_ALIAS": "default",
     "ACCESS_TOKEN_LIFETIME": timedelta(

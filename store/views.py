@@ -1,0 +1,535 @@
+from unicodedata import category
+import requests
+from django.db import transaction
+from django.db import IntegrityError
+
+from rest_framework.views import APIView
+from rest_framework.permissions import IsAuthenticated,AllowAny
+
+from config import settings
+from db.models import AddressMaster, PinCode, Product, DisplayProduct, Order, OrderProducts, Payment, OrderTimeLines
+from enums.store import OrderStatus
+from mixins.drf_views import CustomResponse
+from utils.store import generate_order_id
+
+
+class AddressAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self,request):
+        data = request.data
+        required_fields = ["mobile","name","address_name","address_type","full_address",
+                           "house_number","country","city","state","area","pin_code","landmark",
+                           "is_default"
+
+                           ]
+        for field in required_fields:
+            if not data.get(field):
+                return CustomResponse.errorResponse(description=f"{field} is required")
+
+        if data.get("is_default"):
+            AddressMaster.objects.filter(user_id=request.user.id,is_default = True).update(is_default = False)
+
+        AddressMaster.objects.create(
+            user_id = request.user.id,
+            mobile = data.get("mobile"),
+            name = data.get("name"),
+            address_name = data.get("address_name"),
+            address_type = data.get("address_type"),
+            full_address = data.get("full_address"),
+            house_number = data.get("house_number"),
+            country = data.get("country"),
+            city = data.get("city"),
+            state = data.get("state"),
+            area = data.get("area"),
+            pin_code = data.get("pin_code"),
+            landmark = data.get("landmark"),
+            is_default = data.get("is_default"),
+
+        )
+        return CustomResponse.successResponse(data={},description="address created successfully")
+    def get(self,request,id=None):
+        if id:
+            address = AddressMaster.objects.filter(id=id,user_id=request.user.id).first()
+            if not address:
+                return CustomResponse.errorResponse(description="address not found")
+
+            return CustomResponse.successResponse(data=[self._address_dict(address)],total=1)
+        addresses = AddressMaster.objects.filter(user_id = request.user.id).order_by("-created_at")
+
+        data = []
+        for addres in addresses:
+            data.append(self._address_dict(addres))
+        return CustomResponse.successResponse(data=data,total = len(data))
+
+    def put(self,request,id=None):
+        if not id:
+            return CustomResponse.errorResponse(description="address id required")
+
+        address = AddressMaster.objects.filter(id=id,user_id=request.user.id).first()
+
+        if not address:
+            return CustomResponse.errorResponse(description="address not found")
+
+        if request.data.get("is_default"):
+            AddressMaster.objects.filter(user_id = request.user.id,is_default = True).exclude(id=id).update(is_default= False)
+            for field in [
+                "mobile", "name", "address_name", "address_type",
+                "full_address", "house_number", "country", "city",
+                "state", "area", "pin_code", "landmark", "is_default"
+            ]:
+                setattr(address,field,request.data.get(field))
+
+            address.save()
+
+            return CustomResponse.successResponse(data={},description="address updated successfully")
+    def delete(self,request,id=None):
+        if not id:
+            return CustomResponse.errorResponse(description="id is required")
+
+        address = AddressMaster.objects.filter(id=id,user_id = request.user.id).first()
+        if not address:
+            return CustomResponse.errorResponse(description="address not found")
+
+        address.delete()
+        return CustomResponse.successResponse(data={},description="address deleted successfully")
+
+    def _address_dict(self, address):
+        return {
+            "id": str(address.id),
+            "mobile": address.mobile,
+            "name": address.name,
+            "address_name": address.address_name,
+            "address_type": address.address_type,
+            "full_address": address.full_address,
+            "house_number": address.house_number,
+            "country": address.country,
+            "city": address.city,
+            "state": address.state,
+            "area": address.area,
+            "pin_code": address.pin_code,
+            "landmark": address.landmark,
+            "is_default": address.is_default,
+        }
+
+
+class PinListView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self,request):
+        pin = request.query_params.get("pincode")
+
+        if not pin:
+            return CustomResponse.errorResponse(description="pin required")
+
+        pin = PinCode.objects.filter(pin=pin).first()
+        if not pin:
+            return CustomResponse.errorResponse(description="pin not found")
+
+        data = {
+            "id" :str(pin.id),
+            "pin":pin.pin,
+            "state":pin.state,
+            "city":pin.city,
+            "area":pin.area
+        }
+
+        return CustomResponse.successResponse(data=[data],total=1)
+
+# class ProductAPIView(APIView):
+#     permission_classes = [AllowAny]
+#
+#     def get(self, request):
+#         category = request.query_params.get("category")
+#
+#         if not category:
+#             return CustomResponse.errorResponse(
+#                 description="category is required"
+#             )
+#
+#         #  Filter display products by category
+#         display_products = (
+#             DisplayProduct.objects
+#             .filter(is_active=True, category__contains=[category])
+#             .order_by("-created_at")
+#         )
+#
+#         if not display_products.exists():
+#             return CustomResponse.successResponse(
+#                 data=[],
+#                 total=0,
+#                 description="No products found for this category"
+#             )
+#
+#         response_data = []
+#
+#         for dp in display_products:
+#             #  Fetch variant products
+#             variants = []
+#             if dp.variant_product_id:
+#                 variant_qs = Product.objects.filter(
+#                     id__in=dp.variant_product_id
+#                 )
+#
+#                 for v in variant_qs:
+#                     variants.append({
+#                         "id": str(v.id),
+#                         "name": v.name,
+#                         "size": v.size,
+#                         "colour": v.colour,
+#                         "mrp": v.mrp,
+#                         "selling_price": v.selling_price,
+#                         "gst_percentage": v.gst_percentage,
+#                         "gst_amount": v.gst_amount,
+#                         "current_stock": v.current_stock,
+#                         "images": v.images,
+#                         "videos": v.videos,
+#                         "thumbnail_image": v.thumbnail_image,
+#                     })
+#
+#             # Display product payload
+#             response_data.append({
+#                 "display_product_id": str(dp.id),
+#                 "product_name": dp.product_name,
+#                 "product_tagline": dp.product_tagline,
+#                 "description": dp.description,
+#                 "highlights": dp.highlights,
+#                 "category": dp.category,
+#                 "gender": dp.gender,
+#                 "age": dp.age,
+#                 "rating": dp.rating,
+#                 "number_of_reviews": dp.number_of_reviews,
+#                 "tags": dp.tags,
+#                 "search_tags": dp.search_tags,
+#                 "variants": variants,
+#             })
+#
+#         return CustomResponse.successResponse(
+#             data=response_data,
+#             total=len(response_data),
+#             description="Products fetched successfully"
+#         )
+
+
+class ProductListAPIView(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        category = request.query_params.get("category")
+        page = int(request.query_params.get("page", 1))
+        page_size = int(request.query_params.get("page_size", 10))
+        min_price = request.query_params.get("min_price")
+        max_price = request.query_params.get("max_price")
+        tag = request.query_params.get("tag")
+        sort = request.query_params.get("sort")
+
+        queryset = DisplayProduct.objects.filter(
+            # is_active=True,
+            # has_stock=True
+        )
+
+        if category:
+            queryset = queryset.filter(category__contains=[category])
+
+        if min_price:
+            queryset = queryset.filter(starting_price__gte=min_price)
+
+        if max_price:
+            queryset = queryset.filter(starting_price__lte=max_price)
+
+        if tag:
+            queryset = queryset.filter(search_tags__icontains=tag)
+
+        if sort == "price_asc":
+            queryset = queryset.order_by("starting_price")
+        elif sort == "price_desc":
+            queryset = queryset.order_by("-starting_price")
+        elif sort == "rating":
+            queryset = queryset.order_by("-rating")
+        else:
+            queryset = queryset.order_by("-created_at")
+
+        total = queryset.count()
+        offset = (page - 1) * page_size
+        queryset = queryset[offset:offset + page_size]
+
+        data = []
+        for p in queryset:
+            data.append({
+                "id": str(p.id),
+                "product_name": p.product_name,
+                "product_tagline": p.product_tagline,
+                "starting_price": p.starting_price,
+                "rating": p.rating,
+                "thumbnail_image": p.thumbnail_image,
+                "has_stock": p.has_stock,
+            })
+
+        return CustomResponse.successResponse(
+            data=data,
+            total=total
+        )
+
+
+class ProductDetailAPIView(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request, id):
+        display_product = DisplayProduct.objects.filter(
+            id=id,
+            is_active=True
+        ).first()
+
+        if not display_product:
+            return CustomResponse.errorResponse(
+                description="Product not found"
+            )
+
+        variants = Product.objects.filter(
+            id__in=display_product.variant_product_ids,
+            current_stock__gt=0
+        )
+
+        variant_data = []
+        for v in variants:
+            variant_data.append({
+                "variant_id": str(v.id),
+                "size": v.size,
+                "colour": v.colour,
+                "price": v.selling_price,
+                "stock": v.current_stock,
+                "images": v.images,
+            })
+
+        return CustomResponse.successResponse(
+            data={
+                "product_id": str(display_product.id),
+                "product_name": display_product.product_name,
+                "description": display_product.description,
+                "rating": display_product.rating,
+                "variants": variant_data,
+            }
+        )
+#
+# class InitiateOrder(APIView):
+#
+#     permission_classes = [IsAuthenticated]
+#
+#     def post(self, request):
+#         user = request.user
+#         order_id = generate_order_id()
+#         payload = request.data
+#         address = payload.get("address", {})
+#         products = payload.get("products", [])
+#         selling_price = payload.get("selling_price", 0)
+#         coupon_discount = payload.get("coupon_discount", 0)
+#         wallet_paid = payload.get("wallet_paid", 0)
+#         amount = payload.get("amount", 0)
+#         # create record in order table
+#         order = Order()
+#         order.order_id = order_id
+#         order.user_id = user.id
+#         order.address = address
+#         order.selling_price = selling_price
+#         order.coupon_discount = coupon_discount
+#         order.wallet_paid = wallet_paid
+#         order.amount = amount
+#         order.status = OrderStatus.INITIATED
+#         # create record in order_products
+#         for item in products:
+#             o_product = OrderProducts()
+#             o_product.order_id = order_id
+#             product = Product.object.filter(id=item["product_id"]).first()
+#             if not product:
+#                 return CustomResponse().errorResponse(data={}, description="Something wrong with product selection")
+#             product_ratio = product.selling_price / selling_price
+#             product_discount = coupon_discount * product_ratio
+#             product_wallet = wallet_paid * product_ratio
+#             product_online = amount * product_ratio
+#             product_total = product.selling_price * item["qty"]
+#             taxable_amount = product_total - product_discount - product_wallet
+#             base_amount = taxable_amount / (1 + product.gst_percentage)
+#             gst_amount = taxable_amount - base_amount
+#             o_product.product_id = product.id
+#             o_product.sku = product.sku
+#             o_product.qty = item["qty"]
+#             o_product.mrp = item.mrp
+#             o_product.selling_price = product.selling_price
+#             o_product.Apportioned_discount = product_discount
+#             o_product.Apportioned_wallet = product_wallet
+#             o_product.Apportioned_gst = gst_amount
+#             o_product.Apportioned_online = product_online
+#             o_product.save()
+#         order.save()
+#
+#         # create record in payment table
+#         payment = Payment()
+#         payment.order_id = order_id
+#         payment.amount = amount
+#         payment.user_id = user.id
+#         payment.mobile = user.mobile
+#         payment.email = user.email
+#         # contact cashfree
+#         payment_resp = initiateOrder(user, amount, order_id,)
+#         payment.session_id = payment_resp["cf_order_id"]
+#         payment.txn_id = payment_resp["payment_session_id"]
+#         payment.save()
+#         # create record in timeline
+#
+#         timeline = OrderTimeLines()
+#         timeline.order_id = order_id
+#         timeline.status = OrderStatus.INITIATED
+#         timeline.remarks = payload.get("remarks")
+#
+#
+#
+#         # prepare the response
+#         return CustomResponse().successResponse(data=payment_resp, description="Order initiated. Please continue the payment flow")
+
+class InitiateOrder(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        user = request.user
+        payload = request.data
+
+        order_id = generate_order_id()
+        address = payload.get("address", {})
+        products = payload.get("products", [])
+        selling_price = payload.get("selling_price", 0)
+        coupon_discount = payload.get("coupon_discount", 0)
+        wallet_paid = payload.get("wallet_paid", 0)
+        amount = payload.get("amount", 0)
+
+        if not products:
+            return CustomResponse().errorResponse(description="Products required")
+
+        try:
+            with transaction.atomic():
+
+                #  Create Order
+                order = Order.objects.create(
+                    order_id=order_id,
+                    user_id=user.id,
+                    address=address,
+                    selling_price=selling_price,
+                    coupon_discount=coupon_discount,
+                    wallet_paid=wallet_paid,
+                    amount=amount,
+                    status=OrderStatus.INITIATED
+                )
+
+                #  Create Order Products
+                for item in products:
+                    product = Product.objects.filter(id=item["product_id"]).first()
+                    if not product:
+                        raise ValueError("Invalid product selected")
+
+                    product_ratio = product.selling_price / selling_price
+                    product_discount = coupon_discount * product_ratio
+                    product_wallet = wallet_paid * product_ratio
+                    product_online = amount * product_ratio
+
+                    product_total = product.selling_price * item["qty"]
+                    taxable_amount = product_total - product_discount - product_wallet
+                    base_amount = taxable_amount / (1 + product.gst_percentage)
+                    gst_amount = taxable_amount - base_amount
+
+                    OrderProducts.objects.create(
+                        order=order,
+                        product_id=product.id,
+                        sku=product.sku,
+                        qty=item["qty"],
+                        mrp=product.mrp,
+                        selling_price=product.selling_price,
+                        Apportioned_discount=product_discount,
+                        Apportioned_wallet=product_wallet,
+                        Apportioned_gst=gst_amount,
+                        Apportioned_online=product_online
+                    )
+
+                #  Create Order Timeline
+                OrderTimeLines.objects.create(
+                    order=order,
+                    status=OrderStatus.INITIATED,
+                    remarks=payload.get("remarks", "Order initiated")
+                )
+
+                #  Create Payment
+                payment = Payment.objects.create(
+                    order=order,
+                    amount=amount,
+                    user_id=user.id,
+                    mobile=user.mobile,
+                    email=user.email,
+                )
+
+            #  Outside atomic block → call Cashfree
+            payment_resp = initiateOrder(user, amount, order_id)
+
+            payment.session_id = payment_resp["cf_order_id"]
+            payment.txn_id = payment_resp["payment_session_id"]
+            payment.save(update_fields=["session_id", "txn_id"])
+
+            return CustomResponse().successResponse(
+                data=payment_resp,
+                description="Order initiated. Please continue payment"
+            )
+
+        except Exception as e:
+            return CustomResponse().errorResponse(
+                description=str(e) or "Failed to initiate order"
+            )
+
+def initiateOrder(user, amount, order_id,cashfree):
+    """
+    Initiate payment using school-specific CashFree credentials from the database.
+    """
+    # --- Prepare payload ---
+    payload = {
+        "order_currency": "INR",
+        "order_amount": float(amount),
+        "order_id": str(order_id),
+        "customer_details": {
+            "customer_id": str(user.id),
+            "customer_phone": str(user.mobile),
+            "customer_name": str(user.username),
+        },
+        "order_meta": {
+            "notify_url": settings.CASHFREE_WEBHOOK,
+        },
+    }
+
+    # --- Prepare headers ---
+    headers = {
+        "x-api-version": settings.CASHFREE_API_VERSION,
+        "x-client-id": cashfree.client_id,
+        "x-client-secret": cashfree.client_secret,
+        "Content-Type": "application/json",
+    }
+
+
+    try:
+        # --- Send request to CashFree ---
+        response = requests.post(cashfree.url, json=payload, headers=headers, timeout=15)
+
+
+        # --- Validate response ---
+        if response.status_code == 200:
+            resp_json = response.json()
+            cf_order_id = resp_json.get("cf_order_id")
+            session_id = resp_json.get("payment_session_id")
+
+            if cf_order_id and session_id:
+                return {
+                    "cf_order_id": cf_order_id,
+                    "payment_session_id": session_id,
+                }
+            else:
+                raise Exception("Couldnot found cf_order_id and payment_session_id")
+        else:
+            raise Exception("Response code is not 200")
+    except Exception as e:
+        raise Exception(e)
+
+

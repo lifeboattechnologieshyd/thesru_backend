@@ -31,6 +31,7 @@ class User(AbstractBaseUser):
     profile_image = models.CharField(max_length=400, null=True)
     email = models.EmailField(max_length=100, null=True)
     referral_code = models.CharField(max_length=20, null=True)
+    wallet_balance = models.DecimalField(max_digits=12,decimal_places=2,default=0.00)
     mobile = models.BigIntegerField(
         validators=[MinValueValidator(1000000000), MaxValueValidator(9999999999)], null=True
     )
@@ -75,3 +76,16 @@ class UserOTP(AuditModel):
             models.Index(fields=["mobile", "expires_at", "otp"]),
             models.Index(fields=["email", "expires_at", "otp"]),
         ]
+
+
+class Store(AuditModel):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    name = models.CharField(max_length=100)
+    mobile = models.CharField(max_length=20)
+    address = models.CharField(max_length=100)
+    logo = models.CharField(max_length=300)
+    gst_number = models.CharField(max_length=100)
+
+    class Meta:
+        db_table = "store"
+
