@@ -7,8 +7,9 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('db', '0023_addressmaster_alter_inventory_type'),
+        ('db', '0001_initial'),
     ]
+
 
     operations = [
         migrations.CreateModel(
