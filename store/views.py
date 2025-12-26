@@ -232,23 +232,23 @@ class ProductListAPIView(APIView):
         if category:
             queryset = queryset.filter(category__contains=[category])
 
-        if min_price:
-            queryset = queryset.filter(starting_price__gte=min_price)
+        # if min_price:
+        #     queryset = queryset.filter(starting_price__gte=min_price)
+        #
+        # if max_price:
+        #     queryset = queryset.filter(starting_price__lte=max_price)
+        #
+        # if tag:
+        #     queryset = queryset.filter(search_tags__icontains=tag)
 
-        if max_price:
-            queryset = queryset.filter(starting_price__lte=max_price)
-
-        if tag:
-            queryset = queryset.filter(search_tags__icontains=tag)
-
-        if sort == "price_asc":
-            queryset = queryset.order_by("starting_price")
-        elif sort == "price_desc":
-            queryset = queryset.order_by("-starting_price")
-        elif sort == "rating":
-            queryset = queryset.order_by("-rating")
-        else:
-            queryset = queryset.order_by("-created_at")
+        # if sort == "price_asc":
+        #     queryset = queryset.order_by("starting_price")
+        # elif sort == "price_desc":
+        #     queryset = queryset.order_by("-starting_price")
+        # elif sort == "rating":
+        #     queryset = queryset.order_by("-rating")
+        # else:
+        #     queryset = queryset.order_by("-created_at")
 
         total = queryset.count()
         offset = (page - 1) * page_size
@@ -260,7 +260,7 @@ class ProductListAPIView(APIView):
                 "id": str(p.id),
                 "product_name": p.product_name,
                 "product_tagline": p.product_tagline,
-                "starting_price": p.starting_price,
+                # "starting_price": p.starting_price,
                 "rating": p.rating,
                 "thumbnail_image": p.thumbnail_image,
                 # "has_stock": p.has_stock,
