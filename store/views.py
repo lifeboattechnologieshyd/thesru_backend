@@ -225,7 +225,7 @@ class ProductListAPIView(APIView):
         sort = request.query_params.get("sort")
 
         queryset = DisplayProduct.objects.filter(
-            # is_active=True,
+            is_active=True,
             # has_stock=True
         )
 
