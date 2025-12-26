@@ -7,7 +7,8 @@ from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated,AllowAny
 
 from django.conf import settings
-from db.models import AddressMaster, PinCode, Product, DisplayProduct, Order, OrderProducts, Payment, OrderTimeLines
+from db.models import AddressMaster, PinCode, Product, DisplayProduct, Order, OrderProducts, Payment, OrderTimeLines, \
+    Banner, Category
 from enums.store import OrderStatus
 from mixins.drf_views import CustomResponse
 from utils.store import generate_order_id
@@ -557,3 +558,89 @@ class OrderView(APIView):
             data=orders,
             total=len(orders)
         )
+
+
+class BannerListView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, id=None):
+        action = request.query_params.get("action")
+
+        # BASE QUERY → only active banners
+        queryset = Banner.objects.filter(is_active=True)
+
+        #  ACTION FILTER (optional)
+        if action is not None:
+            if action.lower() == "true":
+                queryset = queryset.filter(action=True)
+            elif action.lower() == "false":
+                queryset = queryset.filter(action=False)
+
+        #  SINGLE BANNER (active only)
+        if id:
+            banner = (
+                queryset
+                .filter(id=id)
+                .values()
+                .first()
+            )
+
+            if not banner:
+                return CustomResponse.errorResponse(
+                    description="Active banner not found"
+                )
+
+            return CustomResponse.successResponse(
+                data=[banner],
+                total=1
+            )
+
+        # LIST BANNERS
+        banners = queryset.order_by("-created_at").values()
+        data = list(banners)
+
+        return CustomResponse.successResponse(
+            data=data,
+            total=len(data)
+        )
+
+
+class CategoryListView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, id=None):
+
+        #  SINGLE CATEGORY (only active)
+        if id:
+            category = (
+                Category.objects
+                .filter(id=id, is_active=True)
+                .values()
+                .first()
+            )
+
+            if not category:
+                return CustomResponse.errorResponse(
+                    description="Active category not found"
+                )
+
+            return CustomResponse.successResponse(
+                data=[category],
+                total=1
+            )
+
+        #  LIST ALL ACTIVE CATEGORIES
+        categories = (
+            Category.objects
+            .filter(is_active=True)
+            .order_by("-created_at")
+            .values()
+        )
+
+        data = list(categories)
+
+        return CustomResponse.successResponse(
+            data=data,
+            total=len(data)
+        )
+
