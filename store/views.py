@@ -263,7 +263,7 @@ class ProductListAPIView(APIView):
                 "starting_price": p.starting_price,
                 "rating": p.rating,
                 "thumbnail_image": p.thumbnail_image,
-                "has_stock": p.has_stock,
+                # "has_stock": p.has_stock,
             })
 
         return CustomResponse.successResponse(
