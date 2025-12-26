@@ -32,7 +32,7 @@ class ProductAPIView(APIView):
             mrp_others = data.get("mrp_others"),
             selling_price_others = data.get("selling_price_others"),
             inr = data.get("inr"),
-            product_id = data.get("product_id"),
+            sku = data.get("sku"),
             gst_percentage = data.get("gst_percentage"),
             gst_amount = data.get("gst_amount"),
             current_stock = data.get("current_stock"),
