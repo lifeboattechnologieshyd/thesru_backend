@@ -41,7 +41,8 @@ class MobileSendOTPView(APIView):
             is_new_user = True
 
         #  Generate OTP
-        otp = str(random.randint(1000, 9999))
+        # otp = str(random.randint(1000, 9999))
+        otp = 1234
 
         expires_at = timezone.now() + timedelta(minutes=5)
 

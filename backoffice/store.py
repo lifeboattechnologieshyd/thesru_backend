@@ -40,7 +40,7 @@ class ProductAPIView(APIView):
             videos = data.get("videos"),
             thumbnail_image = data.get("thumbnail_image")
         )
-        return CustomResponse.successResponse(data={},description="product created successfully")
+        return CustomResponse().successResponse(data={},description="product created successfully")
 
     def get(self, request, id=None):
         #  single product

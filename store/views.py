@@ -6,7 +6,7 @@ from django.db import IntegrityError
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated,AllowAny
 
-from config import settings
+from django.conf import settings
 from db.models import AddressMaster, PinCode, Product, DisplayProduct, Order, OrderProducts, Payment, OrderTimeLines
 from enums.store import OrderStatus
 from mixins.drf_views import CustomResponse
@@ -420,7 +420,12 @@ class InitiateOrder(APIView):
                 )
 
                 #  Create Order Products
+                print("PRODUCTS:", products)
+                print("TYPE:", type(products))
+
                 for item in products:
+                    print("ITEM:", item, type(item))
+
                     product = Product.objects.filter(id=item["product_id"]).first()
                     if not product:
                         raise ValueError("Invalid product selected")
@@ -464,12 +469,13 @@ class InitiateOrder(APIView):
                     email=user.email,
                 )
 
-            #  Outside atomic block → call Cashfree
-            payment_resp = initiateOrder(user, amount, order_id)
+                payment_resp = initiateOrder(user, amount, order_id)
 
-            payment.session_id = payment_resp["cf_order_id"]
-            payment.txn_id = payment_resp["payment_session_id"]
-            payment.save(update_fields=["session_id", "txn_id"])
+                payment.session_id = payment_resp["cf_order_id"]
+                payment.txn_id = payment_resp["payment_session_id"]
+                payment.save(update_fields=["session_id", "txn_id"])
+
+
 
             return CustomResponse().successResponse(
                 data=payment_resp,
@@ -526,10 +532,28 @@ def initiateOrder(user, amount, order_id,cashfree):
                     "payment_session_id": session_id,
                 }
             else:
-                raise Exception("Couldnot found cf_order_id and payment_session_id")
+                raise Exception("Could not found cf_order_id and payment_session_id")
         else:
             raise Exception("Response code is not 200")
     except Exception as e:
         raise Exception(e)
 
 
+class OrderView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        user = request.user
+        status = request.query_params.get("status")
+
+        orders_qs = Order.objects.filter(user_id=user.id).order_by("-created_at")
+
+        if status:
+            orders_qs = orders_qs.filter(status=status)
+
+        orders = list(orders_qs.values())
+
+        return CustomResponse().successResponse(
+            data=orders,
+            total=len(orders)
+        )
