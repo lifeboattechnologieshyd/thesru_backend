@@ -561,7 +561,7 @@ class OrderView(APIView):
 
 
 class BannerListView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
 
     def get(self, request, id=None):
         action = request.query_params.get("action")
@@ -606,7 +606,7 @@ class BannerListView(APIView):
 
 
 class CategoryListView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
 
     def get(self, request, id=None):
 
