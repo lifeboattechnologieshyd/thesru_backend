@@ -156,7 +156,7 @@ class DisplayProductAPIView(APIView):
                 data={
                     "id": str(product.id),
                     "default_product_id": str(product.default_product_id),
-                    "variant_product_id": product.variant_product_id,
+                    "variant_product_id": product.variant_product_id or [],
                     "category": product.category,
                     "gender": product.gender,
                     "tags": product.tags,
@@ -180,6 +180,7 @@ class DisplayProductAPIView(APIView):
             data.append({
                 "id": str(product.id),
                 "default_product_id": str(product.default_product_id),
+                "variant_product_id": product.variant_product_id or [],
                 "product_name": product.product_name,
                 "product_tagline": product.product_tagline,
                 "category": product.category,
