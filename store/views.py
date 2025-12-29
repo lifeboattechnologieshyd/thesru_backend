@@ -219,52 +219,41 @@ class ProductListAPIView(APIView):
         category = request.query_params.get("category")
         page = int(request.query_params.get("page", 1))
         page_size = int(request.query_params.get("page_size", 10))
-        min_price = request.query_params.get("min_price")
-        max_price = request.query_params.get("max_price")
-        tag = request.query_params.get("tag")
-        sort = request.query_params.get("sort")
+
 
         queryset = DisplayProduct.objects.filter(
             is_active=True,
-            # has_stock=True
         )
 
         if category:
             queryset = queryset.filter(category__contains=[category])
 
-        # if min_price:
-        #     queryset = queryset.filter(starting_price__gte=min_price)
-        #
-        # if max_price:
-        #     queryset = queryset.filter(starting_price__lte=max_price)
-        #
-        # if tag:
-        #     queryset = queryset.filter(search_tags__icontains=tag)
 
-        # if sort == "price_asc":
-        #     queryset = queryset.order_by("starting_price")
-        # elif sort == "price_desc":
-        #     queryset = queryset.order_by("-starting_price")
-        # elif sort == "rating":
-        #     queryset = queryset.order_by("-rating")
-        # else:
-        #     queryset = queryset.order_by("-created_at")
 
         total = queryset.count()
         offset = (page - 1) * page_size
         queryset = queryset[offset:offset + page_size]
 
         data = []
-        for p in queryset:
+        for product in queryset:
             data.append({
-                "id": str(p.id),
-                "product_name": p.product_name,
-                "product_tagline": p.product_tagline,
-                # "starting_price": p.starting_price,
-                "rating": p.rating,
-                # "thumbnail_image": p.thumbnail_image,
-                # "has_stock": p.has_stock,
-            })
+                    "id": str(product.id),
+                    "default_product_id": str(product.default_product_id),
+                    "variant_product_id": product.variant_product_id or [],
+                    "category": product.category,
+                    "gender": product.gender,
+                    "tags": product.tags,
+                    "search_tags": product.search_tags,
+                    "product_name": product.product_name,
+                    "product_tagline": product.product_tagline,
+                    "age": product.age,
+                    "description": product.description,
+                    "highlights": product.highlights,
+                    "rating": product.rating,
+                    "number_of_reviews": product.number_of_reviews,
+                    "is_active": product.is_active,
+                    "created_at": product.created_at,
+                })
 
         return CustomResponse.successResponse(
             data=data,
