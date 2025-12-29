@@ -264,9 +264,10 @@ class ProductListAPIView(APIView):
 class ProductDetailAPIView(APIView):
     permission_classes = [AllowAny]
 
-    def get(self, request, id):
+    def get(self, request, default_product_id):
+        #  Fetch DisplayProduct using default_product_id
         display_product = DisplayProduct.objects.filter(
-            id=id,
+            id=default_product_id,
             is_active=True
         ).first()
 
@@ -275,31 +276,61 @@ class ProductDetailAPIView(APIView):
                 description="Product not found"
             )
 
+        #  Fetch Variant Products
         variants = Product.objects.filter(
-            id__in=display_product.variant_product_ids,
-            current_stock__gt=0
+            id__in=display_product.variant_product_id or []
         )
 
         variant_data = []
         for v in variants:
             variant_data.append({
-                "variant_id": str(v.id),
+                "id": str(v.id),
+                "sku": v.sku,
+                "name": v.name,
                 "size": v.size,
                 "colour": v.colour,
-                "price": v.selling_price,
-                "stock": v.current_stock,
+                "mrp": v.mrp,
+                "selling_price": v.selling_price,
+                "mrp_others": v.mrp_others,
+                "selling_price_others": v.selling_price_others,
+                "inr": v.inr,
+                "gst_percentage": v.gst_percentage,
+                "gst_amount": v.gst_amount,
+                "current_stock": v.current_stock,
                 "images": v.images,
+                "videos": v.videos,
+                "thumbnail_image": v.thumbnail_image,
+                "created_at": v.created_at,
+                "updated_at": v.updated_at,
             })
 
         return CustomResponse.successResponse(
             data={
-                "product_id": str(display_product.id),
+                #  DISPLAY PRODUCT
+                "id": str(display_product.id),
+                "default_product_id": str(display_product.default_product_id),
+                "variant_product_id": display_product.variant_product_id or [],
+                "is_active": display_product.is_active,
+                "category": display_product.category,
+                "gender": display_product.gender,
+                "tags": display_product.tags,
+                "search_tags": display_product.search_tags,
                 "product_name": display_product.product_name,
+                "product_tagline": display_product.product_tagline,
+                "age": display_product.age,
                 "description": display_product.description,
+                "highlights": display_product.highlights,
                 "rating": display_product.rating,
-                "variants": variant_data,
-            }
+                "number_of_reviews": display_product.number_of_reviews,
+                "created_at": display_product.created_at,
+                "updated_at": display_product.updated_at,
+
+                #  VARIANTS
+                "variants": variant_data
+            },
+            description="Product details fetched successfully"
         )
+
 #
 # class InitiateOrder(APIView):
 #
