@@ -138,56 +138,65 @@ class DisplayProductAPIView(APIView):
         return CustomResponse.successResponse(data={},description="display product created successfully")
 
 
+
+
+
+
     def get(self, request, id=None):
-        queryset = DisplayProduct.objects.all()
+        queryset = DisplayProduct.objects.filter(is_active = True)
 
         if id:
-            inv = queryset.filter(id=id).first()
-            if not inv:
+            product = queryset.filter(id=id).first()
+            if not product:
                 return CustomResponse().errorResponse(
-                    description="Inventory not found"
+                    description="display product not found"
                 )
 
             return CustomResponse().successResponse(
                 data={
-                    "id": str(inv.id),
-                    "product_id": str(inv.product_id),
-                    "sku": inv.sku,
-                    "type": inv.type,
-                    "date": inv.date,
-                    "user": str(inv.user),
-                    "quantity": inv.quantity,
-                    "quantity_before": inv.quantity_before,
-                    "quantity_after": inv.quantity_after,
-                    "purchase_rate_per_item": inv.purchase_rate_per_item,
-                    "purchase_price": inv.purchase_price,
-                    "sale_rate_per_item": inv.sale_rate_per_item,
-                    "sale_price": inv.sale_price,
-                    "gst_input": inv.gst_input,
-                    "gst_output": inv.gst_output,
-                    "remarks": inv.remarks,
-                    "created_at": inv.created_at,
+                    "id": str(product.id),
+                    "default_product_id": str(product.default_product_id),
+                    "variant_product_id": product.variant_product_id,
+                    "category": product.category,
+                    "gender": product.gender,
+                    "tags": product.tags,
+                    "search_tags": product.search_tags,
+                    "product_name": product.product_name,
+                    "product_tagline": product.product_tagline,
+                    "age": product.age,
+                    "description": product.description,
+                    "highlights": product.highlights,
+                    "rating": product.rating,
+                    "number_of_reviews": product.number_of_reviews,
+                    "is_active": product.is_active,
+                    "created_at": product.created_at,
                 },
                 total=1
             )
 
+            #  LIST DISPLAY PRODUCTS
         data = []
-        for inv in queryset.order_by("-created_at"):
+        for product in queryset.order_by("-created_at"):
             data.append({
-                "id": str(inv.id),
-                "product_id": str(inv.product_id),
-                "sku": inv.sku,
-                "type": inv.type,
-                "quantity": inv.quantity,
-                "quantity_before": inv.quantity_before,
-                "quantity_after": inv.quantity_after,
-                "created_at": inv.created_at,
+                "id": str(product.id),
+                "default_product_id": str(product.default_product_id),
+                "product_name": product.product_name,
+                "product_tagline": product.product_tagline,
+                "category": product.category,
+                "gender": product.gender,
+                "rating": product.rating,
+                "number_of_reviews": product.number_of_reviews,
+                "created_at": product.created_at,
             })
 
         return CustomResponse().successResponse(
             data=data,
             total=len(data)
         )
+
+
+
+
     def put(self, request, id=None):
         if not id:
             return CustomResponse().errorResponse(description="display product id is required")
