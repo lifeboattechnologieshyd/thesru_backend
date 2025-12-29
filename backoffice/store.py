@@ -139,7 +139,7 @@ class DisplayProductAPIView(APIView):
 
 
     def get(self, request, id=None):
-        queryset = Inventory.objects.all()
+        queryset = DisplayProduct.objects.all()
 
         if id:
             inv = queryset.filter(id=id).first()
