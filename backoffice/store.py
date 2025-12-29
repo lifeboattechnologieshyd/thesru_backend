@@ -1,6 +1,6 @@
 from unicodedata import category
 from django.db import transaction
-
+from django.db import IntegrityError
 from rest_framework.views import APIView
 from django.utils import timezone
 
@@ -23,25 +23,40 @@ class ProductAPIView(APIView):
                 return CustomResponse().errorResponse(
                     description=f"{field} is required"
                 )
-        Product.objects.create(
-            name = data.get("name"),
-            size = data.get("size"),
-            colour = data.get("colour"),
-            mrp = data.get("mrp"),
-            selling_price = data.get("selling_price"),
-            mrp_others = data.get("mrp_others"),
-            selling_price_others = data.get("selling_price_others"),
-            inr = data.get("inr"),
-            sku = data.get("sku"),
-            gst_percentage = data.get("gst_percentage"),
-            gst_amount = data.get("gst_amount"),
-            current_stock = data.get("current_stock"),
-            images = data.get("images"),
-            videos = data.get("videos"),
-            thumbnail_image = data.get("thumbnail_image")
-        )
-        return CustomResponse().successResponse(data={},description="product created successfully")
+        try:
+            Product.objects.create(
+                name=data.get("name"),
+                size=data.get("size"),
+                colour=data.get("colour"),
+                mrp=data.get("mrp"),
+                selling_price=data.get("selling_price"),
+                mrp_others=data.get("mrp_others"),
+                selling_price_others=data.get("selling_price_others"),
+                inr=data.get("inr"),
+                sku=data.get("sku"),
+                gst_percentage=data.get("gst_percentage"),
+                gst_amount=data.get("gst_amount"),
+                current_stock=data.get("current_stock"),
+                images=data.get("images"),
+                videos=data.get("videos"),
+                thumbnail_image=data.get("thumbnail_image")
+            )
 
+            return CustomResponse.successResponse(
+                data={},
+                description="Product created successfully"
+            )
+
+        except IntegrityError as e:
+            # Handle duplicate SKU error
+            if "product_sku_key" in str(e):
+                return CustomResponse.errorResponse(
+                    description="Product with this SKU already exists"
+                )
+
+            return CustomResponse.errorResponse(
+                description="Database integrity error"
+            )
     def get(self, request, id=None):
         #  single product
         if id:
