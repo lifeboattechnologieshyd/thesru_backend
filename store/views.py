@@ -1,3 +1,4 @@
+import uuid
 from unicodedata import category
 import requests
 from django.db import transaction
@@ -280,7 +281,21 @@ class ProductListAPIView(APIView):
 
 
         if categories:
-            category_list = [c.strip() for c in categories.split(",") if c.strip()]
+            category_list = []
+
+            for c in categories.split(","):
+                c = c.strip()
+                if not c:
+                    continue
+                try:
+                    # Validate UUID
+                    uuid.UUID(c)
+                    category_list.append(c)
+                except ValueError:
+                    return CustomResponse.errorResponse(
+                        description=f"Invalid category UUID: {c}"
+                    )
+
             queryset = queryset.filter(category__overlap=category_list)
 
 
