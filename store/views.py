@@ -364,10 +364,10 @@ class ProductListAPIView(APIView):
 class ProductDetailAPIView(APIView):
     permission_classes = [AllowAny]
 
-    def get(self, request, default_product_id):
+    def get(self, request, id):
         #  Fetch DisplayProduct using default_product_id
         display_product = DisplayProduct.objects.filter(
-            id=default_product_id,
+            default_product_id=id,
             is_active=True
         ).first()
 
