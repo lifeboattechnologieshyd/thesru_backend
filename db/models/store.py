@@ -113,7 +113,7 @@ class AddressMaster(AuditModel):
     state = models.CharField(max_length=25)
     area = models.CharField(max_length=100)
     pin_code = models.CharField(max_length=10)
-    landmark = models.CharField(max_length=100,null=True)
+    landmark = models.CharField(max_length=100,null=True,blank=True)
     is_default = models.BooleanField(default=False)
 
     class Meta:

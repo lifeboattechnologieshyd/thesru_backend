@@ -20,7 +20,7 @@ class AddressAPIView(APIView):
     def post(self,request):
         data = request.data
         required_fields = ["mobile","name","address_name","address_type","full_address",
-                           "house_number","country","city","state","area","pin_code","landmark",
+                           "house_number","country","city","state","area","pin_code",
                            "is_default"
 
                            ]
