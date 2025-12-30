@@ -212,48 +212,151 @@ class PinListView(APIView):
 #         )
 
 
+# class ProductListAPIView(APIView):
+#     permission_classes = [AllowAny]
+#
+#     def get(self, request):
+#         category = request.query_params.get("category")
+#         page = int(request.query_params.get("page", 1))
+#         page_size = int(request.query_params.get("page_size", 10))
+#
+#
+#         queryset = DisplayProduct.objects.filter(
+#             is_active=True,
+#         )
+#
+#         if category:
+#             queryset = queryset.filter(category__contains=[category])
+#         #     gender,tags,
+#
+#
+#
+#         total = queryset.count()
+#         offset = (page - 1) * page_size
+#         queryset = queryset[offset:offset + page_size]
+#
+#         data = []
+#         for product in queryset:
+#             data.append({
+#                     "id": str(product.id),
+#                     "default_product_id": str(product.default_product_id),
+#                     "variant_product_id": product.variant_product_id or [],
+#                     "category": product.category,
+#                     "gender": product.gender,
+#                     "tags": product.tags,
+#                     "search_tags": product.search_tags,
+#                     "product_name": product.product_name,
+#                     "product_tagline": product.product_tagline,
+#                     "age": product.age,
+#                     "description": product.description,
+#                     "highlights": product.highlights,
+#                     "rating": product.rating,
+#                     "number_of_reviews": product.number_of_reviews,
+#                     "is_active": product.is_active,
+#                 })
+#
+#         return CustomResponse.successResponse(
+#             data=data,
+#             total=total
+#         )
+
+
 class ProductListAPIView(APIView):
     permission_classes = [AllowAny]
 
     def get(self, request):
-        category = request.query_params.get("category")
+        # ---------- Query params ----------
+        categories = request.query_params.get("category")
+        gender = request.query_params.get("gender")
+        tags = request.query_params.get("tags")  # comma-separated
+        min_price = request.query_params.get("min_price")
+        max_price = request.query_params.get("max_price")
+
         page = int(request.query_params.get("page", 1))
         page_size = int(request.query_params.get("page_size", 10))
 
-
-        queryset = DisplayProduct.objects.filter(
-            is_active=True,
-        )
-
-        if category:
-            queryset = queryset.filter(category__contains=[category])
-        #     gender,tags,
+        # ---------- DisplayProduct base queryset ----------
+        queryset = DisplayProduct.objects.filter(is_active=True)
 
 
+        if categories:
+            category_list = [c.strip() for c in categories.split(",") if c.strip()]
+            queryset = queryset.filter(category__overlap=category_list)
 
+
+        if gender:
+            queryset = queryset.filter(gender__iexact=gender)
+
+        if tags:
+            tag_list = [t.strip() for t in tags.split(",") if t.strip()]
+            queryset = queryset.filter(tags__overlap=tag_list)
+
+        # ---------- Pagination ----------
         total = queryset.count()
         offset = (page - 1) * page_size
         queryset = queryset[offset:offset + page_size]
 
+        # ---------- Fetch related products ----------
+        product_ids = queryset.values_list("default_product_id", flat=True)
+
+        product_qs = Product.objects.filter(id__in=product_ids)
+
+        # ---------- Price filters (Product table) ----------
+        if min_price:
+            product_qs = product_qs.filter(selling_price__gte=min_price)
+
+        if max_price:
+            product_qs = product_qs.filter(selling_price__lte=max_price)
+
+        products = list(product_qs)
+        product_map = {str(p.id): p for p in products}
+
         data = []
-        for product in queryset:
+
+        for display in queryset:
+            product = product_map.get(str(display.default_product_id))
+
+            # Skip if price filter excluded the product
+            if (min_price or max_price) and not product:
+                continue
+
             data.append({
-                    "id": str(product.id),
-                    "default_product_id": str(product.default_product_id),
-                    "variant_product_id": product.variant_product_id or [],
-                    "category": product.category,
-                    "gender": product.gender,
-                    "tags": product.tags,
-                    "search_tags": product.search_tags,
-                    "product_name": product.product_name,
-                    "product_tagline": product.product_tagline,
-                    "age": product.age,
-                    "description": product.description,
-                    "highlights": product.highlights,
-                    "rating": product.rating,
-                    "number_of_reviews": product.number_of_reviews,
-                    "is_active": product.is_active,
-                })
+                # ---------- unified product identity ----------
+                "id": str(display.default_product_id),
+
+                # ---------- DisplayProduct fields ----------
+                "category": display.category,
+                "gender": display.gender,
+                "tags": display.tags,
+                "search_tags": display.search_tags,
+                "product_name": display.product_name,
+                "product_tagline": display.product_tagline,
+                "age": display.age,
+                "description": display.description,
+                "highlights": display.highlights,
+                "rating": display.rating,
+                "number_of_reviews": display.number_of_reviews,
+                "is_active": display.is_active,
+
+                # ---------- Product fields ----------
+                "sku": product.sku if product else None,
+                "name": product.name if product else None,
+                "size": product.size if product else None,
+                "colour": product.colour if product else None,
+
+                "selling_price": str(product.selling_price) if product else None,
+                "mrp": str(product.mrp) if product else None,
+                "mrp_others": product.mrp_others if product else None,
+
+                "selling_price_others": product.selling_price_others if product else None,
+                "gst_percentage": product.gst_percentage if product else None,
+                "gst_amount": str(product.gst_amount) if product else None,
+
+                "current_stock": product.current_stock if product else 0,
+                "images": product.images if product else [],
+                "videos": product.videos if product else [],
+                "thumbnail_image": product.thumbnail_image if product else None,
+            })
 
         return CustomResponse.successResponse(
             data=data,
