@@ -227,6 +227,7 @@ class ProductListAPIView(APIView):
 
         if category:
             queryset = queryset.filter(category__contains=[category])
+        #     gender,tags,
 
 
 
