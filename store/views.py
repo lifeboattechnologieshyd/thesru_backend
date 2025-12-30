@@ -339,16 +339,13 @@ class ProductListAPIView(APIView):
                 "is_active": display.is_active,
 
                 # ---------- Product fields ----------
-                "sku": product.sku if product else None,
                 "name": product.name if product else None,
                 "size": product.size if product else None,
                 "colour": product.colour if product else None,
 
                 "selling_price": str(product.selling_price) if product else None,
                 "mrp": str(product.mrp) if product else None,
-                "mrp_others": product.mrp_others if product else None,
 
-                "selling_price_others": product.selling_price_others if product else None,
                 "gst_percentage": product.gst_percentage if product else None,
                 "gst_amount": str(product.gst_amount) if product else None,
 
