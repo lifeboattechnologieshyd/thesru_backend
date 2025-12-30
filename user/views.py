@@ -1,6 +1,10 @@
 from datetime import timedelta
 
+from django.core.files.base import ContentFile
+from django.core.files.storage import default_storage
 from django.utils import timezone
+from rest_framework.parsers import FormParser, MultiPartParser
+from django.conf import settings
 
 from django.contrib.auth.hashers import make_password, check_password
 from rest_framework.permissions import AllowAny
@@ -14,6 +18,7 @@ from serializers.user import UserMasterSerializer
 
 from rest_framework import status
 
+from utils.storage import add_unique_suffix_to_filename, sanitize_filename
 from utils.user import generate_username, generate_referral_code
 
 
@@ -163,4 +168,35 @@ class MobileVerifyOTPView(APIView):
 
 
 
+class FileUploadView(APIView):
+    permission_classes = [AllowAny]
+    parser_classes = [MultiPartParser, FormParser]
 
+    def post(self, request, *args, **kwargs):
+        files = request.FILES.getlist("files")
+        path = request.data.get("path", "temp")
+
+        if not files:
+            return CustomResponse().successResponse(
+                {"error": "No file was provided."}, status=status.HTTP_400_BAD_REQUEST
+            )
+
+        uploaded_files = []
+
+        try:
+            for file_obj in files:
+                # Save each file to the default storage
+                sanitized_filename = add_unique_suffix_to_filename(sanitize_filename(file_obj.name))
+
+                file_path = default_storage.save(f"{path}/{sanitized_filename}", ContentFile(file_obj.read()))
+                file_url = settings.MEDIA_URL + file_path
+                uploaded_files.append(
+                    {"original_filename": file_obj.name, "file_url": file_url, "file_path": file_path}
+                )
+
+            return CustomResponse().successResponse(uploaded_files, status=status.HTTP_201_CREATED)
+
+        except Exception as e:
+            return CustomResponse().errorResponse(
+                {"error": str(e)}, description="File upload failed", status=status.HTTP_400_BAD_REQUEST
+            )

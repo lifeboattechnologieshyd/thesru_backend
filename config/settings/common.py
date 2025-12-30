@@ -121,6 +121,61 @@ DATABASES = {
 #################################
 AUTH_USER_MODEL = "db.User"
 
+
+#############################
+#       AWS CREDS         #
+#############################
+AWS_ACCESS_KEY_ID = os.environ.get("AWS_ACCESS_KEY_ID")
+AWS_SECRET_ACCESS_KEY = os.environ.get("AWS_SECRET_ACCESS_KEY")
+AWS_S3_REGION_NAME = os.environ.get("AWS_S3_REGION_NAME")
+AWS_S3_BUCKET = os.environ.get("AWS_S3_BUCKET")
+AWS_S3_ENDPOINT_URL = os.environ.get("AWS_S3_ENDPOINT_URL", None)  # Optional: set for MinIO
+AWS_S3_USE_SSL = os.environ.get("AWS_S3_USE_SSL", "True") == "True"  # Optional: set for MinIO
+
+
+
+#############################
+#       STORAGE ENGINE      #
+#############################
+STORAGES = {
+    "default": {
+        "BACKEND": "storages.backends.s3.S3Storage",
+        "OPTIONS": {
+            "access_key": AWS_ACCESS_KEY_ID,
+            "secret_key": AWS_SECRET_ACCESS_KEY,
+            "region_name": AWS_S3_REGION_NAME,
+            "bucket_name": AWS_S3_BUCKET,
+            "endpoint_url": AWS_S3_ENDPOINT_URL if AWS_S3_ENDPOINT_URL else None,
+            "use_ssl": AWS_S3_USE_SSL,
+        },
+    },
+    "staticfiles": {  # Static files
+        "BACKEND": "storages.backends.s3.S3Storage",
+        "OPTIONS": {
+            "access_key": AWS_ACCESS_KEY_ID,
+            "secret_key": AWS_SECRET_ACCESS_KEY,
+            "region_name": AWS_S3_REGION_NAME,
+            "bucket_name": AWS_S3_BUCKET,
+            "endpoint_url": AWS_S3_ENDPOINT_URL if AWS_S3_ENDPOINT_URL else None,
+            "use_ssl": AWS_S3_USE_SSL,
+            "location": "static",
+        },
+    },
+}
+
+
+#############################
+#       STATIC FILES        #
+#############################
+STATIC_URL = f"https://{AWS_S3_BUCKET}.s3.{AWS_S3_REGION_NAME}.amazonaws.com/static/"
+
+
+#############################
+#       MEDIA FILES         #
+#############################
+MEDIA_URL = f"https://{AWS_S3_BUCKET}.s3.{AWS_S3_REGION_NAME}.amazonaws.com/"
+
+
 CASHFREE_URL = "https://sandbox.cashfree.com/pg/orders"
 CASHFREE_API_VERSION = "2023-08-01"
 CASHFREE_CLIENT_ID = os.getenv("CASHFREE_CLIENT_ID")
