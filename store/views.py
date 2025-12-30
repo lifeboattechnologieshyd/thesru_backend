@@ -253,7 +253,6 @@ class ProductListAPIView(APIView):
                     "rating": product.rating,
                     "number_of_reviews": product.number_of_reviews,
                     "is_active": product.is_active,
-                    "created_at": product.created_at,
                 })
 
         return CustomResponse.successResponse(
@@ -301,8 +300,6 @@ class ProductDetailAPIView(APIView):
                 "images": v.images,
                 "videos": v.videos,
                 "thumbnail_image": v.thumbnail_image,
-                "created_at": v.created_at,
-                "updated_at": v.updated_at,
             })
 
         return CustomResponse.successResponse(
@@ -323,8 +320,6 @@ class ProductDetailAPIView(APIView):
                 "highlights": display_product.highlights,
                 "rating": display_product.rating,
                 "number_of_reviews": display_product.number_of_reviews,
-                "created_at": display_product.created_at,
-                "updated_at": display_product.updated_at,
 
                 #  VARIANTS
                 "variants": variant_data
