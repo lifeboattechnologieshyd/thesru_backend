@@ -580,64 +580,155 @@ class OrderView(APIView):
         )
 
 
+# class BannerListView(APIView):
+#     permission_classes = [AllowAny]
+#
+#     def get(self, request, id=None):
+#         action = request.query_params.get("action")
+#
+#         # BASE QUERY → only active banners
+#         queryset = Banner.objects.filter(is_active=True)
+#
+#         #  ACTION FILTER (optional)
+#         if action is not None:
+#             if action.lower() == "true":
+#                 queryset = queryset.filter(action=True)
+#             elif action.lower() == "false":
+#                 queryset = queryset.filter(action=False)
+#
+#         #  SINGLE BANNER (active only)
+#         if id:
+#             banner = (
+#                 queryset
+#                 .filter(id=id)
+#                 .values()
+#                 .first()
+#             )
+#
+#             if not banner:
+#                 return CustomResponse.errorResponse(
+#                     description="Active banner not found"
+#                 )
+#
+#             return CustomResponse.successResponse(
+#                 data=[banner],
+#                 total=1
+#             )
+#
+#         # LIST BANNERS
+#         banners = queryset.order_by("-created_at").values()
+#         data = list(banners)
+#
+#         return CustomResponse.successResponse(
+#             data=data,
+#             total=len(data)
+#         )
+
 class BannerListView(APIView):
     permission_classes = [AllowAny]
 
     def get(self, request, id=None):
         action = request.query_params.get("action")
 
-        # BASE QUERY → only active banners
         queryset = Banner.objects.filter(is_active=True)
 
-        #  ACTION FILTER (optional)
+        #  ACTION FILTER
         if action is not None:
             if action.lower() == "true":
                 queryset = queryset.filter(action=True)
             elif action.lower() == "false":
                 queryset = queryset.filter(action=False)
 
-        #  SINGLE BANNER (active only)
+        #  SINGLE BANNER
         if id:
-            banner = (
-                queryset
-                .filter(id=id)
-                .values()
-                .first()
-            )
-
+            banner = queryset.filter(id=id).first()
             if not banner:
                 return CustomResponse.errorResponse(
                     description="Active banner not found"
                 )
 
             return CustomResponse.successResponse(
-                data=[banner],
+                data=[{
+                    "id": str(banner.id),
+                    "screen": banner.screen,
+                    "image": banner.image,
+                    "is_active": banner.is_active,
+                    "priority": banner.priority,
+                    "action": banner.action,
+                    "destination": banner.destination,
+
+                }],
                 total=1
             )
 
-        # LIST BANNERS
-        banners = queryset.order_by("-created_at").values()
-        data = list(banners)
+        #  LIST BANNERS
+        data = []
+        for banner in queryset.order_by("-created_at"):
+            data.append({
+                "id": str(banner.id),
+                "screen": banner.screen,
+                "image": banner.image,
+                "is_active": banner.is_active,
+                "priority": banner.priority,
+                "action": banner.action,
+                "destination": banner.destination,
+
+            })
 
         return CustomResponse.successResponse(
             data=data,
             total=len(data)
         )
 
+# class CategoryListView(APIView):
+#     permission_classes = [AllowAny]
+#
+#     def get(self, request, id=None):
+#
+#         #  SINGLE CATEGORY (only active)
+#         if id:
+#             category = (
+#                 Category.objects
+#                 .filter(id=id, is_active=True)
+#                 .values()
+#                 .first()
+#             )
+#
+#             if not category:
+#                 return CustomResponse.errorResponse(
+#                     description="Active category not found"
+#                 )
+#
+#             return CustomResponse.successResponse(
+#                 data=[category],
+#                 total=1
+#             )
+#
+#         #  LIST ALL ACTIVE CATEGORIES
+#         categories = (
+#             Category.objects
+#             .filter(is_active=True)
+#             .order_by("-created_at")
+#             .values()
+#         )
+#
+#         data = list(categories)
+#
+#         return CustomResponse.successResponse(
+#             data=data,
+#             total=len(data)
+#         )
 
 class CategoryListView(APIView):
     permission_classes = [AllowAny]
 
     def get(self, request, id=None):
 
-        #  SINGLE CATEGORY (only active)
+        queryset = Category.objects.filter(is_active=True)
+
+        # SINGLE CATEGORY
         if id:
-            category = (
-                Category.objects
-                .filter(id=id, is_active=True)
-                .values()
-                .first()
-            )
+            category = queryset.filter(id=id).first()
 
             if not category:
                 return CustomResponse.errorResponse(
@@ -645,22 +736,30 @@ class CategoryListView(APIView):
                 )
 
             return CustomResponse.successResponse(
-                data=[category],
+                data=[{
+                    "id": str(category.id),
+                    "name": category.name,
+                    "icon": category.icon,
+                    "search_tags": category.search_tags,
+                    "is_active": category.is_active,
+
+                }],
                 total=1
             )
 
-        #  LIST ALL ACTIVE CATEGORIES
-        categories = (
-            Category.objects
-            .filter(is_active=True)
-            .order_by("-created_at")
-            .values()
-        )
+        #  LIST ALL CATEGORIES
+        data = []
+        for category in queryset.order_by("-created_at"):
+            data.append({
+                "id": str(category.id),
+                "name": category.name,
+                "icon": category.icon,
+                "search_tags": category.search_tags,
+                "is_active": category.is_active,
 
-        data = list(categories)
+            })
 
         return CustomResponse.successResponse(
             data=data,
             total=len(data)
         )
-
