@@ -9,6 +9,7 @@ https://docs.djangoproject.com/en/5.2/topics/settings/
 For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.2/ref/settings/
 """
+from corsheaders.defaults import default_headers
 
 import os
 from datetime import timedelta
@@ -218,6 +219,19 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
+#############################
+#       CORS SETTINGS       #
+#############################
+ALLOWED_HOSTS = ["*"]
+CORS_ALLOW_ALL_ORIGINS = True
+CORS_ALLOW_CREDENTIALS = True
+CORS_ALLOW_HEADERS = [
+    *default_headers,
+    "x-request-id",
+]
+CORS_EXPOSE_HEADERS = [
+    "x-request-id",
+]
 
 # Internationalization
 # https://docs.djangoproject.com/en/5.2/topics/i18n/
