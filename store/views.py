@@ -337,7 +337,7 @@ class ProductListAPIView(APIView):
 
             data.append({
                 # ---------- unified product identity ----------
-                "id": str(display.default_product_id),
+                "default_product_id": str(display.default_product_id),
 
                 # ---------- DisplayProduct fields ----------
                 "category": display.category,
