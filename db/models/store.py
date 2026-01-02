@@ -126,6 +126,9 @@ class PinCode(AuditModel):
     state = models.CharField(max_length=25)
     area = models.CharField(max_length=100)
     city = models.CharField(max_length=100)
+    country = models.CharField(max_length=100)
+
+
 
     class Meta:
         db_table = "pincode"

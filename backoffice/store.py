@@ -605,7 +605,7 @@ class PinCodeAPIView(APIView):
     def post(self,request):
         data = request.data
 
-        required_fields = ["pin","state","area","city"]
+        required_fields = ["pin","state","area","city","country"]
         for field in required_fields:
             if not data.get(field):
                 return CustomResponse.errorResponse(description=f"{field} is required")
@@ -614,7 +614,9 @@ class PinCodeAPIView(APIView):
             pin = data.get("pin"),
             state = data.get("state"),
             area = data.get("area"),
-            city = data.get("city")
+            city = data.get("city"),
+            country = data.get("country")
+
 
 
         )
@@ -643,7 +645,7 @@ class PinCodeAPIView(APIView):
 
 
         for field in [
-            "pin","state","area","city"
+            "pin","state","area","city","country",
         ]:
             if field in request.data:
                 setattr(pin,field,request.data.get(field))

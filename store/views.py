@@ -129,14 +129,14 @@ class PinListView(APIView):
             return CustomResponse.errorResponse(description="pin not found")
 
         data = {
-            "id" :str(pin.id),
             "pin":pin.pin,
             "state":pin.state,
             "city":pin.city,
-            "area":pin.area
+            "area":pin.area,
+            "country":pin.country
         }
 
-        return CustomResponse.successResponse(data=[data],total=1)
+        return CustomResponse.successResponse(data=data,total=1)
 
 # class ProductAPIView(APIView):
 #     permission_classes = [AllowAny]
