@@ -53,7 +53,6 @@ class ProductAPIView(APIView):
                 return CustomResponse.errorResponse(
                     description="Product with this SKU already exists"
                 )
-
             return CustomResponse.errorResponse(
                 description="Database integrity error"
             )
