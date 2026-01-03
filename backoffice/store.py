@@ -273,18 +273,40 @@ class CategoriesAPIView(APIView):
         )
         return CustomResponse.successResponse(data={},description="category created successfully")
 
-    def get(self,request,id=None):
+    def get(self, request, id=None):
         if id:
             category = Category.objects.filter(id=id).values().first()
             if not category:
-                return CustomResponse.errorResponse(description="category not found")
+                return CustomResponse.errorResponse(
+                    description="category not found"
+                )
 
-            return CustomResponse.successResponse(data=[category],total=1)
+            return CustomResponse.successResponse(
+                data=[category],
+                total=1
+            )
 
-        catagories = Category.objects.all().order_by("-created_at").values()
+        page = int(request.query_params.get("page", 1))
+        page_size = int(request.query_params.get("page_size", 10))
 
-        data = list(catagories)
-        return CustomResponse.successResponse(data=data,total=len(data))
+        if page < 1 or page_size < 1:
+            return CustomResponse.errorResponse(
+                description="page and page_size must be positive integers"
+            )
+
+        queryset = Category.objects.all().order_by("-created_at")
+
+        total = queryset.count()
+        offset = (page - 1) * page_size
+        queryset = queryset[offset: offset + page_size]
+
+        data = list(queryset.values())
+
+        return CustomResponse.successResponse(
+            data=data,
+            total=total,
+
+        )
 
     def put(self,request,id=None):
         if not id:

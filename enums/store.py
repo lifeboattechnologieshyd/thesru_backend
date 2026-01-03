@@ -4,6 +4,7 @@ from django.db import models
 
 class BannerScreen(models.TextChoices):
     HOME = "Home"
+    WISHLIST = "Wishlist"
 
 class InventoryType(models.TextChoices):
     PURCHASE = "Purchase"

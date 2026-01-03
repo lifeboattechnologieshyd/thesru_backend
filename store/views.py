@@ -9,7 +9,7 @@ from rest_framework.permissions import IsAuthenticated,AllowAny
 
 from django.conf import settings
 from db.models import AddressMaster, PinCode, Product, DisplayProduct, Order, OrderProducts, Payment, OrderTimeLines, \
-    Banner, Category
+    Banner, Category, Cart, Wishlist
 from enums.store import OrderStatus
 from mixins.drf_views import CustomResponse
 from utils.store import generate_order_id
@@ -873,4 +873,262 @@ class CategoryListView(APIView):
         return CustomResponse.successResponse(
             data=data,
             total=len(data)
+        )
+
+
+class AddToCartAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        user_id = request.user.id
+        product_id = request.data.get("product_id")
+        quantity = int(request.data.get("quantity", 1))
+
+        if not product_id:
+            return CustomResponse().errorResponse(
+                description="product_id is required"
+            )
+
+        product = Product.objects.filter(id=product_id).first()
+        if not product:
+            return CustomResponse().errorResponse(
+                description="Product not found",
+                status=404
+            )
+
+        cart_item, created = Cart.objects.get_or_create(
+            user_id=user_id,
+            product_id=product_id,
+            defaults={"quantity": quantity}
+        )
+
+        new_quantity = quantity if created else cart_item.quantity + quantity
+
+        if new_quantity > product.current_stock:
+            return CustomResponse().errorResponse(
+                description="Insufficient stock"
+            )
+
+        cart_item.quantity = new_quantity
+        cart_item.save()
+
+        return CustomResponse().successResponse(
+            message="Product added to cart",
+            data={
+                "product_id": str(product_id),
+                "quantity": cart_item.quantity
+            }
+        )
+
+
+
+class CartListAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        user_id = request.user.id
+        page = int(request.query_params.get("page", 1))
+        limit = int(request.query_params.get("limit", 10))
+        offset = (page - 1) * limit
+
+        qs = Cart.objects.filter(user_id=user_id)
+        total = qs.count()
+
+        data = qs.values(
+            "id", "product_id", "quantity"
+        )[offset:offset + limit]
+
+        return CustomResponse().successResponse(
+            data=list(data),
+            total=total
+        )
+
+
+class UpdateCartAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def patch(self, request, cart_id):
+        quantity = request.data.get("quantity")
+
+        if not quantity or int(quantity) <= 0:
+            return CustomResponse().errorResponse(
+                description="Valid quantity is required"
+            )
+
+        try:
+            cart_item = Cart.objects.get(
+                id=cart_id,
+                user_id=request.user.id
+            )
+        except Cart.DoesNotExist:
+            return CustomResponse().errorResponse(
+                description="Cart item not found",
+            )
+
+        cart_item.quantity = int(quantity)
+        cart_item.save()
+
+        return CustomResponse().successResponse(data={},
+            message="Quantity updated successfully"
+        )
+
+class RemoveFromCartAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def delete(self, request, cart_id):
+        deleted, _ = Cart.objects.filter(
+            id=cart_id,
+            user_id=request.user.id
+        ).delete()
+
+        if not deleted:
+            return CustomResponse().errorResponse(
+                description="Cart item not found",
+            )
+
+        return CustomResponse().successResponse(data={},
+            message="Item removed from cart"
+        )
+
+class AddToWishlistAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        user_id = request.user.id
+        product_id = request.data.get("product_id")
+
+        if not product_id:
+            return CustomResponse().errorResponse(
+                description="product_id is required"
+            )
+
+        obj, created = Wishlist.objects.get_or_create(
+            user_id=user_id,
+            product_id=product_id
+        )
+
+        if not created:
+            return CustomResponse().successResponse(data={},
+                message="Product already in wishlist"
+            )
+
+        return CustomResponse().successResponse(data={},
+            message="Product added to wishlist"
+        )
+
+
+class WishlistListAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        user_id = request.user.id
+        page = int(request.query_params.get("page", 1))
+        limit = int(request.query_params.get("limit", 10))
+        offset = (page - 1) * limit
+
+        qs = Wishlist.objects.filter(user_id=user_id)
+        total = qs.count()
+
+        data = qs.values(
+            "id", "product_id"
+        )[offset:offset + limit]
+
+        return CustomResponse().successResponse(
+            data=list(data),
+            total=total
+        )
+
+class RemoveFromWishlistAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def delete(self, request, wishlist_id):
+        deleted, _ = Wishlist.objects.filter(
+            id=wishlist_id,
+            user_id=request.user.id
+        ).delete()
+
+        if not deleted:
+            return CustomResponse().errorResponse(
+                description="Wishlist item not found",
+            )
+
+        return CustomResponse().successResponse(data={},
+            message="Item removed from wishlist"
+        )
+
+
+class MoveWishlistToCartAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        user_id = request.user.id
+        product_id = request.data.get("product_id")
+
+        if not product_id:
+            return CustomResponse().errorResponse(
+                description="product_id is required"
+            )
+
+        wishlist_exists = Wishlist.objects.filter(
+            user_id=user_id,
+            product_id=product_id
+        ).exists()
+
+        if not wishlist_exists:
+            return CustomResponse().errorResponse(
+                description="Product not found in wishlist",
+                status=404
+            )
+
+        cart_item, created = Cart.objects.get_or_create(
+            user_id=user_id,
+            product_id=product_id,
+            defaults={"quantity": 1}
+        )
+
+        if not created:
+            cart_item.quantity += 1
+            cart_item.save()
+
+        Wishlist.objects.filter(
+            user_id=user_id,
+            product_id=product_id
+        ).delete()
+
+        return CustomResponse().successResponse(data={},
+            message="Product moved from wishlist to cart"
+        )
+
+
+class CartTotalAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        user_id = request.user.id
+
+        cart_items = Cart.objects.filter(user_id=user_id)
+
+        total_amount = 0
+        items = []
+
+        for item in cart_items:
+            product = Product.objects.filter(id=item.product_id).first()
+            price = product.selling_price if product else 0
+
+            item_total = price * item.quantity
+            total_amount += item_total
+
+            items.append({
+                "product_id": str(item.product_id),
+                "quantity": item.quantity,
+                "price": price,
+                "total": item_total
+            })
+
+        return CustomResponse().successResponse(
+            data={
+                "items": items,
+                "cart_total": total_amount
+            },
+            total=len(items)
         )

@@ -218,3 +218,37 @@ class CashFree(AuditModel):
 
     class Meta:
         db_table = "cashfree"
+
+
+class Cart(AuditModel):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    product_id = models.UUIDField()
+    quantity = models.PositiveIntegerField()
+    user_id = models.UUIDField()
+
+    class Meta:
+        db_table = "cart"
+        unique_together = ("user_id", "product_id")
+        indexes = [
+            models.Index(fields=["user_id"]),
+            models.Index(fields=["product_id"]),
+        ]
+
+class Wishlist(AuditModel):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    product_id = models.UUIDField()
+    user_id = models.UUIDField(null=False)
+
+    class Meta:
+        db_table = "wishlist"
+
+        unique_together = ("user_id", "product_id")
+        indexes = [
+            models.Index(fields=["user_id"]),
+            models.Index(fields=["product_id"]),
+        ]
+
+
+
+
+
