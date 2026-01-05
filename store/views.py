@@ -946,7 +946,7 @@ class CartListAPIView(APIView):
 class UpdateCartAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
-    def put(self, request, cart_id):
+    def put(self, request, id):
         quantity = request.data.get("quantity")
 
         if not quantity or int(quantity) <= 0:
@@ -956,18 +956,19 @@ class UpdateCartAPIView(APIView):
 
         try:
             cart_item = Cart.objects.get(
-                id=cart_id,
+                id=id,
                 user_id=request.user.id
             )
         except Cart.DoesNotExist:
             return CustomResponse().errorResponse(
-                description="Cart item not found",
+                description="Cart item not found"
             )
 
         cart_item.quantity = int(quantity)
         cart_item.save()
 
-        return CustomResponse().successResponse(data={},
+        return CustomResponse().successResponse(
+            data={},
             message="Quantity updated successfully"
         )
 
