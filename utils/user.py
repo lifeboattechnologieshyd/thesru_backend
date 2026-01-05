@@ -57,9 +57,9 @@ def send_otp_to_mobile(otp, mobile):
             "sms_details": "1",
             "flash": "1",
             "numbers": str(mobile),
-            "sender_id": settings.FULL2ADS_SENDER_ID,
-            "message": settings.FULL2ADS_DLT_TEMPLATE_ID,
-            "entity_id": settings.FULL2ADS_DLT_ENTITY_ID
+            "sender_id": settings.SMS_SENDER_ID,
+            "message": settings.SMS_DLT_TEMPLATE_ID,
+            "entity_id": settings.SMS_DLT_ENTITY_ID
         }
         print("🔎 variables_values =", payload["variables_values"])
 
@@ -82,7 +82,7 @@ def send_otp_to_mobile(otp, mobile):
             url,
             headers={
                 "accept": "application/json",
-                "authorization": settings.FULL2ADS_AUTH_KEY,
+                "authorization": settings.SMS_AUTH_KEY,
                 "content-type": "application/json"
             },
             json=payload,
