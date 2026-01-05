@@ -1,7 +1,8 @@
 from django.urls import path
 
 from store.views import PinListView, AddressAPIView, ProductDetailAPIView, ProductListAPIView, InitiateOrder, OrderView, \
-    BannerListView, CategoryListView
+    BannerListView, CategoryListView, AddToCartAPIView, CartListAPIView, UpdateCartAPIView, RemoveFromCartAPIView, \
+    AddToWishlistAPIView, WishlistListAPIView, RemoveFromWishlistAPIView, MoveWishlistToCartAPIView, CartTotalAPIView
 
 urlpatterns = [
 
@@ -16,5 +17,15 @@ urlpatterns = [
 
     path("initiateorder", InitiateOrder.as_view()),
     path("order",OrderView.as_view()),
+
+    path("add/cart",AddToCartAPIView.as_view()),
+    path("get/cart",CartListAPIView.as_view()),
+    path("update/cart",UpdateCartAPIView.as_view()),
+    path("remove/cart",RemoveFromCartAPIView.as_view()),
+    path("add/wishlist",AddToWishlistAPIView.as_view()),
+    path("get/wishlist",WishlistListAPIView.as_view()),
+    path("remove/wishlist",RemoveFromWishlistAPIView.as_view()),
+    path("wishlist/to/cart",MoveWishlistToCartAPIView.as_view()),
+    path("cart/total",CartTotalAPIView.as_view()),
 
 ]

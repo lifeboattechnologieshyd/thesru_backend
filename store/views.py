@@ -893,7 +893,6 @@ class AddToCartAPIView(APIView):
         if not product:
             return CustomResponse().errorResponse(
                 description="Product not found",
-                status=404
             )
 
         cart_item, created = Cart.objects.get_or_create(
@@ -1077,7 +1076,6 @@ class MoveWishlistToCartAPIView(APIView):
         if not wishlist_exists:
             return CustomResponse().errorResponse(
                 description="Product not found in wishlist",
-                status=404
             )
 
         cart_item, created = Cart.objects.get_or_create(
