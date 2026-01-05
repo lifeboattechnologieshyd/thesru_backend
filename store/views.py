@@ -942,6 +942,9 @@ class AddToCartAPIView(APIView):
 #             total=total
 #         )
 
+
+
+
 class CartListAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -958,13 +961,11 @@ class CartListAPIView(APIView):
 
         offset = (page - 1) * limit
 
-        # ---------- CART QUERY ----------
         qs = Cart.objects.filter(user_id=user_id).order_by("-created_at")
         total = qs.count()
 
         cart_items = qs[offset: offset + limit]
 
-        # ---------- FETCH PRODUCTS IN ONE QUERY ----------
         product_ids = [
             uuid.UUID(str(item.product_id))
             for item in cart_items
@@ -974,38 +975,49 @@ class CartListAPIView(APIView):
         products = Product.objects.filter(id__in=product_ids)
         product_map = {str(p.id): p for p in products}
 
-        # ---------- BUILD RESPONSE ----------
+        # 🔥 AUTO-REMOVE INVALID CART ITEMS
+        invalid_cart_ids = [
+            item.id for item in cart_items
+            if str(item.product_id) not in product_map
+        ]
+
+        if invalid_cart_ids:
+            Cart.objects.filter(id__in=invalid_cart_ids).delete()
+
+        # BUILD RESPONSE (ONLY VALID ITEMS)
         data = []
         for item in cart_items:
             product = product_map.get(str(item.product_id))
+            if not product:
+                continue
 
             data.append({
                 "cart_id": str(item.id),
                 "quantity": item.quantity,
-
-                # ---- PRODUCT DETAILS ----
                 "product": {
-                    "id": str(product.id) if product else None,
-                    "sku": product.sku if product else None,
-                    "name": product.name if product else None,
-                    "size": product.size if product else None,
-                    "colour": product.colour if product else None,
-                    "mrp": product.mrp if product else None,
-                    "selling_price": product.selling_price if product else None,
-                    "inr": product.inr if product else None,
-                    "gst_percentage": product.gst_percentage if product else None,
-                    "gst_amount": product.gst_amount if product else None,
-                    "current_stock": product.current_stock if product else None,
-                    "thumbnail_image": product.thumbnail_image if product else None,
-                    "images": product.images if product else [],
-                    "videos": product.videos if product else [],
+                    "id": str(product.id),
+                    "sku": product.sku,
+                    "name": product.name,
+                    "size": product.size,
+                    "colour": product.colour,
+                    "mrp": product.mrp,
+                    "selling_price": product.selling_price,
+                    "inr": product.inr,
+                    "gst_percentage": product.gst_percentage,
+                    "gst_amount": product.gst_amount,
+                    "current_stock": product.current_stock,
+                    "thumbnail_image": product.thumbnail_image,
+                    "images": product.images or [],
+                    "videos": product.videos or [],
                 }
             })
 
         return CustomResponse().successResponse(
             data=data,
-            total=total
+            total=len(data)
         )
+
+
 
 
 class UpdateCartAPIView(APIView):
