@@ -965,7 +965,11 @@ class CartListAPIView(APIView):
         cart_items = qs[offset: offset + limit]
 
         # ---------- FETCH PRODUCTS IN ONE QUERY ----------
-        product_ids = [item.product_id for item in cart_items]
+        product_ids = [
+            uuid.UUID(str(item.product_id))
+            for item in cart_items
+            if item.product_id
+        ]
 
         products = Product.objects.filter(id__in=product_ids)
         product_map = {str(p.id): p for p in products}
