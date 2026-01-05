@@ -19,7 +19,7 @@ from serializers.user import UserMasterSerializer
 from rest_framework import status
 
 from utils.storage import add_unique_suffix_to_filename, sanitize_filename
-from utils.user import generate_username, generate_referral_code
+from utils.user import generate_username, generate_referral_code, send_otp_to_mobile
 
 
 # class MobileSendOTPView(APIView):
@@ -103,6 +103,7 @@ class MobileSendOTPView(APIView):
 
         # Generate OTP
         otp = 1234
+        send_otp_to_mobile(otp,mobile)
         expires_at = timezone.now() + timedelta(minutes=15)
 
         # Invalidate old OTPs

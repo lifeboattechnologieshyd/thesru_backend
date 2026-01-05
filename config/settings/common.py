@@ -254,3 +254,11 @@ STATIC_URL = "static/"
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+
+FULL2ADS_AUTH_KEY = "G5OsafzTnblgPcNLiU69BtXdpZCrKEmuYAIFvhoxb79M2jJwkWLDTxFjvrotcO8mKwfSB2WYXRdUbzka"
+FULL2ADS_SENDER_ID = "THESRU"
+FULL2ADS_ROUTE_ID = "1"
+FULL2ADS_DLT_ENTITY_ID = "1101594420000089902"
+FULL2ADS_DLT_TEMPLATE_ID = "1107176181045414160"
+

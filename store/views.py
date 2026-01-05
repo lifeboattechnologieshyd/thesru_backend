@@ -920,25 +920,86 @@ class AddToCartAPIView(APIView):
         )
 
 
+#
+# class CartListAPIView(APIView):
+#     permission_classes = [IsAuthenticated]
+#
+#     def get(self, request):
+#         user_id = request.user.id
+#         page = int(request.query_params.get("page", 1))
+#         limit = int(request.query_params.get("limit", 10))
+#         offset = (page - 1) * limit
+#
+#         qs = Cart.objects.filter(user_id=user_id)
+#         total = qs.count()
+#
+#         data = qs.values(
+#             "id", "product_id", "quantity"
+#         )[offset:offset + limit]
+#
+#         return CustomResponse().successResponse(
+#             data=list(data),
+#             total=total
+#         )
 
 class CartListAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
         user_id = request.user.id
+
         page = int(request.query_params.get("page", 1))
         limit = int(request.query_params.get("limit", 10))
+
+        if page < 1 or limit < 1:
+            return CustomResponse().errorResponse(
+                description="page and limit must be positive integers"
+            )
+
         offset = (page - 1) * limit
 
-        qs = Cart.objects.filter(user_id=user_id)
+        # ---------- CART QUERY ----------
+        qs = Cart.objects.filter(user_id=user_id).order_by("-created_at")
         total = qs.count()
 
-        data = qs.values(
-            "id", "product_id", "quantity"
-        )[offset:offset + limit]
+        cart_items = qs[offset: offset + limit]
+
+        # ---------- FETCH PRODUCTS IN ONE QUERY ----------
+        product_ids = [item.product_id for item in cart_items]
+
+        products = Product.objects.filter(id__in=product_ids)
+        product_map = {str(p.id): p for p in products}
+
+        # ---------- BUILD RESPONSE ----------
+        data = []
+        for item in cart_items:
+            product = product_map.get(str(item.product_id))
+
+            data.append({
+                "cart_id": str(item.id),
+                "quantity": item.quantity,
+
+                # ---- PRODUCT DETAILS ----
+                "product": {
+                    "id": str(product.id) if product else None,
+                    "sku": product.sku if product else None,
+                    "name": product.name if product else None,
+                    "size": product.size if product else None,
+                    "colour": product.colour if product else None,
+                    "mrp": product.mrp if product else None,
+                    "selling_price": product.selling_price if product else None,
+                    "inr": product.inr if product else None,
+                    "gst_percentage": product.gst_percentage if product else None,
+                    "gst_amount": product.gst_amount if product else None,
+                    "current_stock": product.current_stock if product else None,
+                    "thumbnail_image": product.thumbnail_image if product else None,
+                    "images": product.images if product else [],
+                    "videos": product.videos if product else [],
+                }
+            })
 
         return CustomResponse().successResponse(
-            data=list(data),
+            data=data,
             total=total
         )
 
@@ -1017,24 +1078,85 @@ class AddToWishlistAPIView(APIView):
         )
 
 
+# class WishlistListAPIView(APIView):
+#     permission_classes = [IsAuthenticated]
+#
+#     def get(self, request):
+#         user_id = request.user.id
+#         page = int(request.query_params.get("page", 1))
+#         limit = int(request.query_params.get("limit", 10))
+#         offset = (page - 1) * limit
+#
+#         qs = Wishlist.objects.filter(user_id=user_id)
+#         total = qs.count()
+#
+#         data = qs.values(
+#             "id", "product_id"
+#         )[offset:offset + limit]
+#
+#         return CustomResponse().successResponse(
+#             data=list(data),
+#             total=total
+#         )
+
+
 class WishlistListAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
         user_id = request.user.id
+
         page = int(request.query_params.get("page", 1))
         limit = int(request.query_params.get("limit", 10))
+
+        if page < 1 or limit < 1:
+            return CustomResponse().errorResponse(
+                description="page and limit must be positive integers"
+            )
+
         offset = (page - 1) * limit
 
-        qs = Wishlist.objects.filter(user_id=user_id)
+        # ---------- WISHLIST QUERY ----------
+        qs = Wishlist.objects.filter(user_id=user_id).order_by("-created_at")
         total = qs.count()
 
-        data = qs.values(
-            "id", "product_id"
-        )[offset:offset + limit]
+        wishlist_items = qs[offset: offset + limit]
+
+        # ---------- FETCH PRODUCTS (ONE QUERY) ----------
+        product_ids = [item.product_id for item in wishlist_items]
+
+        products = Product.objects.filter(id__in=product_ids)
+        product_map = {str(p.id): p for p in products}
+
+        # ---------- BUILD RESPONSE ----------
+        data = []
+        for item in wishlist_items:
+            product = product_map.get(str(item.product_id))
+
+            data.append({
+                "wishlist_id": str(item.id),
+
+                # ---- PRODUCT DETAILS ----
+                "product": {
+                    "id": str(product.id) if product else None,
+                    "sku": product.sku if product else None,
+                    "name": product.name if product else None,
+                    "size": product.size if product else None,
+                    "colour": product.colour if product else None,
+                    "mrp": product.mrp if product else None,
+                    "selling_price": product.selling_price if product else None,
+                    "inr": product.inr if product else None,
+                    "gst_percentage": product.gst_percentage if product else None,
+                    "gst_amount": product.gst_amount if product else None,
+                    "current_stock": product.current_stock if product else None,
+                    "thumbnail_image": product.thumbnail_image if product else None,
+                    "images": product.images if product else [],
+                    "videos": product.videos if product else [],
+                }
+            })
 
         return CustomResponse().successResponse(
-            data=list(data),
+            data=data,
             total=total
         )
 
