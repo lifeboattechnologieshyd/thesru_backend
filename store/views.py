@@ -1009,11 +1009,11 @@ class AddToWishlistAPIView(APIView):
 
         if not created:
             return CustomResponse().successResponse(data={},
-                message="Product already in wishlist"
+                description="Product already in wishlist"
             )
 
         return CustomResponse().successResponse(data={},
-            message="Product added to wishlist"
+            description="Product added to wishlist"
         )
 
 
@@ -1053,7 +1053,7 @@ class RemoveFromWishlistAPIView(APIView):
             )
 
         return CustomResponse().successResponse(data={},
-            message="Item removed from wishlist"
+            description="Item removed from wishlist"
         )
 
 
@@ -1095,7 +1095,7 @@ class MoveWishlistToCartAPIView(APIView):
         ).delete()
 
         return CustomResponse().successResponse(data={},
-            message="Product moved from wishlist to cart"
+            description="Product moved from wishlist to cart"
         )
 
 
