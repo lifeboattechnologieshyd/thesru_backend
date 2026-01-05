@@ -1041,9 +1041,9 @@ class WishlistListAPIView(APIView):
 class RemoveFromWishlistAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
-    def delete(self, request, wishlist_id):
+    def delete(self, request, id):
         deleted, _ = Wishlist.objects.filter(
-            id=wishlist_id,
+            id=id,
             user_id=request.user.id
         ).delete()
 
