@@ -43,15 +43,15 @@ def get_client_ip(request):
 
 def send_otp_to_mobile(otp, mobile):
     try:
-        print("📨 [OTP SMS] Starting send_otp_to_mobile()")
-        print(f"📱 Mobile: {mobile}")
-        print(f"🔢 OTP: {otp}")
+        print(" [OTP SMS] Starting send_otp_to_mobile()")
+        print(f" Mobile: {mobile}")
+        print(f" OTP: {otp}")
 
         url = "https://sms.lifeboattechnologies.com/dev/bulkV2"
-        print(f"🌐 URL: {url}")
+        print(f" URL: {url}")
 
         payload = {
-            "variables_values": str(otp),
+            "variables_values": f"{otp} is your OTP to verify your mobile on SRU. This OTP is valid for 15 minutes. Please do not share your OTP with anyone. -SRU",
 
             "route": "dlt",
             "sms_details": "1",
@@ -61,23 +61,23 @@ def send_otp_to_mobile(otp, mobile):
             "message": settings.SMS_DLT_TEMPLATE_ID,
             "entity_id": settings.SMS_DLT_ENTITY_ID
         }
-        print("🔎 variables_values =", payload["variables_values"])
+        print(" variables_values =", payload["variables_values"])
 
 
 
-        print("📦 Payload:")
+        print(" Payload:")
         print(json.dumps(payload, indent=2))
 
         headers = {
             "accept": "application/json",
-            "authorization": "****MASKED_AUTH_KEY****",
+            "authorization": settings.SMS_AUTH_KEY,
             "content-type": "application/json"
         }
 
-        print("🧾 Headers:")
+        print(" Headers:")
         print(headers)
 
-        print("🚀 Sending SMS request...")
+        print(" Sending SMS request...")
         response = requests.post(
             url,
             headers={
@@ -89,26 +89,26 @@ def send_otp_to_mobile(otp, mobile):
             timeout=10
         )
 
-        print(f"📡 Response Status Code: {response.status_code}")
-        print(f"📨 Raw Response Text: {response.text}")
+        print(f"Response Status Code: {response.status_code}")
+        print(f"Raw Response Text: {response.text}")
 
         if response.status_code == 200:
             try:
                 data = response.json()
-                print("✅ Parsed JSON Response:")
+                print(" Parsed JSON Response:")
                 print(json.dumps(data, indent=2))
 
                 if data.get("status") in [True, "success", "ok"]:
                     print("🎉 OTP SMS sent successfully")
                     return True
             except Exception:
-                print("⚠️ Response is not JSON, assuming success")
+                print(" Response is not JSON, assuming success")
                 return True
 
-        print("❌ OTP SMS failed")
+        print(" OTP SMS failed")
         return False
 
     except Exception as e:
-        print("🔥 Exception occurred while sending OTP SMS")
+        print(" Exception occurred while sending OTP SMS")
         print(str(e))
         return False

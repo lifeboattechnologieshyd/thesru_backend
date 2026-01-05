@@ -122,7 +122,7 @@ class AddressMaster(AuditModel):
 
 class PinCode(AuditModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    pin = models.PositiveIntegerField()
+    pin = models.PositiveIntegerField(unique=True)
     state = models.CharField(max_length=25)
     area = models.CharField(max_length=100)
     city = models.CharField(max_length=100)
