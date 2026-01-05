@@ -987,7 +987,7 @@ class RemoveFromCartAPIView(APIView):
             )
 
         return CustomResponse().successResponse(data={},
-            message="Item removed from cart"
+            description="Item removed from cart"
         )
 
 class AddToWishlistAPIView(APIView):
