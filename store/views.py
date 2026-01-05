@@ -969,7 +969,7 @@ class UpdateCartAPIView(APIView):
 
         return CustomResponse().successResponse(
             data={},
-            message="Quantity updated successfully"
+            description="Quantity updated successfully"
         )
 
 class RemoveFromCartAPIView(APIView):
