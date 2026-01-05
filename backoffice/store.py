@@ -57,26 +57,39 @@ class ProductAPIView(APIView):
                 description="Database integrity error"
             )
     def get(self, request, id=None):
-        #  single product
+        # ---------- SINGLE CATEGORY ----------
         if id:
-            product = Product.objects.filter(id=id).values().first()
-            if not product:
-                return CustomResponse().errorResponse(
-                    description="Product not found"
+            category = Category.objects.filter(id=id).values().first()
+            if not category:
+                return CustomResponse.errorResponse(
+                    description="category not found"
                 )
 
-            return CustomResponse().successResponse(
-                data=[product],
+            return CustomResponse.successResponse(
+                data=[category],
                 total=1
             )
-        # all products
-        products = Product.objects.all().order_by("-created_at").values()
 
-        data = list(products)
+        # ---------- PAGINATION ----------
+        page = int(request.query_params.get("page", 1))
+        page_size = int(request.query_params.get("page_size", 10))
 
-        return CustomResponse().successResponse(
+        if page < 1 or page_size < 1:
+            return CustomResponse.errorResponse(
+                description="page and page_size must be positive integers"
+            )
+
+        queryset = Category.objects.all().order_by("-created_at")
+
+        total = queryset.count()
+        offset = (page - 1) * page_size
+        queryset = queryset[offset: offset + page_size]
+
+        data = list(queryset.values())
+
+        return CustomResponse.successResponse(
             data=data,
-            total=len(data)
+            total=total
         )
 
     def put(self, request, id=None):
@@ -157,8 +170,9 @@ class DisplayProductAPIView(APIView):
 
 
     def get(self, request, id=None):
-        queryset = DisplayProduct.objects.filter(is_active = True)
+        queryset = DisplayProduct.objects.filter(is_active=True)
 
+        # ---------- SINGLE DISPLAY PRODUCT ----------
         if id:
             product = queryset.filter(id=id).first()
             if not product:
@@ -188,9 +202,24 @@ class DisplayProductAPIView(APIView):
                 total=1
             )
 
-            #  LIST DISPLAY PRODUCTS
+        # ---------- PAGINATION ----------
+        page = int(request.query_params.get("page", 1))
+        page_size = int(request.query_params.get("page_size", 10))
+
+        if page < 1 or page_size < 1:
+            return CustomResponse().errorResponse(
+                description="page and page_size must be positive integers"
+            )
+
+        queryset = queryset.order_by("-created_at")
+
+        total = queryset.count()
+        offset = (page - 1) * page_size
+        queryset = queryset[offset: offset + page_size]
+
+        # ---------- LIST DISPLAY PRODUCTS ----------
         data = []
-        for product in queryset.order_by("-created_at"):
+        for product in queryset:
             data.append({
                 "id": str(product.id),
                 "default_product_id": str(product.default_product_id),
@@ -206,7 +235,7 @@ class DisplayProductAPIView(APIView):
 
         return CustomResponse().successResponse(
             data=data,
-            total=len(data)
+            total=total
         )
 
 
@@ -360,18 +389,42 @@ class BannerAPIView(APIView):
         )
         return CustomResponse.successResponse(data={},description="banner created successfully")
 
-    def get(self,request,id=None):
+    def get(self, request, id=None):
+        # ---------- SINGLE BANNER ----------
         if id:
             banner = Banner.objects.filter(id=id).values().first()
             if not banner:
-                return CustomResponse.errorResponse(description="banner id required")
-            return CustomResponse.successResponse(data=[banner],total=1)
+                return CustomResponse.errorResponse(
+                    description="banner id required"
+                )
 
-        banner = Banner.objects.all().order_by("-created_at").values()
+            return CustomResponse.successResponse(
+                data=[banner],
+                total=1
+            )
 
-        data = list(banner)
+        # ---------- PAGINATION ----------
+        page = int(request.query_params.get("page", 1))
+        page_size = int(request.query_params.get("page_size", 10))
 
-        return CustomResponse.successResponse(data=data,total=len(data))
+        if page < 1 or page_size < 1:
+            return CustomResponse.errorResponse(
+                description="page and page_size must be positive integers"
+            )
+
+        queryset = Banner.objects.all().order_by("-created_at")
+
+        total = queryset.count()
+        offset = (page - 1) * page_size
+        queryset = queryset[offset: offset + page_size]
+
+        data = list(queryset.values())
+
+        return CustomResponse.successResponse(
+            data=data,
+            total=total
+        )
+
 
     def put(self,request,id=None):
         if not id:
@@ -534,14 +587,16 @@ class InventoryAPIView(APIView):
                 "purchase_price":purchase_price,
             }
         )
-    def get(self, request,id=None):
-
+    def get(self, request, id=None):
         queryset = Inventory.objects.all()
 
+        # ---------- SINGLE INVENTORY ----------
         if id:
             inv = queryset.filter(id=id).first()
             if not inv:
-                return CustomResponse().errorResponse(description="Inventory not found")
+                return CustomResponse().errorResponse(
+                    description="Inventory not found"
+                )
 
             return CustomResponse().successResponse(
                 data={
@@ -555,14 +610,28 @@ class InventoryAPIView(APIView):
                     "purchase_price": inv.purchase_price,
                     "sale_price": inv.sale_price,
                     "created_at": inv.created_at,
-                }
+                },
+                total=1
             )
 
-        if id:
-            queryset = queryset.filter(product_id=id)
+        # ---------- PAGINATION ----------
+        page = int(request.query_params.get("page", 1))
+        page_size = int(request.query_params.get("page_size", 10))
 
+        if page < 1 or page_size < 1:
+            return CustomResponse().errorResponse(
+                description="page and page_size must be positive integers"
+            )
+
+        queryset = queryset.order_by("-created_at")
+
+        total = queryset.count()
+        offset = (page - 1) * page_size
+        queryset = queryset[offset: offset + page_size]
+
+        # ---------- LIST INVENTORY ----------
         data = []
-        for inv in queryset.order_by("-created_at"):
+        for inv in queryset:
             data.append({
                 "id": str(inv.id),
                 "product_id": str(inv.product_id),
@@ -574,7 +643,7 @@ class InventoryAPIView(APIView):
 
         return CustomResponse().successResponse(
             data=data,
-            total=len(data)
+            total=total
         )
 
 
@@ -643,18 +712,42 @@ class PinCodeAPIView(APIView):
 
         )
         return CustomResponse.successResponse(data={},description="pincode created successfully")
-    def get(self,request,id=None):
+    def get(self, request, id=None):
+        # ---------- SINGLE PINCODE ----------
         if id:
             pin = PinCode.objects.filter(id=id).values().first()
             if not pin:
-                return CustomResponse.errorResponse(description="pincode id required")
-            return CustomResponse.successResponse(data=[pin],total=1)
+                return CustomResponse.errorResponse(
+                    description="pincode id required"
+                )
 
-        pin = PinCode.objects.all().order_by("-created_at").values()
+            return CustomResponse.successResponse(
+                data=[pin],
+                total=1
+            )
 
-        data = list(pin)
+        # ---------- PAGINATION ----------
+        page = int(request.query_params.get("page", 1))
+        page_size = int(request.query_params.get("page_size", 10))
 
-        return CustomResponse.successResponse(data=data,total=len(data))
+        if page < 1 or page_size < 1:
+            return CustomResponse.errorResponse(
+                description="page and page_size must be positive integers"
+            )
+
+        queryset = PinCode.objects.all().order_by("-created_at")
+
+        total = queryset.count()
+        offset = (page - 1) * page_size
+        queryset = queryset[offset: offset + page_size]
+
+        data = list(queryset.values())
+
+        return CustomResponse.successResponse(
+            data=data,
+            total=total
+        )
+
 
     def put(self,request,id=None):
         if not id:
