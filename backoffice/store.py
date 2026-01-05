@@ -59,14 +59,14 @@ class ProductAPIView(APIView):
     def get(self, request, id=None):
         # ---------- SINGLE CATEGORY ----------
         if id:
-            category = Category.objects.filter(id=id).values().first()
-            if not category:
+            product = Product.objects.filter(id=id).values().first()
+            if not product:
                 return CustomResponse.errorResponse(
-                    description="category not found"
+                    description="product  not found"
                 )
 
             return CustomResponse.successResponse(
-                data=[category],
+                data=[product],
                 total=1
             )
 
@@ -79,7 +79,7 @@ class ProductAPIView(APIView):
                 description="page and page_size must be positive integers"
             )
 
-        queryset = Category.objects.all().order_by("-created_at")
+        queryset = Product.objects.all().order_by("-created_at")
 
         total = queryset.count()
         offset = (page - 1) * page_size
