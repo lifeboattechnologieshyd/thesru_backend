@@ -89,3 +89,21 @@ class Store(AuditModel):
     class Meta:
         db_table = "store"
 
+
+
+
+class TempUser(AuditModel):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    mobile = models.BigIntegerField(
+        null=True, validators=[MinValueValidator(1000000000), MaxValueValidator(9999999999)]
+    )
+    email = models.EmailField(max_length=100, null=True)
+    device_id = models.CharField(max_length=100,null=True)
+
+
+    class Meta:
+        db_table = "temp_user"
+        indexes = [
+            models.Index(fields=["mobile"]),
+            models.Index(fields=["email"]),
+        ]
