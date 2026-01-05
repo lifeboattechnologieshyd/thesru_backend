@@ -21,7 +21,7 @@ urlpatterns = [
     path("add/cart",AddToCartAPIView.as_view()),
     path("get/cart",CartListAPIView.as_view()),
     path("update/cart/<str:id>",UpdateCartAPIView.as_view()),
-    path("remove/cart",RemoveFromCartAPIView.as_view()),
+    path("remove/cart/<str:id>",RemoveFromCartAPIView.as_view()),
     path("add/wishlist",AddToWishlistAPIView.as_view()),
     path("get/wishlist",WishlistListAPIView.as_view()),
     path("remove/wishlist",RemoveFromWishlistAPIView.as_view()),

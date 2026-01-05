@@ -969,15 +969,15 @@ class UpdateCartAPIView(APIView):
 
         return CustomResponse().successResponse(
             data={},
-            description="Quantity updated successfully"
+            description="cart updated successfully"
         )
 
 class RemoveFromCartAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
-    def delete(self, request, cart_id):
+    def delete(self, request, id):
         deleted, _ = Cart.objects.filter(
-            id=cart_id,
+            id=id,
             user_id=request.user.id
         ).delete()
 
