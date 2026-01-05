@@ -946,7 +946,7 @@ class CartListAPIView(APIView):
 class UpdateCartAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
-    def patch(self, request, cart_id):
+    def put(self, request, cart_id):
         quantity = request.data.get("quantity")
 
         if not quantity or int(quantity) <= 0:
