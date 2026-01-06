@@ -481,22 +481,18 @@ class WishlistListAPIView(APIView):
         }
 
         # ---------- RESPONSE ----------
-        data = []
+        valid_items = []
 
         for item in wishlist_items:
             product = product_map.get(str(item.product_id))
             display = display_map.get(str(item.product_id))
 
-            # Skip broken references
             if not product or not display:
                 continue
 
-            data.append({
-                # ---------- unified identity ----------
-                "id":item.id,
+            valid_items.append({
                 "default_product_id": str(display.default_product_id),
 
-                # ---------- DisplayProduct ----------
                 "category": display.category,
                 "gender": display.gender,
                 "tags": display.tags,
@@ -510,17 +506,13 @@ class WishlistListAPIView(APIView):
                 "number_of_reviews": display.number_of_reviews,
                 "is_active": display.is_active,
 
-                # ---------- Product ----------
                 "name": product.name,
                 "size": product.size,
                 "colour": product.colour,
-
                 "selling_price": str(product.selling_price),
                 "mrp": str(product.mrp),
-
                 "gst_percentage": product.gst_percentage,
                 "gst_amount": str(product.gst_amount),
-
                 "current_stock": product.current_stock,
                 "images": product.images or [],
                 "videos": product.videos or [],
@@ -528,8 +520,8 @@ class WishlistListAPIView(APIView):
             })
 
         return CustomResponse.successResponse(
-            data=data,
-            total=total
+            data=valid_items,
+            total=len(valid_items)
         )
 
 class ProductDetailAPIView(APIView):
