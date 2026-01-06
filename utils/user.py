@@ -41,74 +41,45 @@ def get_client_ip(request):
     return ip
 
 
+def generate_otp():
+    # return "1234"
+    return str(random.randint(1000, 9999))
+
 def send_otp_to_mobile(otp, mobile):
     try:
-        print(" [OTP SMS] Starting send_otp_to_mobile()")
-        print(f" Mobile: {mobile}")
-        print(f" OTP: {otp}")
+        print("[OTP SMS] Sending OTP")
+        print("Mobile:", mobile)
+        print("OTP:", otp)
 
         url = "https://sms.lifeboattechnologies.com/dev/bulkV2"
-        print(f" URL: {url}")
 
-        payload = {
-            "variables_values": f"{otp} is your OTP to verify your mobile on SRU. This OTP is valid for 15 minutes. Please do not share your OTP with anyone. -SRU",
-
+        params = {
+            "authorization": settings.SMS_AUTH_KEY,   # same as URL
             "route": "dlt",
-            "sms_details": "1",
-            "flash": "1",
-            "numbers": str(mobile),
-            "sender_id": settings.SMS_SENDER_ID,
-            "message": settings.SMS_DLT_TEMPLATE_ID,
-            "entity_id": settings.SMS_DLT_ENTITY_ID
-        }
-        print(" variables_values =", payload["variables_values"])
-
-
-
-        print(" Payload:")
-        print(json.dumps(payload, indent=2))
-
-        headers = {
-            "accept": "application/json",
-            "authorization": settings.SMS_AUTH_KEY,
-            "content-type": "application/json"
+            "sender_id": settings.SMS_SENDER_ID,      # THESRU
+            "message": settings.SMS_DLT_TEMPLATE_ID,  # 8764
+            "variables_values": f"{otp}|",
+            "flash": "0",
+            "numbers": str(mobile)
         }
 
-        print(" Headers:")
-        print(headers)
+        print("Final URL Params:")
+        print(json.dumps(params, indent=2))
 
-        print(" Sending SMS request...")
-        response = requests.post(
+        response = requests.get(
             url,
-            headers={
-                "accept": "application/json",
-                "authorization": settings.SMS_AUTH_KEY,
-                "content-type": "application/json"
-            },
-            json=payload,
+            params=params,
             timeout=10
         )
 
-        print(f"Response Status Code: {response.status_code}")
-        print(f"Raw Response Text: {response.text}")
+        print("Response Status Code:", response.status_code)
+        print("Response Text:", response.text)
 
         if response.status_code == 200:
-            try:
-                data = response.json()
-                print(" Parsed JSON Response:")
-                print(json.dumps(data, indent=2))
+            return True
 
-                if data.get("status") in [True, "success", "ok"]:
-                    print("🎉 OTP SMS sent successfully")
-                    return True
-            except Exception:
-                print(" Response is not JSON, assuming success")
-                return True
-
-        print(" OTP SMS failed")
         return False
 
     except Exception as e:
-        print(" Exception occurred while sending OTP SMS")
-        print(str(e))
+        print("Error sending OTP SMS:", str(e))
         return False
