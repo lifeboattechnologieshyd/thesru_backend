@@ -6,7 +6,7 @@ from django.utils import timezone
 
 from rest_framework.permissions import IsAuthenticated
 
-from db.models import  Category, Product, DisplayProduct, Banner, Inventory, PinCode
+from db.models import  Category, Product, DisplayProduct, Banner, Inventory, PinCode, Coupon
 from enums.store import InventoryType
 from mixins.drf_views import CustomResponse
 
@@ -792,6 +792,103 @@ class PinCodeAPIView(APIView):
 
         pin.delete()
         return CustomResponse.successResponse(data={},description="pincode deleted successfully")
+
+
+
+class CouponAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self,request):
+        data = request.data
+
+        required_fields = ["bonus_code","start_date","expiry_date","minimum_cart_value","bonus_percentage",
+                           "maximum_bonus",]
+        for field in required_fields:
+            if not data.get(field):
+                return CustomResponse.errorResponse(description=f"{field} is required")
+
+        Coupon.objects.create(
+            bonus_code = data.get("bonus_code"),
+            start_date = data.get("start_date"),
+            expiry_date = data.get("expiry_date"),
+            minimum_cart_value = data.get("minimum_cart_value"),
+            bonus_percentage = data.get("bonus_percentage"),
+            maximum_bonus = data.get("maximum_bonus"),
+            terms = data.get("terms"),
+            validity_count = data.get("validity_count"),
+            short_title = data.get("short_title"),
+            long_title = data.get("long_title"),
+
+
+        )
+        return CustomResponse.successResponse(data={},description="coupon created successfully")
+
+
+    def get(self,request,id = None):
+        if id:
+            coupon = Coupon.objects.filter(id=id).values().first()
+            if not coupon:
+                return CustomResponse.errorResponse(
+                    description="coupon id required"
+                )
+
+            return CustomResponse.successResponse(
+                data=[coupon],
+                total=1
+            )
+        page = int(request.query_params.get("page", 1))
+        page_size = int(request.query_params.get("page_size", 10))
+
+        if page < 1 or page_size < 1:
+            return CustomResponse.errorResponse(
+                description="page and page_size must be positive integers"
+            )
+
+        queryset = Coupon.objects.all().order_by("-created_at")
+
+        total = queryset.count()
+        offset = (page - 1) * page_size
+        queryset = queryset[offset: offset + page_size]
+
+        data = list(queryset.values())
+
+        return CustomResponse.successResponse(
+            data=data,
+            total=total
+        )
+    def put(self,request,id=None):
+        if not id:
+            return CustomResponse.errorResponse(description="coupon id required")
+
+        coupon = Coupon.objects.filter(id=id).first()
+
+        if not coupon:
+            return CustomResponse.errorResponse(description="coupon not found")
+
+
+        for field in [
+            "start_date","state","area","city","country",
+        ]:
+            if field in request.data:
+                setattr(coupon,field,request.data.get(field))
+
+        coupon.save()
+        return CustomResponse.successResponse(data={},description="coupon updated successfully")
+
+    def delete(self,request,id=None):
+        if not id:
+            return CustomResponse.errorResponse(description="coupon id required")
+
+        coupon = Coupon.objects.filter(id=id).filter()
+        if not coupon:
+            return CustomResponse.errorResponse(description="coupon not found")
+
+        coupon.delete()
+        return CustomResponse.successResponse(data={},description="coupon deleted successfully")
+
+
+
+
 
 
 

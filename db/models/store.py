@@ -46,7 +46,7 @@ class DisplayProduct(AuditModel):
     number_of_reviews = models.PositiveIntegerField(default=0)
 
     class Meta:
-        db_table = " display_product"
+        db_table = "display_product"
 
 
 class Category(AuditModel):

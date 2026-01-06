@@ -107,3 +107,27 @@ class TempUser(AuditModel):
             models.Index(fields=["mobile"]),
             models.Index(fields=["email"]),
         ]
+
+
+class Coupon(AuditModel):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    bonus_code = models.CharField(max_length=50)
+    short_title = models.CharField(max_length=50,null=True)
+    long_title = models.CharField(max_length=50,null=True)
+    start_date = models.DateTimeField()
+    expiry_date = models.DateTimeField()
+    minimum_cart_value = models.DecimalField(decimal_places=2, max_digits=10)
+    bonus_percentage = models.CharField(max_length=50,null=True)
+    maximum_bonus = models.DecimalField(decimal_places=2, max_digits=10)
+    terms = models.CharField(max_length=1000,null=True)
+    validity_count = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        db_table = "coupon"
+
+
+
+
+
+
+
