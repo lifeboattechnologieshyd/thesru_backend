@@ -186,7 +186,7 @@ CASHFREE_WEBHOOK = "https://dev-api.sru.ai/payment/paymentWebhook"
 SIMPLE_JWT = {
     "BLACKLIST_DB_ALIAS": "default",
     "ACCESS_TOKEN_LIFETIME": timedelta(
-        days=float(os.getenv("ACCESS_TOKEN_LIFETIME_IN_MINUTES", 1))
+        days=float(os.getenv("ACCESS_TOKEN_LIFETIME_IN_DAYS", 7))
     ),
     "REFRESH_TOKEN_LIFETIME": timedelta(
         days=float(os.getenv("REFRESH_TOKEN_LIFETIME_IN_DAYS", 7))
