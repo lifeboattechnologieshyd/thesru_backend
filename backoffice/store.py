@@ -701,17 +701,31 @@ class PinCodeAPIView(APIView):
             if not data.get(field):
                 return CustomResponse.errorResponse(description=f"{field} is required")
 
-        PinCode.objects.create(
+
+        try:
+            PinCode.objects.create(
             pin = data.get("pin"),
             state = data.get("state"),
             area = data.get("area"),
             city = data.get("city"),
             country = data.get("country")
+            )
+            return CustomResponse.successResponse(data={},description="pincode created successfully")
+
+        except IntegrityError as e:
+            if "pin" in str(e).lower():
+                return CustomResponse.errorResponse(
+                    description="This pincode already exists"
+                )
+            return CustomResponse.errorResponse(
+                description="Database integrity error"
+            )
 
 
 
-        )
-        return CustomResponse.successResponse(data={},description="pincode created successfully")
+
+
+
     def get(self, request, id=None):
         # ---------- SINGLE PINCODE ----------
         if id:
