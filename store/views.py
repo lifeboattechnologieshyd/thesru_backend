@@ -376,6 +376,161 @@ class ProductListAPIView(APIView):
         )
 
 
+# class WishlistListAPIView(APIView):
+#     permission_classes = [IsAuthenticated]
+#
+#     def get(self, request):
+#         user_id = request.user.id
+#
+#         page = int(request.query_params.get("page", 1))
+#         limit = int(request.query_params.get("limit", 10))
+#
+#         if page < 1 or limit < 1:
+#             return CustomResponse().errorResponse(
+#                 description="page and limit must be positive integers"
+#             )
+#
+#         offset = (page - 1) * limit
+#
+#         # ---------- WISHLIST QUERY ----------
+#         qs = Wishlist.objects.filter(user_id=user_id).order_by("-created_at")
+#         total = qs.count()
+#
+#         wishlist_items = qs[offset: offset + limit]
+#
+#         # ---------- FETCH PRODUCTS (ONE QUERY) ----------
+#         product_ids = [item.product_id for item in wishlist_items]
+#
+#         products = Product.objects.filter(id__in=product_ids)
+#         product_map = {str(p.id): p for p in products}
+#
+#         # ---------- BUILD RESPONSE ----------
+#         data = []
+#         for item in wishlist_items:
+#             product = product_map.get(str(item.product_id))
+#
+#             data.append({
+#                 "wishlist_id": str(item.id),
+#
+#                 # ---- PRODUCT DETAILS ----
+#                 "product": {
+#                     "id": str(product.id) if product else None,
+#                     "sku": product.sku if product else None,
+#                     "name": product.name if product else None,
+#                     "size": product.size if product else None,
+#                     "colour": product.colour if product else None,
+#                     "mrp": product.mrp if product else None,
+#                     "selling_price": product.selling_price if product else None,
+#                     "inr": product.inr if product else None,
+#                     "gst_percentage": product.gst_percentage if product else None,
+#                     "gst_amount": product.gst_amount if product else None,
+#                     "current_stock": product.current_stock if product else None,
+#                     "thumbnail_image": product.thumbnail_image if product else None,
+#                     "images": product.images if product else [],
+#                     "videos": product.videos if product else [],
+#
+#                 }
+#             })
+#
+#         return CustomResponse().successResponse(
+#             data=data,
+#             total=total
+#         )
+
+class WishlistListAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        user_id = request.user.id
+
+        page = int(request.query_params.get("page", 1))
+        page_size = int(request.query_params.get("page_size", 10))
+
+        if page < 1 or page_size < 1:
+            return CustomResponse.errorResponse(
+                description="page and page_size must be positive integers"
+            )
+
+        offset = (page - 1) * page_size
+
+        # ---------- Wishlist ----------
+        wishlist_qs = Wishlist.objects.filter(
+            user_id=user_id
+        ).order_by("-created_at")
+
+        total = wishlist_qs.count()
+        wishlist_items = wishlist_qs[offset: offset + page_size]
+
+        # ---------- Display Products ----------
+        display_qs = DisplayProduct.objects.filter(
+            default_product_id__in=[w.product_id for w in wishlist_items],
+            is_active=True
+        )
+
+        display_map = {
+            str(d.default_product_id): d for d in display_qs
+        }
+
+        # ---------- Products ----------
+        products = Product.objects.filter(
+            id__in=[w.product_id for w in wishlist_items]
+        )
+
+        product_map = {
+            str(p.id): p for p in products
+        }
+
+        # ---------- RESPONSE ----------
+        data = []
+
+        for item in wishlist_items:
+            product = product_map.get(str(item.product_id))
+            display = display_map.get(str(item.product_id))
+
+            # Skip broken references
+            if not product or not display:
+                continue
+
+            data.append({
+                # ---------- unified identity ----------
+                "default_product_id": str(display.default_product_id),
+
+                # ---------- DisplayProduct ----------
+                "category": display.category,
+                "gender": display.gender,
+                "tags": display.tags,
+                "search_tags": display.search_tags,
+                "product_name": display.product_name,
+                "product_tagline": display.product_tagline,
+                "age": display.age,
+                "description": display.description,
+                "highlights": display.highlights,
+                "rating": display.rating,
+                "number_of_reviews": display.number_of_reviews,
+                "is_active": display.is_active,
+
+                # ---------- Product ----------
+                "name": product.name,
+                "size": product.size,
+                "colour": product.colour,
+
+                "selling_price": str(product.selling_price),
+                "mrp": str(product.mrp),
+
+                "gst_percentage": product.gst_percentage,
+                "gst_amount": str(product.gst_amount),
+
+                "current_stock": product.current_stock,
+                "images": product.images or [],
+                "videos": product.videos or [],
+                "thumbnail_image": product.thumbnail_image,
+            })
+
+        return CustomResponse.successResponse(
+            data=data,
+            total=total
+        )
+
 class ProductDetailAPIView(APIView):
     permission_classes = [AllowAny]
 
@@ -1116,65 +1271,6 @@ class AddToWishlistAPIView(APIView):
 #         )
 
 
-class WishlistListAPIView(APIView):
-    permission_classes = [IsAuthenticated]
-
-    def get(self, request):
-        user_id = request.user.id
-
-        page = int(request.query_params.get("page", 1))
-        limit = int(request.query_params.get("limit", 10))
-
-        if page < 1 or limit < 1:
-            return CustomResponse().errorResponse(
-                description="page and limit must be positive integers"
-            )
-
-        offset = (page - 1) * limit
-
-        # ---------- WISHLIST QUERY ----------
-        qs = Wishlist.objects.filter(user_id=user_id).order_by("-created_at")
-        total = qs.count()
-
-        wishlist_items = qs[offset: offset + limit]
-
-        # ---------- FETCH PRODUCTS (ONE QUERY) ----------
-        product_ids = [item.product_id for item in wishlist_items]
-
-        products = Product.objects.filter(id__in=product_ids)
-        product_map = {str(p.id): p for p in products}
-
-        # ---------- BUILD RESPONSE ----------
-        data = []
-        for item in wishlist_items:
-            product = product_map.get(str(item.product_id))
-
-            data.append({
-                "wishlist_id": str(item.id),
-
-                # ---- PRODUCT DETAILS ----
-                "product": {
-                    "id": str(product.id) if product else None,
-                    "sku": product.sku if product else None,
-                    "name": product.name if product else None,
-                    "size": product.size if product else None,
-                    "colour": product.colour if product else None,
-                    "mrp": product.mrp if product else None,
-                    "selling_price": product.selling_price if product else None,
-                    "inr": product.inr if product else None,
-                    "gst_percentage": product.gst_percentage if product else None,
-                    "gst_amount": product.gst_amount if product else None,
-                    "current_stock": product.current_stock if product else None,
-                    "thumbnail_image": product.thumbnail_image if product else None,
-                    "images": product.images if product else [],
-                    "videos": product.videos if product else [],
-                }
-            })
-
-        return CustomResponse().successResponse(
-            data=data,
-            total=total
-        )
 
 class RemoveFromWishlistAPIView(APIView):
     permission_classes = [IsAuthenticated]
