@@ -515,11 +515,11 @@ class WishlistListAPIView(APIView):
             display = display_map.get(pid)  # may be same DP for both
 
             data.append({
-                # ✅ Wishlist
+                # Wishlist
                 "wishlist_id": str(item.id),
 
-                # ✅ DisplayProduct (same for default + variant)
-                "default_product_id": str(display.default_product_id) if display else None,
+                # DisplayProduct (same for default + variant)
+                "product_id": pid,
                 "category": display.category if display else [],
                 "gender": display.gender if display else None,
                 "tags": display.tags if display else [],
@@ -533,8 +533,7 @@ class WishlistListAPIView(APIView):
                 "number_of_reviews": display.number_of_reviews if display else 0,
                 "is_active": display.is_active if display else False,
 
-                # ✅ Product (DIFFERENT for default & variant)
-                "product_id": pid,
+                #  Product (DIFFERENT for default & variant)
                 "sku": product.sku,
                 "name": product.name,
                 "size": product.size,
