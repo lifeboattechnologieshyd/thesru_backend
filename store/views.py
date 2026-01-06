@@ -458,53 +458,25 @@ class WishlistListAPIView(APIView):
             user_id=user_id
         ).order_by("-created_at")
 
-        total = wishlist_qs.count()
         wishlist_items = wishlist_qs[offset: offset + page_size]
 
-        # ---------- Display Products ----------
-        display_qs = DisplayProduct.objects.filter(
-            default_product_id__in=[w.product_id for w in wishlist_items],
-            is_active=True
-        )
-
-        display_map = {
-            str(d.default_product_id): d for d in display_qs
-        }
+        product_ids = [w.product_id for w in wishlist_items]
 
         # ---------- Products ----------
-        products = Product.objects.filter(
-            id__in=[w.product_id for w in wishlist_items]
-        )
-
-        product_map = {
-            str(p.id): p for p in products
-        }
+        products = Product.objects.filter(id__in=product_ids)
+        product_map = {str(p.id): p for p in products}
 
         # ---------- RESPONSE ----------
-        valid_items = []
+        data = []
 
         for item in wishlist_items:
             product = product_map.get(str(item.product_id))
-            display = display_map.get(str(item.product_id))
-
-            if not product or not display:
+            if not product:
                 continue
 
-            valid_items.append({
-                "default_product_id": str(display.default_product_id),
-
-                "category": display.category,
-                "gender": display.gender,
-                "tags": display.tags,
-                "search_tags": display.search_tags,
-                "product_name": display.product_name,
-                "product_tagline": display.product_tagline,
-                "age": display.age,
-                "description": display.description,
-                "highlights": display.highlights,
-                "rating": display.rating,
-                "number_of_reviews": display.number_of_reviews,
-                "is_active": display.is_active,
+            data.append({
+                "wishlist_id": str(item.id),
+                "product_id": str(product.id),
 
                 "name": product.name,
                 "size": product.size,
@@ -520,8 +492,8 @@ class WishlistListAPIView(APIView):
             })
 
         return CustomResponse.successResponse(
-            data=valid_items,
-            total=len(valid_items)
+            data=data,
+            total=len(data)
         )
 
 class ProductDetailAPIView(APIView):
