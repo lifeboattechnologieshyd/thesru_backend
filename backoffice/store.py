@@ -6,7 +6,7 @@ from django.utils import timezone
 
 from rest_framework.permissions import IsAuthenticated
 
-from db.models import  Category, Product, DisplayProduct, Banner, Inventory, PinCode, Coupon
+from db.models import  Category, Product, DisplayProduct, Banner, Inventory, PinCode, Coupon, Store
 from enums.store import InventoryType
 from mixins.drf_views import CustomResponse
 
@@ -890,6 +890,124 @@ class CouponAPIView(APIView):
 
 
 
+class StoreAPIView(APIView):
+    permission_classes = [IsAuthenticated]
 
+    # ---------------- CREATE STORE ----------------
+    def post(self, request):
+        data = request.data
+
+        required_fields = ["name", "mobile", "address", "logo", "gst_number"]
+        for field in required_fields:
+            if not data.get(field):
+                return CustomResponse.errorResponse(
+                    description=f"{field} is required"
+                )
+
+        try:
+            Store.objects.create(
+                name=data.get("name"),
+                mobile=data.get("mobile"),
+                address=data.get("address"),
+                logo=data.get("logo"),
+                gst_number=data.get("gst_number"),
+            )
+
+            return CustomResponse.successResponse(
+                data={},
+                description="store created successfully"
+            )
+
+        except IntegrityError:
+            return CustomResponse.errorResponse(
+                description="Database integrity error"
+            )
+
+    # ---------------- GET STORE / LIST ----------------
+    def get(self, request, id=None):
+        # ---------- SINGLE STORE ----------
+        if id:
+            store = Store.objects.filter(id=id).values().first()
+            if not store:
+                return CustomResponse.errorResponse(
+                    description="store not found"
+                )
+
+            return CustomResponse.successResponse(
+                data=[store],
+                total=1
+            )
+
+        # ---------- PAGINATION ----------
+        page = int(request.query_params.get("page", 1))
+        page_size = int(request.query_params.get("page_size", 10))
+
+        if page < 1 or page_size < 1:
+            return CustomResponse.errorResponse(
+                description="page and page_size must be positive integers"
+            )
+
+        queryset = Store.objects.all().order_by("-created_at")
+
+        total = queryset.count()
+        offset = (page - 1) * page_size
+        queryset = queryset[offset: offset + page_size]
+
+        data = list(queryset.values())
+
+        return CustomResponse.successResponse(
+            data=data,
+            total=total
+        )
+
+    # ---------------- UPDATE STORE ----------------
+    def put(self, request, id=None):
+        if not id:
+            return CustomResponse.errorResponse(
+                description="store id required"
+            )
+
+        store = Store.objects.filter(id=id).first()
+        if not store:
+            return CustomResponse.errorResponse(
+                description="store not found"
+            )
+
+        for field in [
+            "name",
+            "mobile",
+            "address",
+            "logo",
+            "gst_number",
+        ]:
+            if field in request.data:
+                setattr(store, field, request.data.get(field))
+
+        store.save()
+
+        return CustomResponse.successResponse(
+            data={},
+            description="store updated successfully"
+        )
+
+    # ---------------- DELETE STORE ----------------
+    def delete(self, request, id=None):
+        if not id:
+            return CustomResponse.errorResponse(
+                description="store id required"
+            )
+
+        store = Store.objects.filter(id=id)
+        if not store.exists():
+            return CustomResponse.errorResponse(
+                description="store not found"
+            )
+
+        store.delete()
+
+        return CustomResponse.successResponse(
+            data={},
+            description="store deleted successfully"
+        )
 
 
