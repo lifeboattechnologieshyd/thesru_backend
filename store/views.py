@@ -493,6 +493,7 @@ class WishlistListAPIView(APIView):
 
             data.append({
                 # ---------- unified identity ----------
+                "id":wishlist_qs.id,
                 "default_product_id": str(display.default_product_id),
 
                 # ---------- DisplayProduct ----------
