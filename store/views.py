@@ -509,31 +509,31 @@ class WishlistListAPIView(APIView):
             pid = str(item.product_id)
 
             product = product_map.get(pid)
-            display = display_map.get(pid)
+            if not product:
+                continue  # product truly missing (rare)
 
-            if not product or not display:
-                continue
+            display = display_map.get(pid)  # may be same DP for both
 
             data.append({
                 # ✅ Wishlist
                 "wishlist_id": str(item.id),
 
-                # ✅ DisplayProduct fields
-                "default_product_id": str(display.default_product_id),
-                "category": display.category,
-                "gender": display.gender,
-                "tags": display.tags,
-                "search_tags": display.search_tags,
-                "product_name": display.product_name,
-                "product_tagline": display.product_tagline,
-                "age": display.age,
-                "description": display.description,
-                "highlights": display.highlights,
-                "rating": display.rating,
-                "number_of_reviews": display.number_of_reviews,
-                "is_active": display.is_active,
+                # ✅ DisplayProduct (same for default + variant)
+                "default_product_id": str(display.default_product_id) if display else None,
+                "category": display.category if display else [],
+                "gender": display.gender if display else None,
+                "tags": display.tags if display else [],
+                "search_tags": display.search_tags if display else [],
+                "product_name": display.product_name if display else product.name,
+                "product_tagline": display.product_tagline if display else None,
+                "age": display.age if display else 0,
+                "description": display.description if display else None,
+                "highlights": display.highlights if display else [],
+                "rating": display.rating if display else None,
+                "number_of_reviews": display.number_of_reviews if display else 0,
+                "is_active": display.is_active if display else False,
 
-                # ✅ Product fields (variant-aware)
+                # ✅ Product (DIFFERENT for default & variant)
                 "product_id": pid,
                 "sku": product.sku,
                 "name": product.name,
@@ -548,6 +548,7 @@ class WishlistListAPIView(APIView):
                 "videos": product.videos or [],
                 "thumbnail_image": product.thumbnail_image,
             })
+
 
         return CustomResponse.successResponse(
             data=data,
