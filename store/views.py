@@ -3,6 +3,7 @@ from unicodedata import category
 import requests
 from django.db import transaction
 from django.db import IntegrityError
+from django.db.models import Q
 
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated,AllowAny
@@ -437,6 +438,7 @@ class ProductListAPIView(APIView):
 #             total=total
 #         )
 
+
 class WishlistListAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -453,31 +455,87 @@ class WishlistListAPIView(APIView):
 
         offset = (page - 1) * page_size
 
-        # ---------- Wishlist ----------
+        # ------------------------------------------------
+        # 1️⃣ Wishlist
+        # ------------------------------------------------
         wishlist_qs = Wishlist.objects.filter(
             user_id=user_id
         ).order_by("-created_at")
 
         wishlist_items = wishlist_qs[offset: offset + page_size]
 
-        product_ids = [w.product_id for w in wishlist_items]
+        product_ids = [str(w.product_id) for w in wishlist_items]
 
-        # ---------- Products ----------
+        if not product_ids:
+            return CustomResponse.successResponse(data=[], total=0)
+
+        # ------------------------------------------------
+        # 2️⃣ Products (default + variants)
+        # ------------------------------------------------
         products = Product.objects.filter(id__in=product_ids)
-        product_map = {str(p.id): p for p in products}
 
-        # ---------- RESPONSE ----------
+        product_map = {
+            str(p.id): p for p in products
+        }
+
+        # ------------------------------------------------
+        # 3️⃣ DisplayProducts (MATCH DEFAULT OR VARIANT)
+        # ------------------------------------------------
+        display_products = DisplayProduct.objects.filter(
+            Q(default_product_id__in=product_ids) |
+            Q(variant_product_id__overlap=product_ids),
+            is_active=True
+        )
+
+        # Build lookup:
+        # product_id -> display_product
+        display_map = {}
+
+        for dp in display_products:
+            # default product
+            display_map[str(dp.default_product_id)] = dp
+
+            # variant products
+            if dp.variant_product_id:
+                for vid in dp.variant_product_id:
+                    display_map[str(vid)] = dp
+
+        # ------------------------------------------------
+        # 4️⃣ RESPONSE
+        # ------------------------------------------------
         data = []
 
         for item in wishlist_items:
-            product = product_map.get(str(item.product_id))
-            if not product:
+            pid = str(item.product_id)
+
+            product = product_map.get(pid)
+            display = display_map.get(pid)
+
+            if not product or not display:
                 continue
 
             data.append({
+                # ✅ Wishlist
                 "wishlist_id": str(item.id),
-                "product_id": str(product.id),
 
+                # ✅ DisplayProduct fields
+                "default_product_id": str(display.default_product_id),
+                "category": display.category,
+                "gender": display.gender,
+                "tags": display.tags,
+                "search_tags": display.search_tags,
+                "product_name": display.product_name,
+                "product_tagline": display.product_tagline,
+                "age": display.age,
+                "description": display.description,
+                "highlights": display.highlights,
+                "rating": display.rating,
+                "number_of_reviews": display.number_of_reviews,
+                "is_active": display.is_active,
+
+                # ✅ Product fields (variant-aware)
+                "product_id": pid,
+                "sku": product.sku,
                 "name": product.name,
                 "size": product.size,
                 "colour": product.colour,
