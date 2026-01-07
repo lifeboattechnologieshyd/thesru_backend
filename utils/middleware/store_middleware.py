@@ -10,7 +10,7 @@ class StoreMiddleware:
 
         # ✅ APIs that do NOT need store
         self.exempt_paths = [
-            "/store",
+            "backoffice/store",
 
         ]
 
