@@ -85,6 +85,10 @@ class Store(AuditModel):
     address = models.CharField(max_length=100)
     logo = models.CharField(max_length=300)
     gst_number = models.CharField(max_length=100)
+    client_id = models.CharField(null=False, unique=True)
+    client_secret = models.CharField(null=False, unique=True)
+    webhook = models.CharField(max_length=100)
+    url = models.CharField(max_length=100)
 
     class Meta:
         db_table = "store"
