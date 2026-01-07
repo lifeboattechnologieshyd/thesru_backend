@@ -8,12 +8,19 @@ class StoreMiddleware:
     def __init__(self, get_response):
         self.get_response = get_response
 
-    def __call__(self, request):
-        store_id = request.headers.get("X-STORE-ID")
+        # ✅ APIs that do NOT need store
+        self.exempt_paths = [
+            "/store",
 
-        # Skip admin / auth if needed
-        if request.path.startswith("/admin/"):
-            return self.get_response(request)
+        ]
+
+    def __call__(self, request):
+        # ✅ Skip exempt paths
+        for path in self.exempt_paths:
+            if request.path.startswith(path):
+                return self.get_response(request)
+
+        store_id = request.headers.get("X-STORE-ID")
 
         if not store_id:
             return JsonResponse(
@@ -49,7 +56,7 @@ class StoreMiddleware:
                 status=404
             )
 
-        # Attach store to request
+        # 🔥 Attach store to request
         request.store = store
 
         return self.get_response(request)
