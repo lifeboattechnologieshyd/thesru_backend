@@ -229,6 +229,7 @@ CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOW_HEADERS = [
     *default_headers,
     "x-request-id",
+    "x-store-id",
 ]
 CORS_EXPOSE_HEADERS = [
     "x-request-id",
