@@ -141,6 +141,8 @@ class DisplayProductAPIView(APIView):
 
     def post(self,request):
         data = request.data
+        store = request.store
+
 
         required_fields = ["default_product_id", "category","product_name"]
         for field in required_fields:
@@ -149,6 +151,7 @@ class DisplayProductAPIView(APIView):
                     description=f"{field} is required"
                 )
         DisplayProduct.objects.create(
+            store_id=store.id,
             default_product_id = data.get("default_product_id"),
             variant_product_id = data.get("variant_product_id"),
             is_active = data.get("is_active"),
@@ -291,6 +294,8 @@ class CategoriesAPIView(APIView):
 
     def post(self,request):
         data = request.data
+        store = request.store
+
 
         required_fields = ["name","icon","search_tags","is_active"]
         for field in required_fields:
@@ -298,6 +303,7 @@ class CategoriesAPIView(APIView):
                 return CustomResponse.errorResponse(description=f"{field} is required")
 
         Category.objects.create(
+            store_id=store.id,
             name = data.get("name"),
             icon = data.get("icon"),
             search_tags = data.get("search_tags"),
@@ -375,12 +381,15 @@ class BannerAPIView(APIView):
 
     def post(self,request):
         data = request.data
+        store = request.store
+
         required_fields = ["screen","image","is_active","priority","action","destination"]
         for field in required_fields:
             if not data.get(field):
                 return CustomResponse.errorResponse(description=f"{field} is required")
 
         Banner.objects.create(
+            store_id=store.id,
             screen = data.get("screen"),
             image = data.get("image"),
             is_active = data.get("is_active"),
@@ -469,6 +478,8 @@ class InventoryAPIView(APIView):
 
     def post(self, request):
         data = request.data
+        store = request.store
+
 
         required_fields = [
             "product_id", "sku", "type", "quantity"
@@ -560,6 +571,7 @@ class InventoryAPIView(APIView):
         # 4️⃣ Save inventory atomically
         with transaction.atomic():
             inventory = Inventory.objects.create(
+                store_id=store.id,
                 product_id=product_id,
                 sku=sku,
                 type=inv_type,
@@ -700,6 +712,7 @@ class PinCodeAPIView(APIView):
 
     def post(self,request):
         data = request.data
+
 
         required_fields = ["pin","state","area","city","country"]
         for field in required_fields:
