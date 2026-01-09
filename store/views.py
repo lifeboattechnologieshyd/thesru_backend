@@ -55,8 +55,10 @@ class AddressAPIView(APIView):
         )
         return CustomResponse.successResponse(data={},description="address created successfully")
     def get(self,request,id=None):
+        store = request.store
+
         if id:
-            address = AddressMaster.objects.filter(id=id,user_id=request.user.id).first()
+            address = AddressMaster.objects.filter(id=id,user_id=request.user.id,store_id=store.id).first()
             if not address:
                 return CustomResponse.errorResponse(description="address not found")
 
@@ -450,6 +452,8 @@ class WishlistListAPIView(APIView):
 
     def get(self, request):
         user_id = request.user.id
+        store = request.store
+
 
         page = int(request.query_params.get("page", 1))
         page_size = int(request.query_params.get("page_size", 10))
@@ -465,7 +469,8 @@ class WishlistListAPIView(APIView):
         # 1️⃣ Wishlist
         # ------------------------------------------------
         wishlist_qs = Wishlist.objects.filter(
-            user_id=user_id
+            user_id=user_id,store_id=store.id
+
         ).order_by("-created_at")
 
         wishlist_items = wishlist_qs[offset: offset + page_size]
@@ -564,10 +569,14 @@ class ProductDetailAPIView(APIView):
     permission_classes = [AllowAny]
 
     def get(self, request, id):
+        store = request.store
+
         #  Fetch DisplayProduct using default_product_id
         display_product = DisplayProduct.objects.filter(
             default_product_id=id,
-            is_active=True
+            is_active=True,
+            store_id=store.id
+
         ).first()
 
         if not display_product:
@@ -923,9 +932,13 @@ class BannerListView(APIView):
     permission_classes = [AllowAny]
 
     def get(self, request, id=None):
+        store = request.store
+
+
         action = request.query_params.get("action")
 
-        queryset = Banner.objects.filter(is_active=True)
+        queryset = Banner.objects.filter(is_active=True,store_id=store.id
+)
 
         #  ACTION FILTER
         if action is not None:
@@ -1018,8 +1031,11 @@ class CategoryListView(APIView):
     permission_classes = [AllowAny]
 
     def get(self, request, id=None):
+        store = request.store
 
-        queryset = Category.objects.filter(is_active=True)
+
+        queryset = Category.objects.filter(is_active=True,store_id=store.id
+)
 
         # SINGLE CATEGORY
         if id:
@@ -1137,6 +1153,9 @@ class CartListAPIView(APIView):
 
     def get(self, request):
         user_id = request.user.id
+        store = request.store
+
+
 
         page = int(request.query_params.get("page", 1))
         limit = int(request.query_params.get("limit", 10))
@@ -1148,7 +1167,7 @@ class CartListAPIView(APIView):
 
         offset = (page - 1) * limit
 
-        qs = Cart.objects.filter(user_id=user_id).order_by("-created_at")
+        qs = Cart.objects.filter(user_id=user_id,store_id=store.id).order_by("-created_at")
         total = qs.count()
 
         cart_items = qs[offset: offset + limit]
@@ -1330,6 +1349,8 @@ class MoveWishlistToCartAPIView(APIView):
 
     def post(self, request):
         user_id = request.user.id
+        store = request.store
+
         product_id = request.data.get("product_id")
 
         if not product_id:
@@ -1339,7 +1360,9 @@ class MoveWishlistToCartAPIView(APIView):
 
         wishlist_exists = Wishlist.objects.filter(
             user_id=user_id,
-            product_id=product_id
+            product_id=product_id,
+            store_id=store.id
+
         ).exists()
 
         if not wishlist_exists:
@@ -1372,8 +1395,11 @@ class CartTotalAPIView(APIView):
 
     def get(self, request):
         user_id = request.user.id
+        store = request.store
 
-        cart_items = Cart.objects.filter(user_id=user_id)
+
+        cart_items = Cart.objects.filter(user_id=user_id,store_id=store.id
+)
 
         total_amount = 0
         items = []
