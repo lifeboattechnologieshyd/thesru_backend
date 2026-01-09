@@ -375,7 +375,6 @@ class MobileVerifyOTPView(APIView):
     permission_classes = [AllowAny]
 
     def post(self, request):
-        # 🔒 Store is mandatory (set by middleware)
         store = request.store
 
         mobile = request.data.get("mobile")

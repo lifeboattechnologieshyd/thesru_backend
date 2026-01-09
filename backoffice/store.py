@@ -17,6 +17,8 @@ class ProductAPIView(APIView):
 
     def post(self,request):
         data = request.data
+        store = request.store
+
 
         required_fields = ["name", "mrp", "selling_price","thumbnail_image"]
         for field in required_fields:
@@ -26,6 +28,7 @@ class ProductAPIView(APIView):
                 )
         try:
             Product.objects.create(
+                store_id=store.id,
                 name=data.get("name"),
                 size=data.get("size"),
                 colour=data.get("colour"),
@@ -41,6 +44,7 @@ class ProductAPIView(APIView):
                 images=data.get("images"),
                 videos=data.get("videos"),
                 thumbnail_image=data.get("thumbnail_image")
+
             )
 
             return CustomResponse.successResponse(
