@@ -33,7 +33,7 @@ class AddressAPIView(APIView):
                 return CustomResponse.errorResponse(description=f"{field} is required")
 
         if data.get("is_default"):
-            AddressMaster.objects.filter(user_id=request.user.id,is_default = True,store_id=store_id).update(is_default = False)
+            AddressMaster.objects.filter(user_id=request.user.id,is_default = True).update(is_default = False)
 
         AddressMaster.objects.create(
             store_id=store.id,
@@ -1065,6 +1065,8 @@ class AddToCartAPIView(APIView):
 
     def post(self, request):
         user_id = request.user.id
+        store = request.store
+
         product_id = request.data.get("product_id")
         quantity = int(request.data.get("quantity", 1))
 
@@ -1080,6 +1082,7 @@ class AddToCartAPIView(APIView):
             )
 
         cart_item, created = Cart.objects.get_or_create(
+            store_id=store.id,
             user_id=user_id,
             product_id=product_id,
             defaults={"quantity": quantity}
@@ -1256,6 +1259,7 @@ class AddToWishlistAPIView(APIView):
 
     def post(self, request):
         user_id = request.user.id
+        store = request.store
         product_id = request.data.get("product_id")
 
         if not product_id:
@@ -1264,6 +1268,7 @@ class AddToWishlistAPIView(APIView):
             )
 
         obj, created = Wishlist.objects.get_or_create(
+            store_id=store.id,
             user_id=user_id,
             product_id=product_id
         )
