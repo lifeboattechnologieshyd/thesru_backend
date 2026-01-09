@@ -6,7 +6,8 @@ from django.utils import timezone
 
 from rest_framework.permissions import IsAuthenticated
 
-from db.models import  Category, Product, DisplayProduct, Banner, Inventory, PinCode, Coupon, Store
+from db.models import  Category, Product, DisplayProduct, Banner, Inventory, PinCode, Coupon, Store, WebBanner, \
+    FlashSaleBanner
 from enums.store import InventoryType
 from mixins.drf_views import CustomResponse
 
@@ -137,7 +138,7 @@ class DisplayProductAPIView(APIView):
     def post(self,request):
         data = request.data
 
-        required_fields = ["default_product_id", "variant_product_id", "category","product_name"]
+        required_fields = ["default_product_id", "category","product_name"]
         for field in required_fields:
             if not data.get(field):
                 return CustomResponse().errorResponse(
@@ -1009,5 +1010,193 @@ class StoreAPIView(APIView):
             data={},
             description="store deleted successfully"
         )
+
+
+class WebBannerAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self,request):
+        data = request.data
+        store = request.store
+
+        required_fields = ["screen","image","is_active","priority","action","destination"]
+        for field in required_fields:
+            if not data.get(field):
+                return CustomResponse.errorResponse(description=f"{field} is required")
+
+        WebBanner.objects.create(
+            store_id=store.id,
+            screen = data.get("screen"),
+            image = data.get("image"),
+            is_active = data.get("is_active"),
+            priority = data.get("priority"),
+            action = data.get("action"),
+            destination = data.get("destination"),
+
+        )
+        return CustomResponse.successResponse(data={},description="web banner created successfully")
+
+    def get(self, request, id=None):
+        # ---------- SINGLE BANNER ----------
+        if id:
+            banner = WebBanner.objects.filter(id=id).values().first()
+            if not banner:
+                return CustomResponse.errorResponse(
+                    description="web banner id required"
+                )
+
+            return CustomResponse.successResponse(
+                data=[banner],
+                total=1
+            )
+
+        # ---------- PAGINATION ----------
+        page = int(request.query_params.get("page", 1))
+        page_size = int(request.query_params.get("page_size", 10))
+
+        if page < 1 or page_size < 1:
+            return CustomResponse.errorResponse(
+                description="page and page_size must be positive integers"
+            )
+
+        queryset = WebBanner.objects.all().order_by("-created_at")
+
+        total = queryset.count()
+        offset = (page - 1) * page_size
+        queryset = queryset[offset: offset + page_size]
+
+        data = list(queryset.values())
+
+        return CustomResponse.successResponse(
+            data=data,
+            total=total
+        )
+
+
+    def put(self,request,id=None):
+        if not id:
+            return CustomResponse.errorResponse(description="web banner id required")
+
+        banner = WebBanner.objects.filter(id=id).first()
+
+        if not banner:
+            return CustomResponse.errorResponse(description="web banner not found")
+
+
+        for field in [
+            "screen","image","priority","is_active","action","destination"
+        ]:
+            if field in request.data:
+                setattr(banner,field,request.data.get(field))
+
+        banner.save()
+        return CustomResponse.successResponse(data={},description="web banner updated successfully")
+
+    def delete(self,request,id=None):
+        if not id:
+            return CustomResponse.errorResponse(description="web banner id required")
+
+        banner = WebBanner.objects.filter(id=id).filter()
+        if not banner:
+            return CustomResponse.errorResponse(description="web banner not found")
+
+        banner.delete()
+        return CustomResponse.successResponse(data={},description="web banner deleted successfully")
+
+
+class FlashSaleBannerAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self,request):
+        data = request.data
+        store = request.store
+
+        required_fields = ["screen","image","is_active","priority","action","destination","start_date","end_date","product_id","discount"]
+        for field in required_fields:
+            if not data.get(field):
+                return CustomResponse.errorResponse(description=f"{field} is required")
+
+        FlashSaleBanner.objects.create(
+            store_id=store.id,
+            screen = data.get("screen"),
+            image = data.get("image"),
+            is_active = data.get("is_active"),
+            priority = data.get("priority"),
+            action = data.get("action"),
+            destination = data.get("destination"),
+            start_date = data.get("start_date"),
+            end_date = data.get("end_date"),
+            product_id = data.get("product_id"),
+            discount = data.get("discount"),
+
+        )
+        return CustomResponse.successResponse(data={},description="flash sale banner created successfully")
+
+    def get(self, request, id=None):
+        # ---------- SINGLE BANNER ----------
+        if id:
+            banner = FlashSaleBanner.objects.filter(id=id).values().first()
+            if not banner:
+                return CustomResponse.errorResponse(
+                    description="flash sale banner id required"
+                )
+
+            return CustomResponse.successResponse(
+                data=[banner],
+                total=1
+            )
+
+        # ---------- PAGINATION ----------
+        page = int(request.query_params.get("page", 1))
+        page_size = int(request.query_params.get("page_size", 10))
+
+        if page < 1 or page_size < 1:
+            return CustomResponse.errorResponse(
+                description="page and page_size must be positive integers"
+            )
+
+        queryset = FlashSaleBanner.objects.all().order_by("-created_at")
+
+        total = queryset.count()
+        offset = (page - 1) * page_size
+        queryset = queryset[offset: offset + page_size]
+
+        data = list(queryset.values())
+
+        return CustomResponse.successResponse(
+            data=data,
+            total=total
+        )
+
+
+    def put(self,request,id=None):
+        if not id:
+            return CustomResponse.errorResponse(description="flash sale banner id required")
+
+        banner = FlashSaleBanner.objects.filter(id=id).first()
+
+        if not banner:
+            return CustomResponse.errorResponse(description="flash sale banner not found")
+
+
+        for field in [
+            "screen","image","priority","is_active","action","destination"
+        ]:
+            if field in request.data:
+                setattr(banner,field,request.data.get(field))
+
+        banner.save()
+        return CustomResponse.successResponse(data={},description="flash sale banner updated successfully")
+
+    def delete(self,request,id=None):
+        if not id:
+            return CustomResponse.errorResponse(description="flash sale banner id required")
+
+        banner = FlashSaleBanner.objects.filter(id=id).filter()
+        if not banner:
+            return CustomResponse.errorResponse(description="flash sale banner not found")
+
+        banner.delete()
+        return CustomResponse.successResponse(data={},description="flash sale banner deleted successfully")
 
 

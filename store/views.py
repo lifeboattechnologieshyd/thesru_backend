@@ -266,7 +266,10 @@ class PinListView(APIView):
 class ProductListAPIView(APIView):
     permission_classes = [AllowAny]
 
+
     def get(self, request):
+        store_id = request.store.id
+
         # ---------- Query params ----------
         categories = request.query_params.get("category")
         gender = request.query_params.get("gender")
@@ -278,7 +281,7 @@ class ProductListAPIView(APIView):
         page_size = int(request.query_params.get("page_size", 10))
 
         # ---------- DisplayProduct base queryset ----------
-        queryset = DisplayProduct.objects.filter(is_active=True)
+        queryset = DisplayProduct.objects.filter(is_active=True,store_id=store_id)
 
 
         if categories:
@@ -315,7 +318,7 @@ class ProductListAPIView(APIView):
         # ---------- Fetch related products ----------
         product_ids = queryset.values_list("default_product_id", flat=True)
 
-        product_qs = Product.objects.filter(id__in=product_ids)
+        product_qs = Product.objects.filter(id__in=product_ids,store_id=store_id)
 
         # ---------- Price filters (Product table) ----------
         if min_price:

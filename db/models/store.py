@@ -8,6 +8,7 @@ from enums.store import BannerScreen, InventoryType, AddressType, OrderStatus, P
 
 class Product(AuditModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    store_id = models.UUIDField()
     sku = models.CharField(max_length=20,unique=True)
     name = models.CharField(max_length=100)
     size = models.CharField(max_length=50,null=True)
@@ -30,6 +31,7 @@ class Product(AuditModel):
 
 class DisplayProduct(AuditModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    store_id = models.UUIDField()
     default_product_id = models.UUIDField()
     variant_product_id = ArrayField(models.CharField(max_length=50),null=True)
     is_active = models.BooleanField(default=True)
@@ -51,6 +53,7 @@ class DisplayProduct(AuditModel):
 
 class Category(AuditModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    store_id = models.UUIDField()
     name = models.CharField(max_length=50)
     icon = models.CharField(max_length=255, null=True)
     search_tags = ArrayField(models.CharField(max_length=50),null=True)
@@ -63,6 +66,7 @@ class Category(AuditModel):
 
 class Inventory(AuditModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    store_id = models.UUIDField()
     product_id = models.UUIDField()
     sku = models.CharField(max_length=20)
     type = models.CharField(max_length=20,choices=InventoryType.choices)
@@ -87,6 +91,7 @@ class Inventory(AuditModel):
 
 class Banner(AuditModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    store_id = models.UUIDField()
     screen = models.CharField(max_length=20,choices=BannerScreen.choices)
     image = models.CharField(max_length=300, null=True)
     is_active = models.BooleanField(default=True)
@@ -98,9 +103,42 @@ class Banner(AuditModel):
         db_table = "banner"
         ordering = ["-created_at"]
 
+class WebBanner(AuditModel):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    store_id = models.UUIDField()
+    screen = models.CharField(max_length=20,choices=BannerScreen.choices)
+    image = models.CharField(max_length=300, null=True)
+    is_active = models.BooleanField(default=True)
+    priority = models.PositiveIntegerField(default=1)
+    action = models.BooleanField(default=False)
+    destination = models.JSONField()
+
+    class Meta:
+        db_table = "web_banner"
+        ordering = ["-created_at"]
+
+class FlashSaleBanner(AuditModel):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    store_id = models.UUIDField()
+    screen = models.CharField(max_length=20,choices=BannerScreen.choices)
+    image = models.CharField(max_length=300, null=True)
+    is_active = models.BooleanField(default=True)
+    priority = models.PositiveIntegerField(default=1)
+    action = models.BooleanField(default=False)
+    destination = models.JSONField()
+    start_date = models.DateTimeField()
+    end_date = models.DateTimeField()
+    product_id = ArrayField(models.CharField(max_length=50),null=True)
+    discount = models.CharField(max_length=20)
+
+
+    class Meta:
+        db_table = "flash_sale_banner"
+        ordering = ["-created_at"]
 
 class AddressMaster(AuditModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    store_id = models.UUIDField()
     user_id = models.UUIDField()
     mobile = models.CharField(max_length=20,null=True)
     name = models.CharField(max_length=100)
@@ -136,6 +174,7 @@ class PinCode(AuditModel):
 
 class Order(AuditModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    store_id = models.UUIDField()
     user_id = models.UUIDField()
     order_id = models.CharField(unique=True, max_length=16, null=False)
     address = models.JSONField()
@@ -152,6 +191,7 @@ class Order(AuditModel):
 
 class OrderProducts(AuditModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    store_id = models.UUIDField()
     order_id = models.CharField(max_length=16, null=False)
     product_id = models.UUIDField(null=False)
     sku = models.CharField(max_length=20,unique=True)
@@ -172,6 +212,7 @@ class OrderProducts(AuditModel):
 
 class OrderTimeLines(AuditModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    store_id = models.UUIDField()
     order_id = models.CharField(max_length=16, null=False)
     status = models.CharField(max_length=16, null=False)
     remarks = models.CharField(max_length=250, null=True)
@@ -195,6 +236,7 @@ class OrderShippingDetails(AuditModel):
 
 class Payment(AuditModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    store_id = models.UUIDField()
     order_id = models.CharField(max_length=16, null=False)
     txn_id = models.CharField(max_length=16, null=False) #cf_order_id
     session_id = models.CharField(max_length=16, null=False)
@@ -222,6 +264,7 @@ class CashFree(AuditModel):
 
 class Cart(AuditModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    store_id = models.UUIDField()
     product_id = models.UUIDField()
     quantity = models.PositiveIntegerField()
     user_id = models.UUIDField()
@@ -236,6 +279,7 @@ class Cart(AuditModel):
 
 class Wishlist(AuditModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    store_id = models.UUIDField()
     product_id = models.UUIDField()
     user_id = models.UUIDField(null=False)
 

@@ -25,6 +25,7 @@ class CustomUserManager(BaseUserManager):
 
 class User(AbstractBaseUser):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    store_id = models.UUIDField()
     name = models.CharField(max_length=30, null=True)
     username = models.CharField(max_length=30, unique=True)
     user_role = ArrayField(models.CharField(max_length=50, ), blank=True, null=True)
@@ -61,6 +62,7 @@ class User(AbstractBaseUser):
 
 class UserOTP(AuditModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    store_id = models.UUIDField()
     user_id = models.UUIDField(null=True)
     mobile = models.BigIntegerField(
         null=True, validators=[MinValueValidator(1000000000), MaxValueValidator(9999999999)]
@@ -98,6 +100,7 @@ class Store(AuditModel):
 
 class TempUser(AuditModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    store_id = models.UUIDField()
     mobile = models.BigIntegerField(
         null=True, validators=[MinValueValidator(1000000000), MaxValueValidator(9999999999)]
     )
@@ -115,6 +118,7 @@ class TempUser(AuditModel):
 
 class Coupon(AuditModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    store_id = models.UUIDField()
     bonus_code = models.CharField(max_length=50)
     short_title = models.CharField(max_length=50,null=True)
     long_title = models.CharField(max_length=50,null=True)
