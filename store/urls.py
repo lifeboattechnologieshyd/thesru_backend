@@ -16,6 +16,8 @@ urlpatterns = [
     path("category",CategoryListView.as_view()),
     path("web/banner",WebBannerListView.as_view()),
     path("flash/sale/banner",FlashSaleBannerListView.as_view()),
+    path("web/banner/<str:id>",WebBannerListView.as_view()),
+    path("flash/sale/banner/<str:id>",FlashSaleBannerListView.as_view()),
 
 
     path("initiateorder", InitiateOrder.as_view()),
