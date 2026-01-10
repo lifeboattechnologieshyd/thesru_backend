@@ -10,7 +10,7 @@ from rest_framework.permissions import IsAuthenticated,AllowAny
 
 from django.conf import settings
 from db.models import AddressMaster, PinCode, Product, DisplayProduct, Order, OrderProducts, Payment, OrderTimeLines, \
-    Banner, Category, Cart, Wishlist
+    Banner, Category, Cart, Wishlist, WebBanner, FlashSaleBanner
 from enums.store import OrderStatus
 from mixins.drf_views import CustomResponse
 from utils.store import generate_order_id
@@ -988,7 +988,159 @@ class BannerListView(APIView):
             total=len(data)
         )
 
-# class CategoryListView(APIView):
+class WebBannerListView(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request, id=None):
+        store = request.store
+
+
+        action = request.query_params.get("action")
+
+        queryset = WebBanner.objects.filter(is_active=True,store_id=store.id)
+
+        #  ACTION FILTER
+        if action is not None:
+            if action.lower() == "true":
+                queryset = queryset.filter(action=True)
+            elif action.lower() == "false":
+                queryset = queryset.filter(action=False)
+
+        #  SINGLE BANNER
+        if id:
+            banner = queryset.filter(id=id).first()
+            if not banner:
+                return CustomResponse.errorResponse(
+                    description="Active banner not found"
+                )
+
+            return CustomResponse.successResponse(
+                data=[{
+                    "id": str(banner.id),
+                    "screen": banner.screen,
+                    "image": banner.image,
+                    "is_active": banner.is_active,
+                    "priority": banner.priority,
+                    "action": banner.action,
+                    "destination": banner.destination,
+
+                }],
+                total=1
+            )
+
+        #  LIST BANNERS
+        data = []
+        for banner in queryset.order_by("-created_at"):
+            data.append({
+                "id": str(banner.id),
+                "screen": banner.screen,
+                "image": banner.image,
+                "is_active": banner.is_active,
+                "priority": banner.priority,
+                "action": banner.action,
+                "destination": banner.destination,
+
+            })
+
+        return CustomResponse.successResponse(
+            data=data,
+            total=len(data)
+        )
+
+class FlashSaleBannerListView(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request, id=None):
+        store = request.store
+        action = request.query_params.get("action")
+
+        queryset = FlashSaleBanner.objects.filter(
+            is_active=True,
+            store_id=store.id
+        )
+
+        # ACTION FILTER
+        if action is not None:
+            queryset = queryset.filter(action=action.lower() == "true")
+
+        # ---------- SINGLE BANNER ----------
+        if id:
+            banner = queryset.filter(id=id).first()
+            if not banner:
+                return CustomResponse.errorResponse(
+                    description="Active banner not found"
+                )
+
+            product_names = []
+            if banner.product_id:
+                product_names = list(
+                    Product.objects.filter(
+                        id__in=banner.product_id
+                    ).values_list("name", flat=True)
+                )
+
+            return CustomResponse.successResponse(
+                data=[{
+                    "id": str(banner.id),
+                    "screen": banner.screen,
+                    "image": banner.image,
+                    "is_active": banner.is_active,
+                    "priority": banner.priority,
+                    "action": banner.action,
+                    "destination": banner.destination,
+                    "start_date": banner.start_date,
+                    "end_date": banner.end_date,
+                    "product_id": banner.product_id,
+                    "product_names": product_names,
+                    "discount": banner.discount
+                }],
+                total=1
+            )
+
+        # ---------- LIST BANNERS ----------
+        banners = list(queryset.order_by("-created_at"))
+
+        # Collect ALL product IDs from all banners
+        all_product_ids = set()
+        for banner in banners:
+            if banner.product_id:
+                all_product_ids.update(banner.product_id)
+
+        # Fetch products in ONE query
+        products = Product.objects.filter(id__in=all_product_ids)
+        product_map = {str(p.id): p.name for p in products}
+
+        data = []
+        for banner in banners:
+            product_names = []
+            if banner.product_id:
+                product_names = [
+                    product_map.get(str(pid))
+                    for pid in banner.product_id
+                    if str(pid) in product_map
+                ]
+
+            data.append({
+                "id": str(banner.id),
+                "screen": banner.screen,
+                "image": banner.image,
+                "is_active": banner.is_active,
+                "priority": banner.priority,
+                "action": banner.action,
+                "destination": banner.destination,
+                "start_date": banner.start_date,
+                "end_date": banner.end_date,
+                "product_id": banner.product_id,
+                "product_names": product_names,
+                "discount": banner.discount
+            })
+
+        return CustomResponse.successResponse(
+            data=data,
+            total=len(data)
+        )
+
+# # class CategoryListView(APIView):
 #     permission_classes = [AllowAny]
 #
 #     def get(self, request, id=None):

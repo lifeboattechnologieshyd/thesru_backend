@@ -2,7 +2,8 @@ from django.urls import path
 
 from store.views import PinListView, AddressAPIView, ProductDetailAPIView, ProductListAPIView, InitiateOrder, OrderView, \
     BannerListView, CategoryListView, AddToCartAPIView, CartListAPIView, UpdateCartAPIView, RemoveFromCartAPIView, \
-    AddToWishlistAPIView, WishlistListAPIView, RemoveFromWishlistAPIView, MoveWishlistToCartAPIView, CartTotalAPIView
+    AddToWishlistAPIView, WishlistListAPIView, RemoveFromWishlistAPIView, MoveWishlistToCartAPIView, CartTotalAPIView, \
+    FlashSaleBannerListView, WebBannerListView
 
 urlpatterns = [
 
@@ -13,6 +14,8 @@ urlpatterns = [
     path("product/<str:id>", ProductDetailAPIView.as_view()),
     path("banner",BannerListView.as_view()),
     path("category",CategoryListView.as_view()),
+    path("web/banner",WebBannerListView.as_view()),
+    path("flash/sale/banner",FlashSaleBannerListView.as_view()),
 
 
     path("initiateorder", InitiateOrder.as_view()),
