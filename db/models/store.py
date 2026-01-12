@@ -179,7 +179,7 @@ class Order(AuditModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     store_id = models.UUIDField()
     user_id = models.UUIDField()
-    order_id = models.CharField(unique=True, max_length=16, null=False)
+    order_id = models.CharField(unique=True, max_length=50, null=False)
     address = models.JSONField()
     mrp = models.DecimalField(decimal_places=2, max_digits=10)
     selling_price = models.DecimalField(decimal_places=2, max_digits=10)
@@ -196,9 +196,9 @@ class Order(AuditModel):
 class OrderProducts(AuditModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     store_id = models.UUIDField()
-    order_id = models.CharField(max_length=16, null=False)
+    order_id = models.CharField(max_length=50, null=False)
     product_id = models.UUIDField(null=False)
-    sku = models.CharField(max_length=20,unique=True)
+    sku = models.CharField(max_length=20)
     qty = models.PositiveIntegerField(default=0)
     mrp = models.DecimalField(decimal_places=2, max_digits=10)
     selling_price = models.DecimalField(decimal_places=2, max_digits=10)
@@ -206,7 +206,7 @@ class OrderProducts(AuditModel):
     Apportioned_wallet = models.DecimalField(decimal_places=2, max_digits=10)
     Apportioned_online = models.DecimalField(decimal_places=2, max_digits=10)
     Apportioned_gst = models.DecimalField(decimal_places=2, max_digits=10)
-    rating = models.DecimalField(decimal_places=2, max_digits=10)
+    rating = models.DecimalField(decimal_places=2, max_digits=10,default=0)
     review = models.BooleanField(default=False)
 
     class Meta:
@@ -217,8 +217,8 @@ class OrderProducts(AuditModel):
 class OrderTimeLines(AuditModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     store_id = models.UUIDField()
-    order_id = models.CharField(max_length=16, null=False)
-    status = models.CharField(max_length=16, null=False)
+    order_id = models.CharField(max_length=50, null=False)
+    status = models.CharField(max_length=20, null=False)
     remarks = models.CharField(max_length=250, null=True)
 
     class Meta:
@@ -227,8 +227,8 @@ class OrderTimeLines(AuditModel):
 
 class OrderShippingDetails(AuditModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    order_id = models.CharField(max_length=16, null=False)
-    courier_service = models.CharField(max_length=16, null=False)
+    order_id = models.CharField(max_length=50, null=False)
+    courier_service = models.CharField(max_length=50, null=False)
     tracking_id = models.CharField(max_length=250, null=False)
     tracking_url = models.CharField(max_length=250, null=False)
     estimated_delivery_date = models.CharField(max_length=250, null=False)
@@ -241,9 +241,9 @@ class OrderShippingDetails(AuditModel):
 class Payment(AuditModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     store_id = models.UUIDField()
-    order_id = models.CharField(max_length=16, null=False)
-    txn_id = models.CharField(max_length=16, null=False) #cf_order_id
-    session_id = models.CharField(max_length=16, null=False)
+    order_id = models.CharField(max_length=20, null=False)
+    txn_id = models.CharField(max_length=20, null=False) #cf_order_id
+    session_id = models.CharField(max_length=200, null=False)
     amount = models.DecimalField(decimal_places=2, max_digits=10, default=0)
     status = models.CharField(choices=PaymentStatus.choices)
     user_id = models.UUIDField(null=False)

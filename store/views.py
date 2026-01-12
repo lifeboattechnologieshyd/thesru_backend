@@ -4,14 +4,15 @@ import requests
 from django.db import transaction
 from django.db import IntegrityError
 from django.db.models import Q
+from decimal import Decimal
 
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated,AllowAny
 
 from django.conf import settings
 from db.models import AddressMaster, PinCode, Product, DisplayProduct, Order, OrderProducts, Payment, OrderTimeLines, \
-    Banner, Category, Cart, Wishlist, WebBanner, FlashSaleBanner
-from enums.store import OrderStatus
+    Banner, Category, Cart, Wishlist, WebBanner, FlashSaleBanner, CashFree, Store
+from enums.store import OrderStatus, PaymentStatus
 from mixins.drf_views import CustomResponse
 from utils.store import generate_order_id
 
@@ -728,6 +729,12 @@ class InitiateOrder(APIView):
         wallet_paid = payload.get("wallet_paid", 0)
         amount = payload.get("amount", 0)
         mrp = payload.get("mrp", 0)
+        print("DEBUG payload selling_price:", selling_price, type(selling_price))
+        print("DEBUG payload coupon_discount:", coupon_discount, type(coupon_discount))
+        print("DEBUG payload wallet_paid:", wallet_paid, type(wallet_paid))
+        print("DEBUG payload amount:", amount, type(amount))
+        print("DEBUG payload mrp:", mrp, type(mrp))
+
 
 
         if not products:
@@ -735,6 +742,8 @@ class InitiateOrder(APIView):
 
         try:
             with transaction.atomic():
+                print("DEBUG order_id:", order_id, len(str(order_id)))
+
 
                 #  Create Order
                 order = Order.objects.create(
@@ -760,20 +769,41 @@ class InitiateOrder(APIView):
                     product = Product.objects.filter(id=item["product_id"]).first()
                     if not product:
                         raise ValueError("Invalid product selected")
+                    print("DEBUG product.selling_price:", product.selling_price, type(product.selling_price))
+                    print("DEBUG product.mrp:", product.mrp, type(product.mrp))
+                    print("DEBUG product.gst_percentage:", product.gst_percentage, type(product.gst_percentage))
+                    print("DEBUG before ratio:",
+                          "product.selling_price =", product.selling_price, type(product.selling_price),
+                          "selling_price =", selling_price, type(selling_price))
+
 
                     product_ratio = product.selling_price / selling_price
+                    print("DEBUG coupon apportion:",
+                          "coupon_discount =", coupon_discount, type(coupon_discount),
+                          "product_ratio =", product_ratio, type(product_ratio))
+
                     product_discount = coupon_discount * product_ratio
                     product_wallet = wallet_paid * product_ratio
                     product_online = amount * product_ratio
+                    print("DEBUG qty:", item.get("qty"), type(item.get("qty")))
+
 
                     product_total = product.selling_price * item["qty"]
+                    print("DEBUG product_total:", product_total, type(product_total))
+                    print("DEBUG product_discount:", product_discount, type(product_discount))
+                    print("DEBUG product_wallet:", product_wallet, type(product_wallet))
+
                     taxable_amount = product_total - product_discount - product_wallet
-                    base_amount = taxable_amount / (1 + product.gst_percentage)
+                    gst_percentage = Decimal(product.gst_percentage)
+
+                    base_amount = taxable_amount / (Decimal("1") + gst_percentage / Decimal("100"))
                     gst_amount = taxable_amount - base_amount
+
+
 
                     OrderProducts.objects.create(
                         store_id=store.id,
-                        order=order,
+                        order_id=order_id,
                         product_id=product.id,
                         sku=product.sku,
                         qty = int(item.get("qty", 0)),
@@ -782,29 +812,45 @@ class InitiateOrder(APIView):
                         Apportioned_discount=product_discount,
                         Apportioned_wallet=product_wallet,
                         Apportioned_gst=gst_amount,
-                        Apportioned_online=product_online
+                        Apportioned_online=product_online,
+
+
+
                     )
 
                 #  Create Order Timeline
                 OrderTimeLines.objects.create(
-                    order=order,
+                    store_id=store.id,
+                    order_id=order_id,
                     status=OrderStatus.INITIATED,
                     remarks=payload.get("remarks", "Order initiated")
                 )
 
                 #  Create Payment
                 payment = Payment.objects.create(
-                    order=order,
+                    store_id=store.id,
+                    order_id=order_id,
                     amount=amount,
                     user_id=user.id,
                     mobile=user.mobile,
                     email=user.email,
                 )
+                cashfree = Store.objects.filter(
+                    id=store.id
+                ).first()
 
-                payment_resp = initiateOrder(user, amount, order_id)
+                if not cashfree:
+                    raise ValueError("CashFree configuration not found for this store")
 
-                payment.session_id = payment_resp["cf_order_id"]
-                payment.txn_id = payment_resp["payment_session_id"]
+
+
+                payment_resp = initiateOrder(user, amount, order_id,cashfree)
+                print("DEBUG cf_order_id:", payment_resp["cf_order_id"], len(payment_resp["cf_order_id"]))
+                print("DEBUG payment_session_id:", payment_resp["payment_session_id"], len(payment_resp["payment_session_id"]))
+
+
+                payment.session_id = payment_resp["payment_session_id"]
+                payment.txn_id = payment_resp["cf_order_id"]
                 payment.save(update_fields=["session_id", "txn_id"])
 
 
@@ -834,7 +880,7 @@ def initiateOrder(user, amount, order_id,cashfree):
             "customer_name": str(user.username),
         },
         "order_meta": {
-            "notify_url": settings.CASHFREE_WEBHOOK,
+            "notify_url": cashfree.webhook,
         },
     }
 
@@ -870,6 +916,70 @@ def initiateOrder(user, amount, order_id,cashfree):
     except Exception as e:
         raise Exception(e)
 
+class Webhook(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        data = request.data
+
+        event_type = data.get("type")
+        order_data = data.get("data", {}).get("order", {})
+        order_id = order_data.get("order_id")
+
+
+        if not order_id:
+            return CustomResponse().errorResponse(
+                description="Invalid webhook payload: order_id missing"
+            )
+
+        payment = Payment.objects.filter(order_id=order_id).first()
+        if not payment:
+            return CustomResponse().errorResponse(
+                description="Payment not found for this order"
+            )
+
+        order = Order.objects.filter(order_id=order_id).first()
+        if not order:
+            return CustomResponse().errorResponse(
+                description="Order not found for this order"
+            )
+
+        with transaction.atomic():
+
+            #  PAYMENT SUCCESS
+            if event_type == "PAYMENT_SUCCESS_WEBHOOK":
+                payment.status = PaymentStatus.COMPLETED
+                payment.save(update_fields=["status"])
+
+                order.status = OrderStatus.PLACED
+                order.paid_online = payment.amount
+                order.save(update_fields=["status", "paid_online"])
+
+
+            #  PAYMENT FAILED
+            elif event_type == "PAYMENT_FAILED_WEBHOOK":
+                payment.status = PaymentStatus.FAILED
+                payment.save(update_fields=["status"])
+
+                order.status = OrderStatus.FAILED
+                order.save(update_fields=["status"])
+
+
+            #  USER DROPPED / CANCELLED
+            elif event_type == "PAYMENT_USER_DROPPED_WEBHOOK":
+                payment.status = PaymentStatus.CANCELLED
+                payment.save(update_fields=["status"])
+
+                order.status = OrderStatus.CANCELLED
+                order.save(update_fields=["status"])
+
+
+
+
+        return CustomResponse().successResponse(
+            data={},
+            description="Webhook processed successfully"
+        )
 
 class OrderView(APIView):
     permission_classes = [IsAuthenticated]
