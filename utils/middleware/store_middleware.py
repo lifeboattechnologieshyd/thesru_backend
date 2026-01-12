@@ -100,6 +100,7 @@ class StoreMiddleware:
     def __init__(self, get_response):
         self.get_response = get_response
         self.exempt_paths = (
+            "store/paymentWebhook"
             "/admin/",
             "/api/auth/",
             "/health/",
@@ -111,7 +112,7 @@ class StoreMiddleware:
             if request.path.startswith(path):
                 return self.get_response(request)
 
-        store_id = request.headers.get("X-STORE-ID", "")
+        store_id = request.headers.get("X-STORE-ID")
 
         #  Store header missing
         if not store_id:
