@@ -920,66 +920,68 @@ class Webhook(APIView):
     permission_classes = [AllowAny]
 
     def post(self, request):
-        data = request.data
+        try:
+            data = request.data
 
-        event_type = data.get("type")
-        order_data = data.get("data", {}).get("order", {})
-        order_id = order_data.get("order_id")
+            event_type = data.get("type")
+            order_id = data.get("data", {}).get("order", {}).get("order_id")
 
+            print("Webhook received:", data)
 
-        if not order_id:
-            return CustomResponse().errorResponse(
-                description="Invalid webhook payload: order_id missing"
+            # Cashfree test webhook may not have real order_id
+            if not order_id:
+                print("Webhook test / invalid payload")
+                return CustomResponse().successResponse(data={},
+                    description="Webhook received"
+                )
+
+            payment = Payment.objects.filter(order_id=order_id).first()
+            order = Order.objects.filter(order_id=order_id).first()
+
+            # If no DB records → still return 200
+            if not payment or not order:
+                print("Order/Payment not found for order_id:", order_id)
+                return CustomResponse().successResponse(
+                    description="Webhook received"
+                )
+
+            with transaction.atomic():
+
+                if event_type == "PAYMENT_SUCCESS_WEBHOOK":
+                    payment.status = PaymentStatus.COMPLETED
+                    payment.save(update_fields=["status"])
+
+                    order.status = OrderStatus.PLACED
+                    order.paid_online = payment.amount
+                    order.save(update_fields=["status", "paid_online"])
+
+                elif event_type == "PAYMENT_FAILED_WEBHOOK":
+                    payment.status = PaymentStatus.FAILED
+                    payment.save(update_fields=["status"])
+
+                    order.status = OrderStatus.FAILED
+                    order.save(update_fields=["status"])
+
+                elif event_type == "PAYMENT_USER_DROPPED_WEBHOOK":
+                    payment.status = PaymentStatus.CANCELLED
+                    payment.save(update_fields=["status"])
+
+                    order.status = OrderStatus.CANCELLED
+                    order.save(update_fields=["status"])
+
+                else:
+                    print("Unhandled webhook type:", event_type)
+
+            return CustomResponse().successResponse(data={},
+                description="Webhook processed"
             )
 
-        payment = Payment.objects.filter(order_id=order_id).first()
-        if not payment:
-            return CustomResponse().errorResponse(
-                description="Payment not found for this order"
+        except Exception as e:
+            # IMPORTANT: Always return 200
+            print("Webhook exception:", str(e))
+            return CustomResponse().successResponse(data={},
+                description="Webhook received"
             )
-
-        order = Order.objects.filter(order_id=order_id).first()
-        if not order:
-            return CustomResponse().errorResponse(
-                description="Order not found for this order"
-            )
-
-        with transaction.atomic():
-
-            #  PAYMENT SUCCESS
-            if event_type == "PAYMENT_SUCCESS_WEBHOOK":
-                payment.status = PaymentStatus.COMPLETED
-                payment.save(update_fields=["status"])
-
-                order.status = OrderStatus.PLACED
-                order.paid_online = payment.amount
-                order.save(update_fields=["status", "paid_online"])
-
-
-            #  PAYMENT FAILED
-            elif event_type == "PAYMENT_FAILED_WEBHOOK":
-                payment.status = PaymentStatus.FAILED
-                payment.save(update_fields=["status"])
-
-                order.status = OrderStatus.FAILED
-                order.save(update_fields=["status"])
-
-
-            #  USER DROPPED / CANCELLED
-            elif event_type == "PAYMENT_USER_DROPPED_WEBHOOK":
-                payment.status = PaymentStatus.CANCELLED
-                payment.save(update_fields=["status"])
-
-                order.status = OrderStatus.CANCELLED
-                order.save(update_fields=["status"])
-
-
-
-
-        return CustomResponse().successResponse(
-            data={},
-            description="Webhook processed successfully"
-        )
 
 class OrderView(APIView):
     permission_classes = [IsAuthenticated]
