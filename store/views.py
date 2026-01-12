@@ -717,6 +717,8 @@ class InitiateOrder(APIView):
     def post(self, request):
         user = request.user
         payload = request.data
+        store = request.store
+
 
         order_id = generate_order_id()
         address = payload.get("address", {})
@@ -736,6 +738,7 @@ class InitiateOrder(APIView):
 
                 #  Create Order
                 order = Order.objects.create(
+                    store_id=store.id,
                     order_id=order_id,
                     user_id=user.id,
                     address=address,
@@ -769,6 +772,7 @@ class InitiateOrder(APIView):
                     gst_amount = taxable_amount - base_amount
 
                     OrderProducts.objects.create(
+                        store_id=store.id,
                         order=order,
                         product_id=product.id,
                         sku=product.sku,
