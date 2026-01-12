@@ -111,7 +111,7 @@ class StoreMiddleware:
             if request.path.startswith(path):
                 return self.get_response(request)
 
-        store_id = request.headers.get("X-STORE-ID")
+        store_id = request.headers.get("X-STORE-ID", "")
 
         #  Store header missing
         if not store_id:
