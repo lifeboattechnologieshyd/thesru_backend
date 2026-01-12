@@ -912,7 +912,9 @@ def initiateOrder(user, amount, order_id,cashfree):
             else:
                 raise Exception("Could not found cf_order_id and payment_session_id")
         else:
-            raise Exception("Response code is not 200")
+            raise Exception(
+                f"Cashfree response code {response.status_code}: {response.text}"
+            )
     except Exception as e:
         raise Exception(e)
 
