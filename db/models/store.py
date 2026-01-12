@@ -184,6 +184,7 @@ class Order(AuditModel):
     mrp = models.DecimalField(decimal_places=2, max_digits=10)
     selling_price = models.DecimalField(decimal_places=2, max_digits=10)
     coupon_discount = models.DecimalField(decimal_places=2, max_digits=10)
+    amount = models.DecimalField(decimal_places=2, max_digits=10)
     wallet_paid = models.DecimalField(decimal_places=2, max_digits=10, default=0)
     paid_online = models.DecimalField(decimal_places=2, max_digits=10, default=0)
     cash_on_delivery = models.DecimalField(decimal_places=2, max_digits=10, default=0)
