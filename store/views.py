@@ -725,6 +725,8 @@ class InitiateOrder(APIView):
         coupon_discount = payload.get("coupon_discount", 0)
         wallet_paid = payload.get("wallet_paid", 0)
         amount = payload.get("amount", 0)
+        mrp = payload.get("mrp", 0)
+
 
         if not products:
             return CustomResponse().errorResponse(description="Products required")
@@ -741,6 +743,7 @@ class InitiateOrder(APIView):
                     coupon_discount=coupon_discount,
                     wallet_paid=wallet_paid,
                     amount=amount,
+                    mrp = mrp,
                     status=OrderStatus.INITIATED
                 )
 
