@@ -100,28 +100,27 @@ class StoreMiddleware:
     def __init__(self, get_response):
         self.get_response = get_response
         self.exempt_paths = (
-            "store/paymentWebhook",
+            "/store/paymentWebhook",
             "/admin/",
             "/api/auth/",
             "/health/",
         )
 
+
     def __call__(self, request):
-        # Skip exempt paths
-        for path in self.exempt_paths:
-            if request.path.startswith(path):
-                return self.get_response(request)
+        print("MIDDLEWARE PATH:", request.path)
+
+        if any(request.path.startswith(p) for p in self.exempt_paths):
+            return self.get_response(request)
 
         store_id = request.headers.get("X-STORE-ID")
 
-        #  Store header missing
         if not store_id:
             return JsonResponse(
                 {"error": "X-STORE-ID header is required"},
                 status=400
             )
 
-        #  Invalid UUID
         try:
             store_uuid = uuid.UUID(store_id)
         except ValueError:
@@ -132,7 +131,6 @@ class StoreMiddleware:
 
         Store = apps.get_model("db", "Store")
 
-        #  Store not found
         try:
             store = Store.objects.get(id=store_uuid)
         except Store.DoesNotExist:
@@ -141,7 +139,5 @@ class StoreMiddleware:
                 status=400
             )
 
-        #  Attach store to request
         request.store = store
-
         return self.get_response(request)
