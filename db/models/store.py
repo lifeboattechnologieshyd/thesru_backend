@@ -120,6 +120,9 @@ class WebBanner(AuditModel):
 class FlashSaleBanner(AuditModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     store_id = models.UUIDField()
+    name = models.CharField(max_length=50,null=True)
+    title = models.CharField(max_length=100,null=True)
+    description = models.CharField(max_length=1000,null=True)
     screen = models.CharField(max_length=20,choices=BannerScreen.choices)
     image = models.CharField(max_length=300, null=True)
     is_active = models.BooleanField(default=True)

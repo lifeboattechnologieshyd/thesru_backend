@@ -1,9 +1,9 @@
-name: Production Deployment
+name: Production
 
 on:
   push:
     branches:
-      - master
+      - main
 
 jobs:
   deploy:
@@ -23,13 +23,13 @@ jobs:
         run: |
           ssh ${{ secrets.PRODUCTION_EC2_USER }}@${{ secrets.PRODUCTION_EC2_HOST }} << EOF
           # Commands to run on the EC2 instance
-          cd schoolfirst-backend
-          git checkout master
+          cd thesru_backend
+          git checkout main
           git pull
           docker system prune -a -f
-          # docker compose up -d --build --force-recreate --remove-orphans || true
-          docker buildx build --platform linux/arm64 -t schoolfirst-backend:master-latest --load .
-          docker stop schoolfirst-backend || true
-          docker rm schoolfirst-backend || true
-          docker run -d --name schoolfirst-backend --env-file .env -p 8000:8000 schoolfirst-backend:master-latest
+          docker compose up -d --build --force-recreate --remove-orphans || true
+          docker buildx build --platform linux/arm64 -t thesru-backend:development-latest --load .
+          docker stop thesru-backend || true
+          docker rm thesru-backend || true
+          docker run -d --name thesru-backend --env-file .env --network=thesru_backend_thesru -p 6000:8000 thesru-backend:development-latest
           EOF

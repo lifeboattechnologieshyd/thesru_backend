@@ -1145,6 +1145,9 @@ class FlashSaleBannerAPIView(APIView):
             end_date = data.get("end_date"),
             product_id = data.get("product_id"),
             discount = data.get("discount"),
+            name = data.get("name"),
+            title = data.get("title"),
+            description = data.get("description"),
 
         )
         return CustomResponse.successResponse(data={},description="flash sale banner created successfully")
@@ -1197,7 +1200,7 @@ class FlashSaleBannerAPIView(APIView):
 
 
         for field in [
-            "screen","image","priority","is_active","action","destination"
+            "screen","image","priority","is_active","action","destination","description","title","name"
         ]:
             if field in request.data:
                 setattr(banner,field,request.data.get(field))
