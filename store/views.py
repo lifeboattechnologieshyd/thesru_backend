@@ -776,7 +776,7 @@ class InitiateOrder(APIView):
                         order=order,
                         product_id=product.id,
                         sku=product.sku,
-                        qty=item["qty"],
+                        qty = int(item.get("qty", 0)),
                         mrp=product.mrp,
                         selling_price=product.selling_price,
                         Apportioned_discount=product_discount,
