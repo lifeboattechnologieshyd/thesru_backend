@@ -1826,9 +1826,25 @@ class Reviews(APIView):
     def post(self, request):
         payload = request.data
         user = request.user
+        store_id = request.store.id
+
         product = DisplayProduct.objects.filter(id=payload["product_id"]).first()
         if not product:
             return CustomResponse().errorResponse(data={}, description="We couldn’t find any product with the provided ID.")
+
+        has_purchased = OrderProducts.objects.filter(
+            product_id=product,
+            store_id=store_id,
+            order_id__in=Order.objects.filter(
+                user_id=user.id
+            ).values_list("id", flat=True)
+        ).exists()
+
+        if not has_purchased:
+            return CustomResponse().errorResponse(
+                description="You can review this product only after purchasing it."
+            )
+
 
         product_review = ProductReviews.objects.filter(user_id=user.id, product_id=payload["product_id"]).first()
         if product_review:
