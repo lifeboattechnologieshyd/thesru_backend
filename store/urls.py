@@ -3,7 +3,7 @@ from django.urls import path
 from store.views import PinListView, AddressAPIView, ProductDetailAPIView, ProductListAPIView, InitiateOrder, OrderView, \
     BannerListView, CategoryListView, AddToCartAPIView, CartListAPIView, UpdateCartAPIView, RemoveFromCartAPIView, \
     AddToWishlistAPIView, WishlistListAPIView, RemoveFromWishlistAPIView, MoveWishlistToCartAPIView, CartTotalAPIView, \
-    FlashSaleBannerListView, WebBannerListView, Webhook, PaymentStatusAPIView
+    FlashSaleBannerListView, WebBannerListView, Webhook, PaymentStatusAPIView, ProductReview
 
 urlpatterns = [
 
@@ -36,6 +36,6 @@ urlpatterns = [
     path("cart/total",CartTotalAPIView.as_view()),
 
 
-    path("product/review",CartTotalAPIView.as_view()),
+    path("product/review",ProductReview.as_view()),
 
 ]
