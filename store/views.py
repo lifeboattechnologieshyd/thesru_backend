@@ -1834,7 +1834,7 @@ class Reviews(APIView):
                 description="product_id is required"
             )
 
-        product = DisplayProduct.objects.filter(id=product_id).first()
+        product = DisplayProduct.objects.filter(default_product_id=product_id).first()
         if not product:
             return CustomResponse().errorResponse(
                 description="We couldn’t find any product with the provided ID."
