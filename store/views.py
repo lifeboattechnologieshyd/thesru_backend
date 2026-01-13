@@ -1835,10 +1835,15 @@ class Reviews(APIView):
         has_purchased = OrderProducts.objects.filter(
             product_id=product.id,
             store_id=store_id,
-            order_id__in=Order.objects.filter(
-                user_id=user.id
-            ).values_list("id", flat=True)
+            order_id__in=[
+                str(order_id) for order_id in
+                Order.objects.filter(user_id=user.id)
+                .values_list("id", flat=True)
+            ]
         ).exists()
+
+
+
 
         if not has_purchased:
             return CustomResponse().errorResponse(
