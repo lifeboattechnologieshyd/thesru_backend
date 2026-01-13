@@ -1828,9 +1828,17 @@ class Reviews(APIView):
         user = request.user
         store_id = request.store.id
 
-        product = DisplayProduct.objects.filter(id=payload["product_id"]).first()
+        product_id = payload.get("product_id")
+        if not product_id:
+            return CustomResponse().errorResponse(
+                description="product_id is required"
+            )
+
+        product = DisplayProduct.objects.filter(id=product_id).first()
         if not product:
-            return CustomResponse().errorResponse(data={}, description="We couldn’t find any product with the provided ID.")
+            return CustomResponse().errorResponse(
+                description="We couldn’t find any product with the provided ID."
+            )
 
         has_purchased = OrderProducts.objects.filter(
             product_id=product.id,
