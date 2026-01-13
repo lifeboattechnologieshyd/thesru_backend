@@ -1840,6 +1840,7 @@ class Reviews(APIView):
                 description="We couldn’t find any product with the provided ID."
             )
 
+
         has_purchased = OrderProducts.objects.filter(
             product_id=product.id,
             store_id=store_id,
