@@ -1010,24 +1010,11 @@ class PaymentStatusAPIView(APIView):
         data = request.data
 
         order_id = data.get("order_id")
-        status = data.get("status")
+        frontend_status = data.get("status")
 
-        if not order_id or not status:
+        if not order_id or not frontend_status:
             return CustomResponse().errorResponse(
                 description="order_id and status are required"
-            )
-
-        # Validate status
-        allowed_statuses = [
-            PaymentStatus.COMPLETED,
-            PaymentStatus.FAILED,
-            PaymentStatus.CANCELLED,
-            PaymentStatus.PENDING,
-        ]
-
-        if status not in allowed_statuses:
-            return CustomResponse().errorResponse(
-                description="Invalid payment status"
             )
 
         payment = Payment.objects.filter(order_id=order_id).first()
@@ -1038,40 +1025,77 @@ class PaymentStatusAPIView(APIView):
                 description="Order or Payment not found"
             )
 
-        #  Do NOT override webhook-confirmed payment
+        # Do not override webhook-confirmed payment
         if payment.status == PaymentStatus.COMPLETED:
             return CustomResponse().successResponse(
                 description="Payment already completed (webhook confirmed)"
             )
 
+        # 🔥 FETCH CASHFREE STATUS
+        cashfree = CashFree.objects.filter(store_id=order.store_id).first()
+        if not cashfree:
+            return CustomResponse().errorResponse(
+                description="Cashfree configuration not found"
+            )
+
+        cf_response = fetch_cashfree_payment_status(order_id, cashfree)
+
+        cf_order_status = cf_response.get("order_status")  # PAID / ACTIVE / FAILED
+        verified_status = map_cashfree_status(cf_order_status)
+
         with transaction.atomic():
 
-            # Update payment
-            payment.status = status
+            payment.status = verified_status
             payment.save(update_fields=["status"])
 
-            # Update order cautiously
-            if status == PaymentStatus.COMPLETED:
+            if verified_status == PaymentStatus.COMPLETED:
                 order.status = OrderStatus.PLACED
                 order.paid_online = payment.amount
 
-            elif status == PaymentStatus.FAILED:
+            elif verified_status == PaymentStatus.FAILED:
                 order.status = OrderStatus.FAILED
 
-            elif status == PaymentStatus.CANCELLED:
+            elif verified_status == PaymentStatus.CANCELLED:
                 order.status = OrderStatus.CANCELLED
 
-            # PENDING → keep order INITIATED
             order.save(update_fields=["status", "paid_online"])
 
         return CustomResponse().successResponse(
             data={
                 "order_id": order_id,
-                "payment_status": payment.status,
+                "frontend_status": frontend_status,
+                "cashfree_status": cf_order_status,
+                "final_payment_status": payment.status,
                 "order_status": order.status,
             },
-            description="Payment status updated "
+            description="Payment status verified with Cashfree and updated"
         )
+
+def map_cashfree_status(cf_status):
+    mapping = {
+        "PAID": PaymentStatus.COMPLETED,
+        "ACTIVE": PaymentStatus.PENDING,
+        "FAILED": PaymentStatus.FAILED,
+        "CANCELLED": PaymentStatus.CANCELLED,
+    }
+    return mapping.get(cf_status, PaymentStatus.PENDING)
+
+def fetch_cashfree_payment_status(order_id, cashfree):
+    url = f"{cashfree.url}/{order_id}"
+
+    headers = {
+        "x-api-version": settings.CASHFREE_API_VERSION,
+        "x-client-id": cashfree.client_id,
+        "x-client-secret": cashfree.client_secret,
+        "Content-Type": "application/json",
+    }
+
+    response = requests.get(url, headers=headers, timeout=10)
+
+    if response.status_code != 200:
+        raise Exception("Failed to fetch order status from Cashfree")
+
+    return response.json()
 
 
 class OrderView(APIView):
