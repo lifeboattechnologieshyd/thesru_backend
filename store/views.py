@@ -1254,6 +1254,9 @@ class FlashSaleBannerListView(APIView):
             data.append({
                 "id": str(banner.id),
                 "screen": banner.screen,
+                "name":banner.name,
+                "title":banner.title,
+                "description":banner.description,
                 "image": banner.image,
                 "is_active": banner.is_active,
                 "priority": banner.priority,
