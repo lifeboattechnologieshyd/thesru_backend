@@ -1849,10 +1849,21 @@ class Reviews(APIView):
         return CustomResponse().successResponse(data={})
 
     def get(self, request):
-        payload = request.GET
         user = request.user
-        product_review = ProductReviews.objects.filter(user_id=user.id, product_id=payload["product_id"]).values()
-        return CustomResponse().successResponse(data=product_review)
+        product_id = request.GET.get("product_id")
+
+        if not product_id:
+            return CustomResponse().errorResponse(
+                description="product_id is required"
+            )
+
+        product_review = ProductReviews.objects.filter(
+            user_id=user.id,
+            product_id=product_id
+        ).values()
+
+        return CustomResponse().successResponse(data=list(product_review))
+
 
 
 
