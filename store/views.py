@@ -1819,7 +1819,7 @@ class CartTotalAPIView(APIView):
         )
 
 
-class ProductReview(APIView):
+class Reviews(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
