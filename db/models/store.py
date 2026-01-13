@@ -45,6 +45,7 @@ class DisplayProduct(AuditModel):
     description = models.TextField(null=True)
     highlights = ArrayField(models.CharField(max_length=50),null=True)
     rating = models.CharField(max_length=20,null=True)
+    total_rating = models.PositiveIntegerField(default=0)
     number_of_reviews = models.PositiveIntegerField(default=0)
 
     class Meta:
@@ -291,6 +292,22 @@ class Wishlist(AuditModel):
         db_table = "wishlist"
 
         unique_together = ("user_id", "product_id")
+        indexes = [
+            models.Index(fields=["user_id"]),
+            models.Index(fields=["product_id"]),
+        ]
+
+
+class ProductReviews(AuditModel):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    store_id = models.UUIDField()
+    product_id = models.UUIDField()
+    user_id = models.UUIDField(null=False)
+    rating = models.PositiveIntegerField()
+    review = models.CharField(max_length=1000, null=True, default="")
+
+    class Meta:
+        db_table = "productreviews"
         indexes = [
             models.Index(fields=["user_id"]),
             models.Index(fields=["product_id"]),

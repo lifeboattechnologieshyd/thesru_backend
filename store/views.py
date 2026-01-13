@@ -11,7 +11,7 @@ from rest_framework.permissions import IsAuthenticated,AllowAny
 
 from django.conf import settings
 from db.models import AddressMaster, PinCode, Product, DisplayProduct, Order, OrderProducts, Payment, OrderTimeLines, \
-    Banner, Category, Cart, Wishlist, WebBanner, FlashSaleBanner, CashFree, Store
+    Banner, Category, Cart, Wishlist, WebBanner, FlashSaleBanner, CashFree, Store, ProductReviews
 from enums.store import OrderStatus, PaymentStatus
 from mixins.drf_views import CustomResponse
 from utils.store import generate_order_id
@@ -1793,3 +1793,42 @@ class CartTotalAPIView(APIView):
             },
             total=len(items)
         )
+
+
+class ProductReview(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        payload = request.data
+        user = request.user
+        product = DisplayProduct.objects.filter(id=payload["product_id"]).first()
+        if not product:
+            return CustomResponse().errorResponse(data={}, description="We couldn’t find any product with the provided ID.")
+
+        product_review = ProductReviews.objects.filter(user_id=user.id, product_id=payload["product_id"]).first()
+        if product_review:
+            return CustomResponse().errorResponse(data={}, description="You have already submitted a review for this product.")
+        rating = ProductReviews()
+        rating.product_id = payload.get("product_id","")
+        rating.rating = payload.get("rating",5)
+        rating.user_id = user.id
+        rating.store_id = request.store.id
+        rating.review = payload.get("review","")
+        rating.save()
+        product.number_of_reviews += 1
+        totalrating = Decimal(product.rating) + Decimal(rating.rating)
+        product.total_rating = totalrating
+        avg_rating = totalrating/product.number_of_reviews
+        product.rating = f"{avg_rating}"
+        product.save()
+        return CustomResponse().successResponse(data={})
+
+    def get(self, request):
+        payload = request.GET
+        user = request.user
+        product_review = ProductReviews.objects.filter(user_id=user.id, product_id=payload["product_id"]).values()
+        return CustomResponse().successResponse(data=product_review)
+
+
+
+
