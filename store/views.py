@@ -963,6 +963,15 @@ class Webhook(APIView):
                     order.status = OrderStatus.PLACED
                     order.paid_online = payment.amount
                     order.save(update_fields=["status", "paid_online"])
+                    # ordered_product_ids = OrderProducts.objects.filter(
+                    #     order_id=order.order_id
+                    # ).values_list("product_id", flat=True)
+                    #
+                    # Cart.objects.filter(
+                    #     user_id=order.user_id,
+                    #     store_id=order.store_id,
+                    #     product_id__in=ordered_product_ids
+                    # ).delete()
 
                 elif event_type == "PAYMENT_FAILED_WEBHOOK":
                     payment.status = PaymentStatus.FAILED
@@ -991,6 +1000,79 @@ class Webhook(APIView):
             return CustomResponse().successResponse(data={},
                 description="Webhook received"
             )
+
+
+
+class PaymentStatusAPIView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        data = request.data
+
+        order_id = data.get("order_id")
+        status = data.get("status")
+
+        if not order_id or not status:
+            return CustomResponse().errorResponse(
+                description="order_id and status are required"
+            )
+
+        # Validate status
+        allowed_statuses = [
+            PaymentStatus.COMPLETED,
+            PaymentStatus.FAILED,
+            PaymentStatus.CANCELLED,
+            PaymentStatus.PENDING,
+        ]
+
+        if status not in allowed_statuses:
+            return CustomResponse().errorResponse(
+                description="Invalid payment status"
+            )
+
+        payment = Payment.objects.filter(order_id=order_id).first()
+        order = Order.objects.filter(order_id=order_id).first()
+
+        if not payment or not order:
+            return CustomResponse().errorResponse(
+                description="Order or Payment not found"
+            )
+
+        #  Do NOT override webhook-confirmed payment
+        if payment.status == PaymentStatus.COMPLETED:
+            return CustomResponse().successResponse(
+                description="Payment already completed (webhook confirmed)"
+            )
+
+        with transaction.atomic():
+
+            # Update payment
+            payment.status = status
+            payment.save(update_fields=["status"])
+
+            # Update order cautiously
+            if status == PaymentStatus.COMPLETED:
+                order.status = OrderStatus.PLACED
+                order.paid_online = payment.amount
+
+            elif status == PaymentStatus.FAILED:
+                order.status = OrderStatus.FAILED
+
+            elif status == PaymentStatus.CANCELLED:
+                order.status = OrderStatus.CANCELLED
+
+            # PENDING → keep order INITIATED
+            order.save(update_fields=["status", "paid_online"])
+
+        return CustomResponse().successResponse(
+            data={
+                "order_id": order_id,
+                "payment_status": payment.status,
+                "order_status": order.status,
+            },
+            description="Payment status updated "
+        )
+
 
 class OrderView(APIView):
     permission_classes = [IsAuthenticated]
