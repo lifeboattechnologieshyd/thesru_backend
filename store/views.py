@@ -1833,7 +1833,7 @@ class Reviews(APIView):
             return CustomResponse().errorResponse(data={}, description="We couldn’t find any product with the provided ID.")
 
         has_purchased = OrderProducts.objects.filter(
-            product_id=product,
+            product_id=product.id,
             store_id=store_id,
             order_id__in=Order.objects.filter(
                 user_id=user.id
