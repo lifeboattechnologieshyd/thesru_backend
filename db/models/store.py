@@ -44,7 +44,7 @@ class DisplayProduct(AuditModel):
     age = models.PositiveIntegerField(default=0)
     description = models.TextField(null=True)
     highlights = ArrayField(models.CharField(max_length=50),null=True)
-    rating = models.CharField(max_length=20,null=True)
+    rating = models.CharField(max_length=50,null=True)
     total_rating = models.PositiveIntegerField(default=0)
     number_of_reviews = models.PositiveIntegerField(default=0)
 
