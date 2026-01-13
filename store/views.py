@@ -869,6 +869,11 @@ def initiateOrder(user, amount, order_id,cashfree):
     """
     Initiate payment using school-specific CashFree credentials from the database.
     """
+    print("DEBUG CASHFREE CLIENT ID:", cashfree.client_id)
+    print("DEBUG CASHFREE CLIENT SECRET:", cashfree.client_secret)
+    print("DEBUG CASHFREE URL:", cashfree.url)
+    print("DEBUG CASHFREE WEBHOOK:", cashfree.webhook)
+
     # --- Prepare payload ---
     payload = {
         "order_currency": "INR",
@@ -891,6 +896,8 @@ def initiateOrder(user, amount, order_id,cashfree):
         "x-client-secret": cashfree.client_secret,
         "Content-Type": "application/json",
     }
+    print("headers",headers)
+    print("payload",payload)
 
 
     try:
@@ -1204,6 +1211,9 @@ class FlashSaleBannerListView(APIView):
                 data=[{
                     "id": str(banner.id),
                     "screen": banner.screen,
+                    "name":banner.name,
+                    "title":banner.title,
+                    "description":banner.description,
                     "image": banner.image,
                     "is_active": banner.is_active,
                     "priority": banner.priority,

@@ -6,6 +6,7 @@ class BannerScreen(models.TextChoices):
     HOME = "Home"
     WISHLIST = "Wishlist"
 
+
 class InventoryType(models.TextChoices):
     PURCHASE = "Purchase"
     SELL = "Sell"
