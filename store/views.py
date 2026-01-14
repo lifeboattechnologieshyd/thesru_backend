@@ -1123,7 +1123,7 @@ class OrderedProducts(APIView):
 
         # Subquery: DisplayProduct → Product
         display_qs = DisplayProduct.objects.filter(
-            default_product_id=OuterRef("product_id")
+            default_product_id=OuterRef("id")
         )
 
         product_name_sq = display_qs.values("product_name")[:1]
