@@ -1853,10 +1853,9 @@ class Reviews(APIView):
         has_purchased = OrderProducts.objects.filter(
             product_id=product.id,
             store_id=store_id,
-            status='Placed',
             order_id__in=[
                 str(order_id) for order_id in
-                Order.objects.filter(user_id=user.id)
+                Order.objects.filter(user_id=user.id, status='Placed')
                 .values_list("order_id", flat=True)
             ]
         ).exists()
