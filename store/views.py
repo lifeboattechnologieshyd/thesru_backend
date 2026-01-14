@@ -11,7 +11,7 @@ from rest_framework.permissions import IsAuthenticated,AllowAny
 
 from django.conf import settings
 from db.models import AddressMaster, PinCode, Product, DisplayProduct, Order, OrderProducts, Payment, OrderTimeLines, \
-    Banner, Category, Cart, Wishlist, WebBanner, FlashSaleBanner, CashFree, Store, ProductReviews
+    Banner, Category, Cart, Wishlist, WebBanner, FlashSaleBanner, CashFree, Store, ProductReviews, ContactMessage
 from enums.store import OrderStatus, PaymentStatus
 from mixins.drf_views import CustomResponse
 from utils.store import generate_order_id
@@ -1907,6 +1907,38 @@ class Reviews(APIView):
         return CustomResponse().successResponse(data=list(product_review))
 
 
+class ContactMessageAPIView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        try:
+            name = request.data.get("name")
+            email = request.data.get("email")
+            subject = request.data.get("subject")
+            message = request.data.get("message")
+
+            # -------- Validation --------
+            if not all([name, email, subject, message]):
+                return CustomResponse().errorResponse(
+                    description="All fields (name, email, subject, message) are required"
+                )
+
+            ContactMessage.objects.create(
+                name=name,
+                email=email,
+                subject=subject,
+                message=message
+            )
+
+            return CustomResponse().successResponse(
+                description="Message submitted successfully",
+                data={}
+            )
+
+        except Exception as e:
+            return CustomResponse().errorResponse(
+                description=str(e)
+            )
 
 
 
