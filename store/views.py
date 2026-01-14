@@ -1107,6 +1107,19 @@ def fetch_cashfree_payment_status(order_id, cashfree):
 
     return response.json()
 
+class OrderedProducts(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        order_id = request.get("order_id")
+        products = OrderProducts.objects.filter(
+            order_id=order_id
+        ).values()
+        return CustomResponse().successResponse(
+            data=list(products),
+            total=len(products)
+        )
+
 
 class OrderView(APIView):
     permission_classes = [IsAuthenticated]

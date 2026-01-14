@@ -3,7 +3,8 @@ from django.urls import path
 from store.views import PinListView, AddressAPIView, ProductDetailAPIView, ProductListAPIView, InitiateOrder, OrderView, \
     BannerListView, CategoryListView, AddToCartAPIView, CartListAPIView, UpdateCartAPIView, RemoveFromCartAPIView, \
     AddToWishlistAPIView, WishlistListAPIView, RemoveFromWishlistAPIView, MoveWishlistToCartAPIView, CartTotalAPIView, \
-    FlashSaleBannerListView, WebBannerListView, Webhook, PaymentStatusAPIView, Reviews, ContactMessageAPIView
+    FlashSaleBannerListView, WebBannerListView, Webhook, PaymentStatusAPIView, Reviews, ContactMessageAPIView, \
+    OrderedProducts
 
 urlpatterns = [
 
@@ -24,6 +25,7 @@ urlpatterns = [
     path("payment/status/update",PaymentStatusAPIView.as_view()),
     path("paymentWebhook", Webhook.as_view()),
     path("order",OrderView.as_view()),
+    path("order/products",OrderedProducts.as_view()),
 
     path("add/cart",AddToCartAPIView.as_view()),
     path("get/cart",CartListAPIView.as_view()),
