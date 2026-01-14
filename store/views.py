@@ -1111,7 +1111,7 @@ class OrderedProducts(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        order_id = request.get("order_id")
+        order_id = request.GET.get("order_id")
         products = OrderProducts.objects.filter(
             order_id=order_id
         ).values()
