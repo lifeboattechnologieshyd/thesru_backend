@@ -1400,7 +1400,7 @@ class OrderListAPIView(APIView):
         try:
             store = request.store
 
-            # -------- Pagination Params --------
+            # -------- Pagination --------
             page = int(request.query_params.get("page", 1))
             page_size = int(request.query_params.get("page_size", 10))
 
@@ -1411,14 +1411,10 @@ class OrderListAPIView(APIView):
 
             offset = (page - 1) * page_size
 
-            # -------- Base Query --------
-            base_qs = Order.objects.filter(store_id=store.id)
-
-            total_orders = base_qs.count()
-            total_pages = ceil(total_orders / page_size) if page_size else 1
-
+            # -------- Orders --------
             orders = list(
-                base_qs.order_by("-created_at")[offset: offset + page_size]
+                Order.objects.filter(store_id=store.id)
+                .order_by("-created_at")[offset: offset + page_size]
                 .values(
                     "order_id",
                     "user_id",
@@ -1434,12 +1430,16 @@ class OrderListAPIView(APIView):
             if not orders:
                 return CustomResponse().successResponse(
                     description="Orders fetched successfully",
-                    data={},
+                    data=[]
                 )
 
             # -------- Users --------
-            user_ids = {o["user_id"] for o in orders}
-            users = User.objects.filter(id__in=user_ids).values("id", "username")
+            user_ids = [o["user_id"] for o in orders]
+
+            users = User.objects.filter(id__in=user_ids).values(
+                "id", "username"
+            )
+
             user_map = {u["id"]: u["username"] for u in users}
 
             # -------- Items Count --------
@@ -1455,15 +1455,15 @@ class OrderListAPIView(APIView):
                 .annotate(total_qty=Sum("qty"))
             }
 
-            # -------- Final Response --------
+            # -------- Final Data --------
             result = []
             for order in orders:
                 payment_status = (
                     "Paid"
                     if (
-                            order["paid_online"] > 0
-                            or order["cash_on_delivery"] > 0
-                            or order["wallet_paid"] > 0
+                        order["paid_online"] > 0
+                        or order["cash_on_delivery"] > 0
+                        or order["wallet_paid"] > 0
                     )
                     else "Unpaid"
                 )
@@ -1479,13 +1479,11 @@ class OrderListAPIView(APIView):
                 })
 
             return CustomResponse().successResponse(
-                data={result},
-
+                description="Orders fetched successfully",
+                data=result
             )
 
         except Exception as e:
             return CustomResponse().errorResponse(
                 description=str(e)
             )
-
-
