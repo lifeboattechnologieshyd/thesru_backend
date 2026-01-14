@@ -1480,7 +1480,8 @@ class OrderListAPIView(APIView):
 
             return CustomResponse().successResponse(
                 description="Orders fetched successfully",
-                data=result
+                data=result,
+                total=len(result)
             )
 
         except Exception as e:
