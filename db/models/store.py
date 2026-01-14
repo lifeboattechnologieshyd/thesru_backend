@@ -303,6 +303,7 @@ class ProductReviews(AuditModel):
     store_id = models.UUIDField()
     product_id = models.UUIDField()
     user_id = models.UUIDField(null=False)
+    username = models.CharField(max_length=30,null=False, default="System")
     rating = models.PositiveIntegerField()
     review = models.CharField(max_length=1000, null=True, default="")
 
