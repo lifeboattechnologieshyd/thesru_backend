@@ -35,7 +35,6 @@ urlpatterns = [
     path("wishlist/to/cart",MoveWishlistToCartAPIView.as_view()),
     path("cart/total",CartTotalAPIView.as_view()),
 
-
     path("productreview",Reviews.as_view()),
     path("contact/message",ContactMessageAPIView.as_view()),
 
