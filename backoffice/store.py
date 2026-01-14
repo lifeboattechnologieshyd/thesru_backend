@@ -3,12 +3,13 @@ from django.db import transaction
 from django.db import IntegrityError
 from rest_framework.views import APIView
 from django.utils import timezone
+from django.db.models import Count, Sum
 
 from rest_framework.permissions import IsAuthenticated
 
 from db.models import  Category, Product, DisplayProduct, Banner, Inventory, PinCode, Coupon, Store, WebBanner, \
-    FlashSaleBanner
-from enums.store import InventoryType
+    FlashSaleBanner, Order, User, Cart
+from enums.store import InventoryType, OrderStatus
 from mixins.drf_views import CustomResponse
 
 
@@ -1220,3 +1221,236 @@ class FlashSaleBannerAPIView(APIView):
         return CustomResponse.successResponse(data={},description="flash sale banner deleted successfully")
 
 
+
+class OrderStatsAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        try:
+            store = request.store
+            from_date = request.query_params.get("from_date")
+            to_date = request.query_params.get("to_date")
+
+            queryset = Order.objects.filter(store_id=store.id)
+
+            # -------- Date Filters --------
+            if from_date:
+                queryset = queryset.filter(created_at__date__gte=from_date)
+
+            if to_date:
+                queryset = queryset.filter(created_at__date__lte=to_date)
+
+            # -------- Total Orders --------
+            total_orders = queryset.count()
+
+            # -------- Status-wise Count --------
+            status_data = (
+                queryset.values("status")
+                .annotate(count=Count("id"))
+            )
+
+            status_counts = {
+                item["status"]: item["count"]
+                for item in status_data
+            }
+
+            # -------- amount Stats --------
+            revenue = queryset.aggregate(
+                total_amount=Sum("amount"),
+                paid_online=Sum("paid_online"),
+                cash_on_delivery=Sum("cash_on_delivery"),
+                wallet_paid=Sum("wallet_paid"),
+            )
+
+            response_data = {
+                "total_orders": total_orders,
+                "status_counts": status_counts,
+                "revenue": {
+                    "total_amount": revenue["total_amount"] or 0,
+                    "paid_online": revenue["paid_online"] or 0,
+                    "cash_on_delivery": revenue["cash_on_delivery"] or 0,
+                    "wallet_paid": revenue["wallet_paid"] or 0,
+                }
+            }
+
+            return CustomResponse().successResponse(
+                message="Order statistics fetched successfully",
+                data=response_data
+            )
+
+        except Exception as e:
+            return CustomResponse().errorResponse(
+                description=str(e)
+            )
+
+
+class AbandonedOrderStatsAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        try:
+            store = request.store
+            from_date = request.query_params.get("from_date")
+            to_date = request.query_params.get("to_date")
+
+            queryset = Order.objects.filter(
+                store_id=store.id,
+                status__in=[
+                    OrderStatus.CANCELLED,
+                    OrderStatus.FAILED
+                ]
+            )
+
+            # -------- Date Filters --------
+            if from_date:
+                queryset = queryset.filter(created_at__date__gte=from_date)
+
+            if to_date:
+                queryset = queryset.filter(created_at__date__lte=to_date)
+
+            # -------- Counts --------
+            cancelled_count = queryset.filter(
+                status=OrderStatus.CANCELLED
+            ).count()
+
+            failed_count = queryset.filter(
+                status=OrderStatus.FAILED
+            ).count()
+
+            # -------- Amount Stats --------
+            cancelled_amount = queryset.filter(
+                status=OrderStatus.CANCELLED
+            ).aggregate(total=Sum("amount"))["total"] or 0
+
+            failed_amount = queryset.filter(
+                status=OrderStatus.FAILED
+            ).aggregate(total=Sum("amount"))["total"] or 0
+
+            response_data = {
+                "cancelled": {
+                    "count": cancelled_count,
+                    "amount": cancelled_amount
+                },
+                "failed": {
+                    "count": failed_count,
+                    "amount": failed_amount
+                }
+            }
+
+            return CustomResponse().successResponse(
+                message="Cancelled and failed order statistics fetched successfully",
+                data=response_data
+            )
+
+        except Exception as e:
+            return CustomResponse().errorResponse(
+                description=str(e)
+            )
+
+class CartListView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        try:
+            store = request.store
+
+            carts = list(
+                Cart.objects.filter(store_id=store.id).values(
+                    "id",
+                    "user_id",
+                    "product_id",
+                    "quantity"
+                )
+            )
+
+            # -------- Fetch Usernames --------
+            user_ids = {cart["user_id"] for cart in carts}
+
+            users = User.objects.filter(id__in=user_ids).values(
+                "id", "username"
+            )
+
+            user_map = {
+                user["id"]: user["username"]
+                for user in users
+            }
+
+            # -------- Attach Username --------
+            for cart in carts:
+                cart["username"] = user_map.get(cart["user_id"])
+
+            return CustomResponse().successResponse(
+                message="Cart records fetched successfully",
+                data=carts
+            )
+
+        except Exception as e:
+            return CustomResponse().errorResponse(
+                description=str(e)
+            )
+
+
+class OrderListAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        try:
+            store = request.store
+
+            orders = list(
+                Order.objects.filter(store_id=store.id)
+                .order_by("-created_at")
+                .values(
+                    "id",
+                    "order_id",
+                    "user_id",
+                    "amount",
+                    "wallet_paid",
+                    "paid_online",
+                    "cash_on_delivery",
+                    "status",
+                    "created_at",
+                )
+            )
+
+            # -------- Fetch Usernames --------
+            user_ids = {order["user_id"] for order in orders}
+
+            users = User.objects.filter(id__in=user_ids).values(
+                "id", "username"
+            )
+
+            user_map = {
+                user["id"]: user["username"]
+                for user in users
+            }
+
+            # -------- Final Response Shape --------
+            for order in orders:
+                order["customer_name"] = user_map.get(order["user_id"])
+
+                order["payment_status"] = (
+                    "Paid"
+                    if (
+                            order["paid_online"] > 0
+                            or order["cash_on_delivery"] > 0
+                            or order["wallet_paid"] > 0
+                    )
+                    else "Unpaid"
+                )
+
+                # cleanup
+                order.pop("user_id", None)
+                order.pop("paid_online", None)
+                order.pop("cash_on_delivery", None)
+                order.pop("wallet_paid", None)
+
+            return CustomResponse().successResponse(
+                message="Orders fetched successfully",
+                data=orders
+            )
+
+        except Exception as e:
+            return CustomResponse().errorResponse(
+                description=str(e)
+            )
