@@ -1393,7 +1393,8 @@ class AbandonedOrderListAPIView(APIView):
 
             return CustomResponse().successResponse(
                 description="Cancelled and failed orders fetched successfully",
-                data=orders
+                data=orders,
+                total=len(orders)
             )
 
         except Exception as e:
