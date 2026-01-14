@@ -1113,26 +1113,14 @@ class OrderedProducts(APIView):
 
     def get(self, request):
         order_id = request.GET.get("order_id")
-        # products = OrderProducts.objects.filter(
-        #     order_id=order_id
-        # ).values()
-        # return CustomResponse().successResponse(
-        #     data=list(products),
-        #     total=len(products)
-        # )
-
-        # Subquery: DisplayProduct → Product
         display_qs = DisplayProduct.objects.filter(
-            default_product_id=OuterRef("id")
+            default_product_id=OuterRef("product_id")
         )
-
         product_name_sq = display_qs.values("product_name")[:1]
         product_id_sq = display_qs.values("default_product_id")[:1]
-
         product_qs = Product.objects.filter(
             id=Subquery(product_id_sq)
         )
-
         products = (
             OrderProducts.objects
             .filter(order_id=order_id)
@@ -1141,20 +1129,19 @@ class OrderedProducts(APIView):
                 product_image=Subquery(product_qs.values("thumbnail_image")[:1]),
             )
             .values(
-                "product_id",
-                "qty",
-                "selling_price",
-                "Apportioned_discount",
-                "Apportioned_wallet",
-                "Apportioned_online",
-                "Apportioned_gst",
-                "review",
-                "rating",
-                "product_name",
-                "product_image"
+                # "product_id",
+                # "qty",
+                # "selling_price",
+                # "Apportioned_discount",
+                # "Apportioned_wallet",
+                # "Apportioned_online",
+                # "Apportioned_gst",
+                # "review",
+                # "rating",
+                # "product_name",
+                # "product_image"
             )
         )
-
         return CustomResponse().successResponse(
             data=list(products),
             total=products.count()
