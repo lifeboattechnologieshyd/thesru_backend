@@ -1442,20 +1442,20 @@ class OrderListAPIView(APIView):
 
             user_map = {u["id"]: u["username"] for u in users}
 
-            # -------- Items Count --------
+            # -------- Items = number of products --------
             order_ids = [o["order_id"] for o in orders]
 
             items_count_map = {
-                row["order_id"]: row["total_qty"]
+                row["order_id"]: row["product_count"]
                 for row in OrderProducts.objects.filter(
                     store_id=store.id,
                     order_id__in=order_ids
                 )
                 .values("order_id")
-                .annotate(total_qty=Sum("qty"))
+                .annotate(product_count=Count("product_id", distinct=True))
             }
 
-            # -------- Final Data --------
+            # -------- Final Response --------
             result = []
             for order in orders:
                 payment_status = (
@@ -1471,7 +1471,7 @@ class OrderListAPIView(APIView):
                 result.append({
                     "order_id": order["order_id"],
                     "created_at": order["created_at"],
-                    "user_name": user_map.get(order["user_id"]),
+                    "customer_name": user_map.get(order["user_id"]),
                     "total": order["amount"],
                     "payment_status": payment_status,
                     "status": order["status"],
