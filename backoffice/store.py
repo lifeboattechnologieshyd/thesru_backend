@@ -1304,13 +1304,10 @@ class AbandonedOrderListAPIView(APIView):
 
             offset = (page - 1) * page_size
 
-            # -------- Base Query --------
+            # -------- Orders (Cancelled + Failed) --------
             queryset = Order.objects.filter(
                 store_id=store.id,
-                status__in=[
-                    OrderStatus.CANCELLED,
-                    OrderStatus.FAILED
-                ]
+                status__in=[OrderStatus.CANCELLED, OrderStatus.FAILED]
             ).order_by("-created_at")
 
             # -------- Date Filters --------
@@ -1330,6 +1327,47 @@ class AbandonedOrderListAPIView(APIView):
                 )
             )
 
+            if not orders:
+                return CustomResponse().successResponse(
+                    description="Cancelled and failed orders fetched successfully",
+                    data=[]
+                )
+
+            # -------- Fetch Order Products --------
+            order_ids = [o["order_id"] for o in orders]
+
+            order_products = OrderProducts.objects.filter(
+                store_id=store.id,
+                order_id__in=order_ids
+            ).values(
+                "order_id",
+                "product_id"
+            )
+
+            # -------- Fetch Product Names --------
+            product_ids = {op["product_id"] for op in order_products}
+
+            products = Product.objects.filter(
+                id__in=product_ids
+            ).values("id", "name")
+
+            product_map = {
+                p["id"]: p["name"]
+                for p in products
+            }
+
+            # -------- Group Products by Order --------
+            products_by_order = {}
+            for op in order_products:
+                products_by_order.setdefault(op["order_id"], []).append({
+                    "product_id": op["product_id"],
+                    "product_name": product_map.get(op["product_id"])
+                })
+
+            # -------- Attach Products to Orders --------
+            for order in orders:
+                order["products"] = products_by_order.get(order["order_id"], [])
+
             return CustomResponse().successResponse(
                 description="Cancelled and failed orders fetched successfully",
                 data=orders
@@ -1339,6 +1377,7 @@ class AbandonedOrderListAPIView(APIView):
             return CustomResponse().errorResponse(
                 description=str(e)
             )
+
 
 
 class CartListView(APIView):
