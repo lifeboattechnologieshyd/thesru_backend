@@ -8,7 +8,7 @@ from django.db.models import Count, Sum
 from rest_framework.permissions import IsAuthenticated
 
 from db.models import  Category, Product, DisplayProduct, Banner, Inventory, PinCode, Coupon, Store, WebBanner, \
-    FlashSaleBanner, Order, User, Cart
+    FlashSaleBanner, Order, User, Cart, OrderProducts
 from enums.store import InventoryType, OrderStatus
 from mixins.drf_views import CustomResponse
 
@@ -1263,7 +1263,6 @@ class OrderStatsAPIView(APIView):
             )
 
             response_data = {
-                "total_orders": total_orders,
                 "status_counts": status_counts,
                 "revenue": {
                     "total_amount": revenue["total_amount"] or 0,
@@ -1274,8 +1273,9 @@ class OrderStatsAPIView(APIView):
             }
 
             return CustomResponse().successResponse(
-                message="Order statistics fetched successfully",
-                data=response_data
+                description="Order statistics fetched successfully",
+                data=response_data,
+                total=len(response_data)
             )
 
         except Exception as e:
@@ -1400,9 +1400,25 @@ class OrderListAPIView(APIView):
         try:
             store = request.store
 
+            # -------- Pagination Params --------
+            page = int(request.query_params.get("page", 1))
+            page_size = int(request.query_params.get("page_size", 10))
+
+            if page < 1:
+                page = 1
+            if page_size < 1:
+                page_size = 10
+
+            offset = (page - 1) * page_size
+
+            # -------- Base Query --------
+            base_qs = Order.objects.filter(store_id=store.id)
+
+            total_orders = base_qs.count()
+            total_pages = ceil(total_orders / page_size) if page_size else 1
+
             orders = list(
-                Order.objects.filter(store_id=store.id)
-                .order_by("-created_at")
+                base_qs.order_by("-created_at")[offset: offset + page_size]
                 .values(
                     "order_id",
                     "user_id",
@@ -1411,51 +1427,65 @@ class OrderListAPIView(APIView):
                     "created_at",
                     "paid_online",
                     "cash_on_delivery",
-                    "wallet_paid"
+                    "wallet_paid",
                 )
             )
 
-            # -------- Fetch Users --------
+            if not orders:
+                return CustomResponse().successResponse(
+                    description="Orders fetched successfully",
+                    data={},
+                )
+
+            # -------- Users --------
             user_ids = {o["user_id"] for o in orders}
+            users = User.objects.filter(id__in=user_ids).values("id", "username")
+            user_map = {u["id"]: u["username"] for u in users}
 
-            users = User.objects.filter(id__in=user_ids).values(
-                "id", "username"
-            )
+            # -------- Items Count --------
+            order_ids = [o["order_id"] for o in orders]
 
-            user_map = {
-                user["id"]: user["username"]
-                for user in users
+            items_count_map = {
+                row["order_id"]: row["total_qty"]
+                for row in OrderProducts.objects.filter(
+                    store_id=store.id,
+                    order_id__in=order_ids
+                )
+                .values("order_id")
+                .annotate(total_qty=Sum("qty"))
             }
 
             # -------- Final Response --------
-            response = []
+            result = []
             for order in orders:
                 payment_status = (
                     "Paid"
                     if (
-                        order["paid_online"] > 0
-                        or order["cash_on_delivery"] > 0
-                        or order["wallet_paid"] > 0
+                            order["paid_online"] > 0
+                            or order["cash_on_delivery"] > 0
+                            or order["wallet_paid"] > 0
                     )
                     else "Unpaid"
                 )
 
-                response.append({
+                result.append({
                     "order_id": order["order_id"],
                     "created_at": order["created_at"],
-                    "user_name": user_map.get(order["user_id"]),
+                    "customer_name": user_map.get(order["user_id"]),
                     "total": order["amount"],
                     "payment_status": payment_status,
                     "status": order["status"],
-                    "items": "Multiple items"  # placeholder for UI
+                    "items": items_count_map.get(order["order_id"], 0),
                 })
 
             return CustomResponse().successResponse(
-                message="Orders fetched successfully",
-                data=response,total=len(response)
+                data={result},
+
             )
 
         except Exception as e:
             return CustomResponse().errorResponse(
                 description=str(e)
             )
+
+
