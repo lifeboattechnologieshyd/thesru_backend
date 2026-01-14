@@ -1830,7 +1830,10 @@ class CartTotalAPIView(APIView):
 
 
 class Reviews(APIView):
-    permission_classes = [IsAuthenticated]
+    def get_permissions(self):
+        if self.request.method == "POST":
+            return [IsAuthenticated()]
+        return [AllowAny()]
 
     def post(self, request):
         payload = request.data
@@ -1887,6 +1890,7 @@ class Reviews(APIView):
         product.rating = f"{avg_rating}"
         product.save()
         return CustomResponse().successResponse(data={})
+
 
     def get(self, request):
         user = request.user
