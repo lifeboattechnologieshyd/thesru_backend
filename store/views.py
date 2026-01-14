@@ -926,6 +926,10 @@ def initiateOrder(user, amount, order_id,cashfree):
     except Exception as e:
         raise Exception(e)
 
+
+SYSTEM_UPDATED_BY = "CASHFREE_WEBHOOK"
+
+
 class Webhook(APIView):
     permission_classes = [AllowAny]
 
@@ -951,7 +955,7 @@ class Webhook(APIView):
             # If no DB records → still return 200
             if not payment or not order:
                 print("Order/Payment not found for order_id:", order_id)
-                return CustomResponse().successResponse(
+                return CustomResponse().successResponse(data={},
                     description="Webhook received"
                 )
 
@@ -959,11 +963,13 @@ class Webhook(APIView):
 
                 if event_type == "PAYMENT_SUCCESS_WEBHOOK":
                     payment.status = PaymentStatus.COMPLETED
-                    payment.save(update_fields=["status"])
+                    payment.updated_by = SYSTEM_UPDATED_BY
+                    payment.save(update_fields=["status", "updated_by"])
 
                     order.status = OrderStatus.PLACED
                     order.paid_online = payment.amount
-                    order.save(update_fields=["status", "paid_online"])
+                    order.updated_by = SYSTEM_UPDATED_BY
+                    order.save(update_fields=["status", "paid_online", "updated_by"])
                     # ordered_product_ids = OrderProducts.objects.filter(
                     #     order_id=order.order_id
                     # ).values_list("product_id", flat=True)
@@ -976,18 +982,21 @@ class Webhook(APIView):
 
                 elif event_type == "PAYMENT_FAILED_WEBHOOK":
                     payment.status = PaymentStatus.FAILED
-                    payment.save(update_fields=["status"])
+                    order.updated_by = SYSTEM_UPDATED_BY
+                    order.save(update_fields=["status", "paid_online", "updated_by"])
 
                     order.status = OrderStatus.FAILED
-                    order.save(update_fields=["status"])
+                    order.updated_by = SYSTEM_UPDATED_BY
+                    order.save(update_fields=["status", "updated_by"])
 
                 elif event_type == "PAYMENT_USER_DROPPED_WEBHOOK":
                     payment.status = PaymentStatus.CANCELLED
-                    payment.save(update_fields=["status"])
+                    payment.updated_by = SYSTEM_UPDATED_BY
+                    payment.save(update_fields=["status", "updated_by"])
 
                     order.status = OrderStatus.CANCELLED
-                    order.save(update_fields=["status"])
-
+                    order.updated_by = SYSTEM_UPDATED_BY
+                    order.save(update_fields=["status", "updated_by"])
                 else:
                     print("Unhandled webhook type:", event_type)
 
