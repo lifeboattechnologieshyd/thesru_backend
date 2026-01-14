@@ -1427,7 +1427,7 @@ class OrderListAPIView(APIView):
 
             # -------- Final Response Shape --------
             for order in orders:
-                order["customer_name"] = user_map.get(order["user_id"])
+                order["user_name"] = user_map.get(order["user_id"])
 
                 order["payment_status"] = (
                     "Paid"
