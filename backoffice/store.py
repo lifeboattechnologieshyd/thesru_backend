@@ -1330,8 +1330,25 @@ class AbandonedOrderListAPIView(APIView):
             if not orders:
                 return CustomResponse().successResponse(
                     description="Cancelled and failed orders fetched successfully",
-                    data=[]
+                    data=[],
+                    total=0
                 )
+
+            # -------- Fetch Users --------
+            user_ids = {o["user_id"] for o in orders}
+
+            users = User.objects.filter(id__in=user_ids).values(
+                "id", "username", "mobile", "email"
+            )
+
+            user_map = {
+                u["id"]: {
+                    "username": u["username"],
+                    "mobile": u["mobile"],
+                    "email": u["email"],
+                }
+                for u in users
+            }
 
             # -------- Fetch Order Products --------
             order_ids = [o["order_id"] for o in orders]
@@ -1374,21 +1391,25 @@ class AbandonedOrderListAPIView(APIView):
                 products_by_order.setdefault(op["order_id"], []).append({
                     "product_id": op["product_id"],
                     "product_name": product_map.get(op["product_id"]),
-                    "sku": op["sku"],
                     "qty": op["qty"],
                     "mrp": op["mrp"],
                     "selling_price": op["selling_price"],
                     "amount": product_amount,
-                    "apportioned_discount": op["Apportioned_discount"],
-                    "apportioned_wallet": op["Apportioned_wallet"],
-                    "apportioned_online": op["Apportioned_online"],
-                    "apportioned_gst": op["Apportioned_gst"],
-                    "rating": op["rating"],
-                    "review": op["review"],
+                    # "apportioned_discount": op["Apportioned_discount"],
+                    # "apportioned_wallet": op["Apportioned_wallet"],
+                    # "apportioned_online": op["Apportioned_online"],
+                    # "apportioned_gst": op["Apportioned_gst"],
+                    # "rating": op["rating"],
+                    # "review": op["review"],
                 })
 
-            # -------- Attach Products to Orders --------
+            # -------- Attach User + Products to Orders --------
             for order in orders:
+                user_info = user_map.get(order["user_id"], {})
+
+                order["username"] = user_info.get("username")
+                order["mobile"] = user_info.get("mobile")
+                order["email"] = user_info.get("email")
                 order["products"] = products_by_order.get(order["order_id"], [])
 
             return CustomResponse().successResponse(
@@ -1401,6 +1422,7 @@ class AbandonedOrderListAPIView(APIView):
             return CustomResponse().errorResponse(
                 description=str(e)
             )
+
 
 
 
