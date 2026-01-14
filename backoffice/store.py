@@ -1367,7 +1367,7 @@ class CartListView(APIView):
             user_ids = {cart["user_id"] for cart in carts}
 
             users = User.objects.filter(id__in=user_ids).values(
-                "id", "username"
+                "id", "username","mobile","email"
             )
 
             user_map = {
