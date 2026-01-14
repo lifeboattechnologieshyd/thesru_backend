@@ -1390,6 +1390,9 @@ class CartListView(APIView):
             )
 
 
+
+
+
 class OrderListAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -1401,20 +1404,19 @@ class OrderListAPIView(APIView):
                 Order.objects.filter(store_id=store.id)
                 .order_by("-created_at")
                 .values(
-                    "id",
                     "order_id",
                     "user_id",
                     "amount",
-                    "wallet_paid",
-                    "paid_online",
-                    "cash_on_delivery",
                     "status",
                     "created_at",
+                    "paid_online",
+                    "cash_on_delivery",
+                    "wallet_paid"
                 )
             )
 
-            # -------- Fetch Usernames --------
-            user_ids = {order["user_id"] for order in orders}
+            # -------- Fetch Users --------
+            user_ids = {o["user_id"] for o in orders}
 
             users = User.objects.filter(id__in=user_ids).values(
                 "id", "username"
@@ -1425,29 +1427,32 @@ class OrderListAPIView(APIView):
                 for user in users
             }
 
-            # -------- Final Response Shape --------
+            # -------- Final Response --------
+            response = []
             for order in orders:
-                order["user_name"] = user_map.get(order["user_id"])
-
-                order["payment_status"] = (
+                payment_status = (
                     "Paid"
                     if (
-                            order["paid_online"] > 0
-                            or order["cash_on_delivery"] > 0
-                            or order["wallet_paid"] > 0
+                        order["paid_online"] > 0
+                        or order["cash_on_delivery"] > 0
+                        or order["wallet_paid"] > 0
                     )
                     else "Unpaid"
                 )
 
-                # cleanup
-                order.pop("user_id", None)
-                order.pop("paid_online", None)
-                order.pop("cash_on_delivery", None)
-                order.pop("wallet_paid", None)
+                response.append({
+                    "order_id": order["order_id"],
+                    "created_at": order["created_at"],
+                    "user_name": user_map.get(order["user_id"]),
+                    "total": order["amount"],
+                    "payment_status": payment_status,
+                    "status": order["status"],
+                    "items": "Multiple items"  # placeholder for UI
+                })
 
             return CustomResponse().successResponse(
                 message="Orders fetched successfully",
-                data=orders
+                data=response,total=len(response)
             )
 
         except Exception as e:
