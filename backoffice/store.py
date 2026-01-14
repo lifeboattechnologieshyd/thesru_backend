@@ -1471,7 +1471,7 @@ class OrderListAPIView(APIView):
                 result.append({
                     "order_id": order["order_id"],
                     "created_at": order["created_at"],
-                    "customer_name": user_map.get(order["user_id"]),
+                    "user_name": user_map.get(order["user_id"]),
                     "total": order["amount"],
                     "payment_status": payment_status,
                     "status": order["status"],
