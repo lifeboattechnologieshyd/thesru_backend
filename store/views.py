@@ -1876,6 +1876,7 @@ class Reviews(APIView):
         rating.product_id = payload.get("product_id","")
         rating.rating = payload.get("rating",5)
         rating.user_id = user.id
+        rating.username = user.username
         rating.store_id = request.store.id
         rating.review = payload.get("review","")
         rating.save()
