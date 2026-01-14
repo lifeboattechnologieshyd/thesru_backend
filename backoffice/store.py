@@ -1284,7 +1284,7 @@ class OrderStatsAPIView(APIView):
             )
 
 
-class AbandonedOrderStatsAPIView(APIView):
+class AbandonedOrderListAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
@@ -1293,13 +1293,25 @@ class AbandonedOrderStatsAPIView(APIView):
             from_date = request.query_params.get("from_date")
             to_date = request.query_params.get("to_date")
 
+            # -------- Pagination --------
+            page = int(request.query_params.get("page", 1))
+            page_size = int(request.query_params.get("page_size", 10))
+
+            if page < 1:
+                page = 1
+            if page_size < 1:
+                page_size = 10
+
+            offset = (page - 1) * page_size
+
+            # -------- Base Query --------
             queryset = Order.objects.filter(
                 store_id=store.id,
                 status__in=[
                     OrderStatus.CANCELLED,
                     OrderStatus.FAILED
                 ]
-            )
+            ).order_by("-created_at")
 
             # -------- Date Filters --------
             if from_date:
@@ -1308,44 +1320,26 @@ class AbandonedOrderStatsAPIView(APIView):
             if to_date:
                 queryset = queryset.filter(created_at__date__lte=to_date)
 
-            # -------- Counts --------
-            cancelled_count = queryset.filter(
-                status=OrderStatus.CANCELLED
-            ).count()
-
-            failed_count = queryset.filter(
-                status=OrderStatus.FAILED
-            ).count()
-
-            # -------- Amount Stats --------
-            cancelled_amount = queryset.filter(
-                status=OrderStatus.CANCELLED
-            ).aggregate(total=Sum("amount"))["total"] or 0
-
-            failed_amount = queryset.filter(
-                status=OrderStatus.FAILED
-            ).aggregate(total=Sum("amount"))["total"] or 0
-
-            response_data = {
-                "cancelled": {
-                    "count": cancelled_count,
-                    "amount": cancelled_amount
-                },
-                "failed": {
-                    "count": failed_count,
-                    "amount": failed_amount
-                }
-            }
+            orders = list(
+                queryset[offset: offset + page_size].values(
+                    "order_id",
+                    "user_id",
+                    "amount",
+                    "status",
+                    "created_at",
+                )
+            )
 
             return CustomResponse().successResponse(
-                description="Cancelled and failed order statistics fetched successfully",
-                data=response_data
+                description="Cancelled and failed orders fetched successfully",
+                data=orders
             )
 
         except Exception as e:
             return CustomResponse().errorResponse(
                 description=str(e)
             )
+
 
 class CartListView(APIView):
     permission_classes = [IsAuthenticated]
@@ -1354,8 +1348,24 @@ class CartListView(APIView):
         try:
             store = request.store
 
+            # -------- Pagination --------
+            page = int(request.query_params.get("page", 1))
+            page_size = int(request.query_params.get("page_size", 10))
+
+            if page < 1:
+                page = 1
+            if page_size < 1:
+                page_size = 10
+
+            offset = (page - 1) * page_size
+
+            # -------- Base Query --------
+            base_qs = Cart.objects.filter(store_id=store.id)
+
+            total_records = base_qs.count()
+
             carts = list(
-                Cart.objects.filter(store_id=store.id).values(
+                base_qs[offset: offset + page_size].values(
                     "id",
                     "user_id",
                     "product_id",
@@ -1367,7 +1377,7 @@ class CartListView(APIView):
                 return CustomResponse().successResponse(
                     description="Cart records fetched successfully",
                     data=[],
-                    total=0
+                    total=total_records
                 )
 
             # -------- Fetch Users --------
@@ -1410,14 +1420,13 @@ class CartListView(APIView):
             return CustomResponse().successResponse(
                 description="Cart records fetched successfully",
                 data=carts,
-                total=len(carts)
+                total=total_records
             )
 
         except Exception as e:
             return CustomResponse().errorResponse(
                 description=str(e)
             )
-
 
 
 
