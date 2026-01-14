@@ -1363,26 +1363,49 @@ class CartListView(APIView):
                 )
             )
 
-            # -------- Fetch Usernames --------
+            if not carts:
+                return CustomResponse().successResponse(
+                    description="Cart records fetched successfully",
+                    data=[],
+                    total=0
+                )
+
+            # -------- Fetch Users --------
             user_ids = {cart["user_id"] for cart in carts}
 
             users = User.objects.filter(id__in=user_ids).values(
-                "id", "username","mobile","email"
+                "id", "username", "mobile", "email"
             )
 
             user_map = {
-                user["id"]: user["username"]
+                user["id"]: {
+                    "username": user["username"],
+                    "mobile": user["mobile"],
+                    "email": user["email"],
+                }
                 for user in users
             }
 
-            # -------- Attach Username --------
+            # -------- Fetch Products --------
+            product_ids = {cart["product_id"] for cart in carts}
+
+            products = Product.objects.filter(id__in=product_ids).values(
+                "id", "name"
+            )
+
+            product_map = {
+                product["id"]: product["name"]
+                for product in products
+            }
+
+            # -------- Attach User & Product Info --------
             for cart in carts:
-                cart["username"] = user_map.get(cart["user_id"])
-                cart["mobile"] = user_map.get(cart["user_id"])
-                cart["email"] = user_map.get(cart["user_id"])
+                user_info = user_map.get(cart["user_id"], {})
 
-
-
+                cart["username"] = user_info.get("username")
+                cart["mobile"] = user_info.get("mobile")
+                cart["email"] = user_info.get("email")
+                cart["product_name"] = product_map.get(cart["product_id"])
 
             return CustomResponse().successResponse(
                 description="Cart records fetched successfully",
@@ -1394,6 +1417,7 @@ class CartListView(APIView):
             return CustomResponse().errorResponse(
                 description=str(e)
             )
+
 
 
 
