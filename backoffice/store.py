@@ -1338,7 +1338,7 @@ class AbandonedOrderStatsAPIView(APIView):
             }
 
             return CustomResponse().successResponse(
-                message="Cancelled and failed order statistics fetched successfully",
+                description="Cancelled and failed order statistics fetched successfully",
                 data=response_data
             )
 
