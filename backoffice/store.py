@@ -1341,7 +1341,17 @@ class AbandonedOrderListAPIView(APIView):
                 order_id__in=order_ids
             ).values(
                 "order_id",
-                "product_id"
+                "product_id",
+                "sku",
+                "qty",
+                "mrp",
+                "selling_price",
+                "Apportioned_discount",
+                "Apportioned_wallet",
+                "Apportioned_online",
+                "Apportioned_gst",
+                "rating",
+                "review",
             )
 
             # -------- Fetch Product Names --------
@@ -1359,9 +1369,22 @@ class AbandonedOrderListAPIView(APIView):
             # -------- Group Products by Order --------
             products_by_order = {}
             for op in order_products:
+                product_amount = op["qty"] * op["selling_price"]
+
                 products_by_order.setdefault(op["order_id"], []).append({
                     "product_id": op["product_id"],
-                    "product_name": product_map.get(op["product_id"])
+                    "product_name": product_map.get(op["product_id"]),
+                    "sku": op["sku"],
+                    "qty": op["qty"],
+                    "mrp": op["mrp"],
+                    "selling_price": op["selling_price"],
+                    "amount": product_amount,
+                    "apportioned_discount": op["Apportioned_discount"],
+                    "apportioned_wallet": op["Apportioned_wallet"],
+                    "apportioned_online": op["Apportioned_online"],
+                    "apportioned_gst": op["Apportioned_gst"],
+                    "rating": op["rating"],
+                    "review": op["review"],
                 })
 
             # -------- Attach Products to Orders --------
