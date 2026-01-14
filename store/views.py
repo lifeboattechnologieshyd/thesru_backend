@@ -1851,7 +1851,7 @@ class Reviews(APIView):
 
 
         has_purchased = OrderProducts.objects.filter(
-            product_id=product.id,
+            product_id=product.default_product_id,
             store_id=store_id,
             order_id__in=[
                 str(order_id) for order_id in
