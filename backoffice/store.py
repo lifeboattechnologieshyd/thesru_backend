@@ -1378,6 +1378,11 @@ class CartListView(APIView):
             # -------- Attach Username --------
             for cart in carts:
                 cart["username"] = user_map.get(cart["user_id"])
+                cart["mobile"] = user_map.get(cart["user_id"])
+                cart["email"] = user_map.get(cart["user_id"])
+
+
+
 
             return CustomResponse().successResponse(
                 description="Cart records fetched successfully",
