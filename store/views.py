@@ -1893,7 +1893,6 @@ class Reviews(APIView):
 
 
     def get(self, request):
-        user = request.user
         product_id = request.GET.get("product_id")
 
         if not product_id:
@@ -1902,7 +1901,6 @@ class Reviews(APIView):
             )
 
         product_review = ProductReviews.objects.filter(
-            user_id=user.id,
             product_id=product_id
         ).values()
 
