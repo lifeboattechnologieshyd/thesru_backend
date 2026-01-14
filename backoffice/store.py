@@ -1380,8 +1380,9 @@ class CartListView(APIView):
                 cart["username"] = user_map.get(cart["user_id"])
 
             return CustomResponse().successResponse(
-                message="Cart records fetched successfully",
-                data=carts
+                description="Cart records fetched successfully",
+                data=carts,
+                total=len(carts)
             )
 
         except Exception as e:
