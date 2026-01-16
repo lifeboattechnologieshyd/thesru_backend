@@ -15,6 +15,7 @@ from db.models import AddressMaster, PinCode, Product, DisplayProduct, Order, Or
 from enums.store import OrderStatus, PaymentStatus
 from mixins.drf_views import CustomResponse
 from utils.store import generate_order_id
+from django.db.models import OuterRef, Subquery
 
 
 class AddressAPIView(APIView):
@@ -1106,6 +1107,45 @@ def fetch_cashfree_payment_status(order_id, cashfree):
         raise Exception("Failed to fetch order status from Cashfree")
 
     return response.json()
+
+class OrderedProducts(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        order_id = request.GET.get("order_id")
+        display_qs = DisplayProduct.objects.filter(
+            default_product_id=OuterRef("product_id")
+        )
+        product_name_sq = display_qs.values("product_name")[:1]
+        product_id_sq = display_qs.values("default_product_id")[:1]
+        product_qs = Product.objects.filter(
+            id=Subquery(product_id_sq)
+        )
+        products = (
+            OrderProducts.objects
+            .filter(order_id=order_id)
+            .annotate(
+                product_name=Subquery(product_name_sq),
+                product_image=Subquery(product_qs.values("thumbnail_image")[:1]),
+            )
+            .values(
+                # "product_id",
+                # "qty",
+                # "selling_price",
+                # "Apportioned_discount",
+                # "Apportioned_wallet",
+                # "Apportioned_online",
+                # "Apportioned_gst",
+                # "review",
+                # "rating",
+                # "product_name",
+                # "product_image"
+            )
+        )
+        return CustomResponse().successResponse(
+            data=list(products),
+            total=products.count()
+        )
 
 
 class OrderView(APIView):
