@@ -284,38 +284,53 @@ class CashFree(AuditModel):
 class Cart(AuditModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     store_id = models.UUIDField()
-    product_id = models.UUIDField()
+    product = models.ForeignKey(
+        Product,
+        null=True,
+        on_delete=models.CASCADE,
+        related_name="cart_items"
+    )
     quantity = models.PositiveIntegerField()
     user_id = models.UUIDField()
 
     class Meta:
         db_table = "cart"
-        unique_together = ("user_id", "product_id")
-        indexes = [
-            models.Index(fields=["user_id"]),
-            models.Index(fields=["product_id"]),
-        ]
+        # unique_together = ("user_id", "product_id")
+        # indexes = [
+        #     models.Index(fields=["user_id"]),
+        #     models.Index(fields=["product_id"]),
+        # ]
 
 class Wishlist(AuditModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     store_id = models.UUIDField()
-    product_id = models.UUIDField()
+    product = models.ForeignKey(
+        Product,
+        null=True,
+        on_delete=models.CASCADE,
+        related_name="wishlist_items"
+    )
     user_id = models.UUIDField(null=False)
 
     class Meta:
         db_table = "wishlist"
 
-        unique_together = ("user_id", "product_id")
-        indexes = [
-            models.Index(fields=["user_id"]),
-            models.Index(fields=["product_id"]),
-        ]
+        # unique_together = ("user_id", "product_id")
+        # indexes = [
+        #     models.Index(fields=["user_id"]),
+        #     models.Index(fields=["product_id"]),
+        # ]
 
 
 class ProductReviews(AuditModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     store_id = models.UUIDField()
-    product_id = models.UUIDField()
+    product = models.ForeignKey(
+        Product,
+        null=True,
+        on_delete=models.CASCADE,
+        related_name="reviews"
+    )
     user_id = models.UUIDField(null=False)
     username = models.CharField(max_length=30,null=False, default="System")
     rating = models.PositiveIntegerField()
@@ -325,7 +340,7 @@ class ProductReviews(AuditModel):
         db_table = "productreviews"
         indexes = [
             models.Index(fields=["user_id"]),
-            models.Index(fields=["product_id"]),
+            # models.Index(fields=["product_id"]),
         ]
 
 
