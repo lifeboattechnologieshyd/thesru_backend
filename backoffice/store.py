@@ -153,7 +153,7 @@ class DisplayProductAPIView(APIView):
                 )
         DisplayProduct.objects.create(
             store_id=store.id,
-            default_product_id = data.get("default_product_id"),
+            default_product = data.get("default_product_id"),
             variant_product_id = data.get("variant_product_id"),
             is_active = data.get("is_active"),
             category = data.get("category"),
@@ -192,7 +192,7 @@ class DisplayProductAPIView(APIView):
             return CustomResponse().successResponse(
                 data={
                     "id": str(product.id),
-                    "default_product_id": str(product.default_product_id),
+                    "default_product_id": str(product.default_product),
                     "variant_product_id": product.variant_product_id or [],
                     "category": product.category,
                     "gender": product.gender,
@@ -231,7 +231,7 @@ class DisplayProductAPIView(APIView):
         for product in queryset:
             data.append({
                 "id": str(product.id),
-                "default_product_id": str(product.default_product_id),
+                "default_product_id": str(product.default_product),
                 "variant_product_id": product.variant_product_id or [],
                 "product_name": product.product_name,
                 "product_tagline": product.product_tagline,
@@ -259,7 +259,7 @@ class DisplayProductAPIView(APIView):
             return CustomResponse().errorResponse(description="display product not found")
 
         for field in [
-            "default_product_id", "variant_product_id", "is_active", "category", "gender","tags","search_tags","product_name"
+            "default_product", "variant_product_id", "is_active", "category", "gender","tags","search_tags","product_name"
             "product_tagline", "age", "description",
             "highlights", "rating", "number_of_reviews"
         ]:
