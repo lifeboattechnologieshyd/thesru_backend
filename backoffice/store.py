@@ -151,9 +151,19 @@ class DisplayProductAPIView(APIView):
                 return CustomResponse().errorResponse(
                     description=f"{field} is required"
                 )
+
+        try:
+            default_product = Product.objects.get(
+                id=data.get("default_product_id"),
+                store_id=store.id
+            )
+        except Product.DoesNotExist:
+            return CustomResponse().errorResponse(
+                description="Invalid default_product_id"
+            )
         DisplayProduct.objects.create(
             store_id=store.id,
-            default_product = data.get("default_product_id"),
+            default_product=default_product,
             variant_product_id = data.get("variant_product_id"),
             is_active = data.get("is_active"),
             category = data.get("category"),
