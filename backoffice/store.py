@@ -193,7 +193,7 @@ class DisplayProductAPIView(APIView):
 
         # ---------- SINGLE DISPLAY PRODUCT ----------
         if id:
-            product = queryset.filter(id=id).first()
+            product = queryset.filter(id=id).select_related("default_product").first()
             if not product:
                 return CustomResponse().errorResponse(
                     description="display product not found"
@@ -202,7 +202,11 @@ class DisplayProductAPIView(APIView):
             return CustomResponse().successResponse(
                 data={
                     "id": str(product.id),
-                    "default_product_id": str(product.default_product),
+                    "default_product_id": str(product.default_product_id),
+                    "default_product_name": (
+                        product.default_product.name
+                        if product.default_product else None
+                    ),
                     "variant_product_id": product.variant_product_id or [],
                     "category": product.category,
                     "gender": product.gender,
@@ -241,7 +245,7 @@ class DisplayProductAPIView(APIView):
         for product in queryset:
             data.append({
                 "id": str(product.id),
-                "default_product_id": str(product.default_product),
+                "default_product_id": str(product.default_product_id),
                 "variant_product_id": product.variant_product_id or [],
                 "product_name": product.product_name,
                 "product_tagline": product.product_tagline,
@@ -262,16 +266,43 @@ class DisplayProductAPIView(APIView):
 
     def put(self, request, id=None):
         if not id:
-            return CustomResponse().errorResponse(description="display product id is required")
+            return CustomResponse().errorResponse(
+                description="display product id is required"
+            )
 
         product = DisplayProduct.objects.filter(id=id).first()
         if not product:
-            return CustomResponse().errorResponse(description="display product not found")
+            return CustomResponse().errorResponse(
+                description="display product not found"
+            )
 
+        # ---------- FK UPDATE ----------
+        if "default_product_id" in request.data:
+            try:
+                default_product = Product.objects.get(
+                    id=request.data.get("default_product_id")
+                )
+                product.default_product = default_product
+            except Product.DoesNotExist:
+                return CustomResponse().errorResponse(
+                    description="Invalid default_product_id"
+                )
+
+        # ---------- NORMAL FIELDS ----------
         for field in [
-            "default_product", "variant_product_id", "is_active", "category", "gender","tags","search_tags","product_name"
-            "product_tagline", "age", "description",
-            "highlights", "rating", "number_of_reviews"
+            "variant_product_id",
+            "is_active",
+            "category",
+            "gender",
+            "tags",
+            "search_tags",
+            "product_name",
+            "product_tagline",
+            "age",
+            "description",
+            "highlights",
+            "rating",
+            "number_of_reviews",
         ]:
             if field in request.data:
                 setattr(product, field, request.data.get(field))
@@ -279,7 +310,8 @@ class DisplayProductAPIView(APIView):
         product.save()
 
         return CustomResponse().successResponse(
-            data={}, description="display product updated successfully"
+            data={},
+            description="display product updated successfully"
         )
 
 
