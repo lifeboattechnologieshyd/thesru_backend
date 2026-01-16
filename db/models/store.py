@@ -32,8 +32,19 @@ class Product(AuditModel):
 class DisplayProduct(AuditModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     store_id = models.UUIDField()
-    default_product_id = models.UUIDField()
-    variant_product_id = ArrayField(models.CharField(max_length=50),null=True)
+    default_product = models.ForeignKey(
+        Product,
+        null=True,
+        on_delete=models.CASCADE,
+        related_name="display_products"
+    )
+    old_default_product_id = models.UUIDField()
+    variants = models.ManyToManyField(
+        Product,
+        related_name="variant_of",
+        blank=True
+    )
+    old_variant_product_id = ArrayField(models.CharField(max_length=50),null=True)
     is_active = models.BooleanField(default=True)
     category = ArrayField(models.CharField(max_length=50),null=True)
     gender = models.CharField(max_length=20,null=True)
