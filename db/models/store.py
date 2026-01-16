@@ -39,12 +39,8 @@ class DisplayProduct(AuditModel):
         related_name="display_products"
     )
     old_default_product_id = models.UUIDField()
-    variants = models.ManyToManyField(
-        Product,
-        related_name="variant_of",
-        blank=True
-    )
-    old_variant_product_id = ArrayField(models.CharField(max_length=50),null=True)
+
+    variant_product_id = ArrayField(models.CharField(max_length=50),null=True)
     is_active = models.BooleanField(default=True)
     category = ArrayField(models.CharField(max_length=50),null=True)
     gender = models.CharField(max_length=20,null=True)
@@ -58,6 +54,7 @@ class DisplayProduct(AuditModel):
     rating = models.CharField(max_length=50,null=True)
     total_rating = models.PositiveIntegerField(default=0)
     number_of_reviews = models.PositiveIntegerField(default=0)
+
 
     class Meta:
         db_table = "display_product"
