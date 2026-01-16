@@ -805,7 +805,8 @@ class InitiateOrder(APIView):
                     OrderProducts.objects.create(
                         store_id=store.id,
                         order_id=order_id,
-                        product_id=product.id,
+                        product=product,
+                        old_product_id=product.id,
                         sku=product.sku,
                         qty = int(item.get("qty", 0)),
                         mrp=product.mrp,
