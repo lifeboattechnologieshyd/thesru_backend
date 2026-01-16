@@ -38,7 +38,7 @@ class DisplayProduct(AuditModel):
         on_delete=models.CASCADE,
         related_name="display_products"
     )
-    old_default_product_id = models.UUIDField()
+    old_default_product_id = models.UUIDField(null=True,blank=True)
 
     variant_product_id = ArrayField(models.CharField(max_length=50),null=True)
     is_active = models.BooleanField(default=True)
