@@ -1,3 +1,4 @@
+from datetime import timedelta
 from unicodedata import category
 from django.db import transaction
 from django.db import IntegrityError
@@ -5,12 +6,113 @@ from rest_framework.views import APIView
 from django.utils import timezone
 from django.db.models import Count, Sum
 
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny
 
-from db.models import  Category, Product, DisplayProduct, Banner, Inventory, PinCode, Coupon, Store, WebBanner, \
-    FlashSaleBanner, Order, User, Cart, OrderProducts
+from config.settings.common import DEBUG
+from db.models import Category, Product, DisplayProduct, Banner, Inventory, PinCode, Coupon, Store, WebBanner, \
+    FlashSaleBanner, Order, User, Cart, OrderProducts, UserOTP, StoreClient, UserSession
 from enums.store import InventoryType, OrderStatus
 from mixins.drf_views import CustomResponse
+from rest_framework_simplejwt.tokens import RefreshToken
+
+from utils.user import generate_otp, send_otp_to_mobile
+
+
+class SendOTP(APIView):
+
+    permission_classes = [AllowAny]
+    def post(self, request):
+        data = request.data
+        store = request.store
+        user = User.objects.filter(mobile=data.get("mobile"),user_role__contains=["ADMIN"], store=store).first()
+        if user:
+            otp = generate_otp()
+            if DEBUG:
+                otp = 1234
+            else:
+                send_otp_to_mobile(otp, data.get("mobile"))
+            expires_at = timezone.now() + timedelta(minutes=15)
+
+            UserOTP.objects.filter(
+                store=request.store,
+                mobile=data.get("mobile"),
+                is_used=False
+            ).update(is_used=True)
+            # Save OTP with store
+            UserOTP.objects.create(
+                store=request.store,
+                mobile=data.get("mobile"),
+                otp=otp,
+                expires_at=expires_at
+            )
+            return CustomResponse().successResponse(
+                description="OTP sent successfully",
+                data={
+                    "mobile": data.get("mobile"),
+                }
+            )
+        else:
+            return CustomResponse().errorResponse(data={}, description="Invalid Mobile Number")
+
+class Login(APIView):
+
+    permission_classes = [AllowAny]
+    def post(self, request):
+        data = request.data
+        store = request.store
+        mobile = data.get("mobile")
+        otp = data.get("otp")
+        user = User.objects.filter(mobile=mobile,
+                                   user_role__contains=["ADMIN"],
+                                   store=store).first()
+        if user:
+            otp_obj = UserOTP.objects.filter(
+                    store=request.store,
+                    mobile=mobile,
+                    otp=otp,
+                    is_used=False
+                ).order_by("-expires_at").first()
+            if not otp_obj:
+                return CustomResponse().errorResponse(
+                    description="Invalid OTP",
+                )
+
+            if timezone.now() > otp_obj.expires_at:
+                return CustomResponse().errorResponse(
+                    description="OTP has expired",
+                )
+            # Mark OTP as used
+            otp_obj.is_used = True
+            otp_obj.save(update_fields=["is_used"])
+            refresh = RefreshToken.for_user(user)
+            UserSession.objects.create(
+                user=user,
+                store=request.store,
+                session_token=str(refresh.access_token),
+                refresh_token=str(refresh),
+                device_id=request.data.get("device_id"),
+                device_type=request.client_type,
+                ip_address=request.META.get("REMOTE_ADDR"),
+                user_agent=request.META.get("HTTP_USER_AGENT"),
+                expires_at=timezone.now() + timedelta(hours=24 * 7)
+            )
+            return CustomResponse().successResponse(
+                description="OTP verified successfully",
+                data={
+                    "access": str(refresh.access_token),
+                    "refresh": str(refresh),
+                    "user": {
+                        "id": str(user.id),
+                        "mobile": user.mobile,
+                        "username": user.username,
+                        "referral_code": user.referral_code,
+                        "device_id": user.device_id,
+                        "store_id": user.store.id
+                    }
+                }
+            )
+        else:
+            return CustomResponse().errorResponse(data={}, description="Invalid Mobile Number")
 
 
 class ProductAPIView(APIView):
@@ -952,27 +1054,42 @@ class CouponAPIView(APIView):
 
 
 class StoreAPIView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
 
     # ---------------- CREATE STORE ----------------
     def post(self, request):
         data = request.data
-
-        required_fields = ["name", "mobile", "address", "logo", "gst_number"]
+        required_fields = ["name", "mobile", "address", "logo"]
+        clients = request.data.get("clients")
         for field in required_fields:
             if not data.get(field):
                 return CustomResponse.errorResponse(
                     description=f"{field} is required"
                 )
+        if Store.objects.filter(mobile=data["mobile"]).exists():
+            return CustomResponse.errorResponse(description="Store with this mobile already exists")
 
         try:
-            Store.objects.create(
+            store = Store.objects.create(
                 name=data.get("name"),
                 mobile=data.get("mobile"),
                 address=data.get("address"),
                 logo=data.get("logo"),
-                gst_number=data.get("gst_number"),
+                created_by="SUPERADMIN"
             )
+            User.objects.create(
+                mobile=store.mobile,
+                store=store,
+                user_role=["ADMIN"],
+                username=store.mobile
+            )
+            for item in clients:
+                store_client = StoreClient()
+                store_client.store = store
+                store_client.identifier = item["identifier"]
+                store_client.client_type = item["client_type"]
+                store_client.is_active = True
+                store_client.save()
 
             return CustomResponse.successResponse(
                 data={},
@@ -1007,15 +1124,11 @@ class StoreAPIView(APIView):
             return CustomResponse.errorResponse(
                 description="page and page_size must be positive integers"
             )
-
         queryset = Store.objects.all().order_by("-created_at")
-
         total = queryset.count()
         offset = (page - 1) * page_size
         queryset = queryset[offset: offset + page_size]
-
         data = list(queryset.values())
-
         return CustomResponse.successResponse(
             data=data,
             total=total

@@ -1,143 +1,76 @@
 import uuid
+from urllib.parse import urlparse
+
 from django.http import JsonResponse
 from django.apps import apps
 
-
-# class StoreMiddleware:
-#     def __init__(self, get_response):
-#         self.get_response = get_response
-#
-#         self.exempt_paths = [
-#
-#         ]
-#
-#     def __call__(self, request):
-#         # Skip exempt paths
-#         for path in self.exempt_paths:
-#             if request.path.startswith(path):
-#                 return self.get_response(request)
-#
-#         store_id = request.headers.get("X-STORE-ID")
-#
-#         if not store_id:
-#             return JsonResponse(
-#                 {
-#                     "success": False,
-#                     "errorCode": 400,
-#                     "description": "X-STORE-ID header is required"
-#                 },
-#                 status=400
-#             )
-#
-#         try:
-#             store_uuid = uuid.UUID(store_id)
-#         except ValueError:
-#             return JsonResponse(
-#                 {
-#                     "success": False,
-#                     "errorCode": 400,
-#                     "description": "Invalid store id"
-#                 },
-#                 status=400
-#             )
-#
-#         # ✅ LAZY LOAD Store model (NO circular import)
-#         Store = apps.get_model("db", "Store")
-#
-#         try:
-#             store = Store.objects.get(id=store_uuid)
-#         except Store.DoesNotExist:
-#             return JsonResponse(
-#                 {
-#                     "success": False,
-#                     "errorCode": 404,
-#                     "description": "Store not found"
-#                 },
-#                 status=404
-#             )
-#
-#         request.store = store
-#         return self.get_response(request)
-
-
-# class StoreMiddleware:
-#     def __init__(self, get_response):
-#         self.get_response = get_response
-#         self.exempt_paths = (
-#             "/admin/",
-#             "/api/auth/",
-#             "/health/",
-#         )
-#
-#     def __call__(self, request):
-#         for path in self.exempt_paths:
-#             if request.path.startswith(path):
-#                 return self.get_response(request)
-#
-#         request.store = None
-#         store_id = request.headers.get("X-STORE-ID")
-#
-#         if not store_id:
-#             return self.get_response(request)
-#
-#         try:
-#             store_uuid = uuid.UUID(store_id)
-#         except ValueError:
-#             return self.get_response(request)
-#
-#         Store = apps.get_model("db", "Store")
-#
-#         try:
-#             store = Store.objects.get(id=store_uuid)
-#         except Store.DoesNotExist:
-#             return self.get_response(request)
-#
-#         request.store = store
-#         return self.get_response(request)
-
-
 class StoreMiddleware:
     def __init__(self, get_response):
+        """
+           Resolves store from:
+           1. X-Client-Identifier (mobile / internal)
+           2. Origin header (browser)
+           3. Host header (fallback)
+           """
         self.get_response = get_response
         self.exempt_paths = (
             "/store/paymentWebhook",
             "/admin/",
             "/api/auth/",
             "/health/",
+            "/backoffice/store",
+            "/user/createadmin",
+            "/user/admin-login",
+            "/user/storage/upload",
+            "/user/update-users"
         )
 
 
     def __call__(self, request):
         print("MIDDLEWARE PATH:", request.path)
-
         if any(request.path.startswith(p) for p in self.exempt_paths):
             return self.get_response(request)
+        request.store = None
+        identifier = None
+        client_type = None
 
-        store_id = request.headers.get("X-STORE-ID")
+        # 1️⃣ Mobile / explicit header (highest priority)
+        client_identifier = request.headers.get("X-Client-Identifier")
+        if client_identifier:
+            identifier = client_identifier
+        x_client_type = request.headers.get("X-Client-Type")
+        if x_client_type:
+            client_type = x_client_type
+        # 2️⃣ Browser origin
+        if not identifier:
+            origin = request.headers.get("Origin")
+            if origin:
+                identifier = urlparse(origin).netloc
 
-        if not store_id:
-            return JsonResponse(
-                {"error": "X-STORE-ID header is required"},
-                status=400
-            )
+        # 3️⃣ Host header (fallback)
+        if not identifier:
+            host = request.get_host()
+            if host:
+                identifier = host.split(":")[0]
 
+            # 🚫 No identifier → public / health APIs
+        if not identifier:
+            return None
+        StoreClient = apps.get_model("db", "StoreClient")
         try:
-            store_uuid = uuid.UUID(store_id)
-        except ValueError:
-            return JsonResponse(
-                {"error": "Invalid X-STORE-ID format"},
-                status=400
+            store_client = StoreClient.objects.select_related("store").get(
+                identifier=identifier,
+                is_active=True
             )
-
-        Store = apps.get_model("db", "Store")
-
-        try:
-            store = Store.objects.get(id=store_uuid)
-        except Store.DoesNotExist:
+            request.store = store_client.store
+            request.store_client = store_client
+            request.client_type = client_type
+        except StoreClient.DoesNotExist:
             return JsonResponse(
-                {"error": "Store not found"},
-                status=400
+                {
+                    "success": False,
+                    "message": "Invalid store or client"
+                },
+                status=401
             )
-
-        request.store = store
         return self.get_response(request)

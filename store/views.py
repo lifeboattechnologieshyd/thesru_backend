@@ -1114,8 +1114,7 @@ class OrderedProducts(APIView):
 
     def get(self, request):
         order_id = request.GET.get("order_id")
-        products = OrderProducts.objects.filter(order_id=order_id)
-
+        products = OrderProducts.objects.filter(order_id=order_id).values()
         return CustomResponse().successResponse(
             data=list(products),
             total=products.count()

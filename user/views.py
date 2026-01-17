@@ -1,18 +1,20 @@
-from datetime import timedelta
+from datetime import timedelta, datetime
 
 from django.core.files.base import ContentFile
 from django.core.files.storage import default_storage
 from django.utils import timezone
+from psutil import users
 from rest_framework.parsers import FormParser, MultiPartParser
 from django.conf import settings
 
 from django.contrib.auth.hashers import make_password, check_password
-from rest_framework.permissions import AllowAny
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
 import random
 
-from db.models import User, UserOTP, TempUser
+from config.settings.common import DEBUG
+from db.models import User, UserOTP, TempUser, Store, UserSession
 from mixins.drf_views import CustomResponse
 from serializers.user import UserMasterSerializer
 
@@ -131,33 +133,32 @@ class MobileSendOTPView(APIView):
     def post(self, request):
         store = request.store
         mobile = request.data.get("mobile")
-
         if not mobile:
             return CustomResponse().errorResponse(
                 description="Mobile number is required",
                 status=status.HTTP_400_BAD_REQUEST
             )
-
         user = User.objects.filter(mobile=mobile).first()
         is_new_user = not bool(user)
 
         if is_new_user:
-            TempUser.objects.update_or_create(mobile=mobile)
-
+            TempUser.objects.update_or_create(mobile=mobile, store=request.store)
         otp = generate_otp()
-        send_otp_to_mobile(otp, mobile)
+        if DEBUG:
+            otp = 1234
+        else:
+            send_otp_to_mobile(otp, mobile)
         expires_at = timezone.now() + timedelta(minutes=15)
-
         # Invalidate old OTPs
         UserOTP.objects.filter(
-            store_id=store.id,
+            store=request.store,
             mobile=mobile,
             is_used=False
         ).update(is_used=True)
 
         # Save OTP with store
         UserOTP.objects.create(
-            store_id=store.id,
+            store=request.store,
             mobile=mobile,
             otp=otp,
             expires_at=expires_at
@@ -174,209 +175,44 @@ class MobileSendOTPView(APIView):
         )
 
 
-# class MobileVerifyOTPView(APIView):
-#     permission_classes = [AllowAny]
-#
-#     def post(self, request):
-#         mobile = request.data.get("mobile")
-#         otp = request.data.get("otp")
-#         device_id = request.data.get("device_id")
-#
-#         # Validate input
-#         if not mobile or not otp:
-#             return CustomResponse().errorResponse(
-#                 description="Mobile and OTP are required",
-#                 status=status.HTTP_400_BAD_REQUEST
-#             )
-#
-#         # Validate OTP
-#         otp_obj = (
-#             UserOTP.objects
-#             .filter(mobile=mobile, otp=otp, is_used=False)
-#             .order_by("-expires_at")
-#             .first()
-#         )
-#
-#         if not otp_obj:
-#             return CustomResponse().errorResponse(
-#                 description="Invalid OTP",
-#                 status=status.HTTP_401_UNAUTHORIZED
-#             )
-#
-#         if timezone.now() > otp_obj.expires_at:
-#             return CustomResponse().errorResponse(
-#                 description="OTP has expired",
-#                 status=status.HTTP_401_UNAUTHORIZED
-#             )
-#
-#         # Mark OTP as used
-#         otp_obj.is_used = True
-#         otp_obj.save(update_fields=["is_used"])
-#
-#         # Fetch or create user
-#         user = User.objects.filter(mobile=mobile).first()
-#         is_new_user = False
-#
-#         if not user:
-#             user = User.objects.create(
-#                 mobile=mobile,
-#                 device_id=device_id
-#             )
-#             is_new_user = True
-#
-#         # Ensure username & referral code
-#         updated = False
-#         if not user.username:
-#             user.username = generate_username(user)
-#             updated = True
-#
-#         if not user.referral_code:
-#             user.referral_code = generate_referral_code()
-#             updated = True
-#
-#         if device_id and user.device_id != device_id:
-#             user.device_id = device_id
-#             updated = True
-#
-#         if updated:
-#             user.save()
-#
-#         #  Generate JWT tokens
-#         refresh = RefreshToken.for_user(user)
-#
-#
-#         #  Final response
-#         return CustomResponse().successResponse(
-#             description="OTP verified successfully",
-#             data={
-#                 "is_new_user": is_new_user,
-#                 "access": str(refresh.access_token),
-#                 "refresh": str(refresh),
-#                 "user": {
-#                     "id": str(user.id),
-#                     "mobile": user.mobile,
-#                     "username": user.username,
-#                     "referral_code": user.referral_code,
-#                     "device_id": user.device_id,
-#                 }
-#             },
-#             status=status.HTTP_200_OK
-#         )
-#
+class AdminLogin(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        mobile = request.data.get("mobile")
+        user = User.objects.filter(mobile=mobile).first()
+        if user and 'SUPERADMIN' in user.user_role:
+            refresh = RefreshToken.for_user(user)
+            data = {
+                "access": str(refresh.access_token),
+                "refresh": str(refresh)
+            }
+            return CustomResponse().successResponse(data=data)
+        else:
+            return CustomResponse().errorResponse(data={}, description="Login Failed")
 
 
-# class MobileVerifyOTPView(APIView):
-#     permission_classes = [AllowAny]
-#
-#     def post(self, request):
-#         mobile = request.data.get("mobile")
-#         otp = request.data.get("otp")
-#         device_id = request.data.get("device_id")
-#
-#         if not mobile or not otp:
-#             return CustomResponse().errorResponse(
-#                 description="Mobile and OTP are required",
-#                 status=status.HTTP_400_BAD_REQUEST
-#             )
-#
-#         # Validate OTP
-#         otp_obj = (
-#             UserOTP.objects
-#             .filter(mobile=mobile, otp=otp, is_used=False)
-#             .order_by("-expires_at")
-#             .first()
-#         )
-#
-#         if not otp_obj:
-#             return CustomResponse().errorResponse(
-#                 description="Invalid OTP",
-#                 status=status.HTTP_401_UNAUTHORIZED
-#             )
-#
-#         if timezone.now() > otp_obj.expires_at:
-#             return CustomResponse().errorResponse(
-#                 description="OTP has expired",
-#                 status=status.HTTP_401_UNAUTHORIZED
-#             )
-#
-#         otp_obj.is_used = True
-#         otp_obj.save(update_fields=["is_used"])
-#
-#         # Check existing user
-#         user = User.objects.filter(mobile=mobile).first()
-#         is_new_user = False
-#
-#         if not user:
-#             # Fetch temp user
-#             temp_user = TempUser.objects.filter(mobile=mobile).first()
-#
-#             if not temp_user:
-#                 return CustomResponse().errorResponse(
-#                     description="Temp user not found",
-#                     status=status.HTTP_400_BAD_REQUEST
-#                 )
-#
-#             # Create real user
-#             user = User.objects.create(
-#                 mobile=mobile,
-#                 device_id=device_id
-#             )
-#             is_new_user = True
-#
-#             # Generate username & referral
-#             user.username = generate_username(user)
-#             user.referral_code = generate_referral_code()
-#             user.save()
-#
-#             # DELETE temp user ONLY AFTER successful save
-#             temp_user.delete()
-#
-#         else:
-#             updated = False
-#
-#             if device_id and user.device_id != device_id:
-#                 user.device_id = device_id
-#                 updated = True
-#
-#             if not user.username:
-#                 user.username = generate_username(user)
-#                 updated = True
-#
-#             if not user.referral_code:
-#                 user.referral_code = generate_referral_code()
-#                 updated = True
-#
-#             if updated:
-#                 user.save()
-#
-#         refresh = RefreshToken.for_user(user)
-#
-#         return CustomResponse().successResponse(
-#             description="OTP verified successfully",
-#             data={
-#                 "is_new_user": is_new_user,
-#                 "access": str(refresh.access_token),
-#                 "refresh": str(refresh),
-#                 "user": {
-#                     "id": str(user.id),
-#                     "mobile": user.mobile,
-#                     "username": user.username,
-#                     "referral_code": user.referral_code,
-#                     "device_id": user.device_id,
-#                     "store_id":user.store_id
-#                 }
-#             },
-#             status=status.HTTP_200_OK
-#         )
-
-
+class CreateAdmin(APIView):
+    permission_classes = [AllowAny]
+    def post(self, request):
+        user = User.objects.create(
+            mobile="9014083090",
+            device_id="123456",
+        )
+        user.username = generate_username(user)
+        user.user_role = ['SUPERADMIN']
+        user.referral_code = generate_referral_code()
+        user.save()
+        return CustomResponse().successResponse(
+            description="Admin Created Successfully",
+            data={},
+            status=status.HTTP_200_OK
+        )
 
 class MobileVerifyOTPView(APIView):
     permission_classes = [AllowAny]
 
     def post(self, request):
-        store = request.store
-
         mobile = request.data.get("mobile")
         otp = request.data.get("otp")
         device_id = request.data.get("device_id")
@@ -391,7 +227,7 @@ class MobileVerifyOTPView(APIView):
         otp_obj = (
             UserOTP.objects
             .filter(
-                store_id=store.id,
+                store=request.store,
                 mobile=mobile,
                 otp=otp,
                 is_used=False
@@ -421,7 +257,7 @@ class MobileVerifyOTPView(APIView):
         is_new_user = False
 
         if not user:
-            temp_user = TempUser.objects.filter(mobile=mobile).first()
+            temp_user = TempUser.objects.filter(mobile=mobile, store=request.store).first()
             if not temp_user:
                 return CustomResponse().errorResponse(
                     description="Temp user not found",
@@ -429,44 +265,48 @@ class MobileVerifyOTPView(APIView):
                 )
 
             # Create user with STORE
+            # todo : we can add device type in user table so will get to know source of first point
             user = User.objects.create(
                 mobile=mobile,
                 device_id=device_id,
-                store_id=store.id
+                store=request.store
             )
             is_new_user = True
-
             user.username = generate_username(user)
             user.referral_code = generate_referral_code()
             user.save()
-
             temp_user.delete()
-
         else:
-            updated = False
-
             if device_id and user.device_id != device_id:
                 user.device_id = device_id
-                updated = True
 
             if not user.username:
                 user.username = generate_username(user)
-                updated = True
 
             if not user.referral_code:
                 user.referral_code = generate_referral_code()
-                updated = True
 
             # Ensure store is attached
-            if not user.store_id:
-                user.store_id = store.id
-                updated = True
+            if not user.store:
+                user.store = request.store
 
-            if updated:
-                user.save()
+
+            user.last_login = datetime.now()
+            user.save()
 
         # ---------------- Tokens ----------------
         refresh = RefreshToken.for_user(user)
+        UserSession.objects.create(
+            user=user,
+            store=request.store,
+            session_token=str(refresh.access_token),
+            refresh_token=str(refresh),
+            device_id=request.data.get("device_id"),
+            device_type=request.client_type,
+            ip_address=request.META.get("REMOTE_ADDR"),
+            user_agent=request.META.get("HTTP_USER_AGENT"),
+            expires_at=timezone.now() + timedelta(hours=24*7)
+        )
 
         return CustomResponse().successResponse(
             description="OTP verified successfully",
@@ -480,7 +320,7 @@ class MobileVerifyOTPView(APIView):
                     "username": user.username,
                     "referral_code": user.referral_code,
                     "device_id": user.device_id,
-                    "store_id": user.store_id
+                    "store_id": user.store.id
                 }
             },
             status=status.HTTP_200_OK

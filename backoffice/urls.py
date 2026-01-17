@@ -2,10 +2,15 @@ from django.urls import path
 
 from backoffice.store import ProductAPIView, DisplayProductAPIView, CategoriesAPIView, BannerAPIView, InventoryAPIView, \
     PinCodeAPIView, StoreAPIView, WebBannerAPIView, FlashSaleBannerAPIView, OrderStatsAPIView, \
-     CartListView, OrderListAPIView, AbandonedOrderListAPIView
+    CartListView, OrderListAPIView, AbandonedOrderListAPIView, Login, SendOTP
 
 urlpatterns = [
     path("product",ProductAPIView.as_view()),
+
+    path("send-otp",SendOTP.as_view()),
+    path("verify-otp",Login.as_view()),
+
+
     path("product/<str:id>",ProductAPIView.as_view()),
     path("display/product",DisplayProductAPIView.as_view()),
     path("display/product/<str:id>",DisplayProductAPIView.as_view()),

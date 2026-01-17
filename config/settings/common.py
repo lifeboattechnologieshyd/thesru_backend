@@ -47,6 +47,7 @@ INSTALLED_APPS = [
     # installed apps
     "db",
     "store",
+    "core",
     # Third Party
     "rest_framework",
     "rest_framework.authtoken",
@@ -195,7 +196,7 @@ SIMPLE_JWT = {
 }
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": (
-        "rest_framework_simplejwt.authentication.JWTAuthentication",
+        "core.auth.authentication.SessionJWTAuthentication",
     ),
     "DEFAULT_PERMISSION_CLASSES": (
         "rest_framework.permissions.IsAuthenticated",
