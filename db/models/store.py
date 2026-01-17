@@ -207,12 +207,11 @@ class OrderProducts(AuditModel):
     store_id = models.UUIDField()
     order_id = models.CharField(max_length=50, null=False)
     product = models.ForeignKey(
-        Product,
+        DisplayProduct,
         null=True,
         on_delete=models.PROTECT,
         related_name="order_items"
     )
-    old_product_id = models.UUIDField(null=True,blank=True)
     sku = models.CharField(max_length=20)
     qty = models.PositiveIntegerField(default=0)
     mrp = models.DecimalField(decimal_places=2, max_digits=10)
