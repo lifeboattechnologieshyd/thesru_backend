@@ -447,7 +447,7 @@ class DisplayProductAPIView(APIView):
 
             results.append({
                 "id": str(v.id),
-                "product_name": v.display_name,
+                "display_name": v.display_name,
                 "description": v.description,
                 "gender": v.gender,
                 "is_active": v.is_active,
