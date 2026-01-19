@@ -2,8 +2,7 @@ import string
 import time
 import random
 
-from db.models import Order
-
+from db.models import Order, StoreSequence
 
 
 # def generate_order_id():
@@ -20,6 +19,20 @@ def generate_order_id():
 
         if not Order.objects.filter(order_id=order_id).exists():
             return order_id
+
+from django.db import transaction
+
+def generate_lsin(store, brand_code):
+    with transaction.atomic():
+        seq, _ = StoreSequence.objects.select_for_update().get_or_create(
+            store=store
+        )
+
+        seq.last_lsin_number += 1
+        seq.save(update_fields=["last_lsin_number"])
+
+        return f"{brand_code}-{str(seq.last_lsin_number).zfill(6)}"
+
 
 
 

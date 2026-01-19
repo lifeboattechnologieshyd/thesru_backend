@@ -119,10 +119,10 @@ class ProductVariant(AuditModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     lsin = models.CharField(
         max_length=12,
-        unique=True,
         db_index=True,
         help_text="Lifeboat standard identification number. Business-facing display product ID"
     )
+
     store = models.ForeignKey(
         Store,
         on_delete=models.CASCADE,
@@ -171,6 +171,8 @@ class ProductVariant(AuditModel):
         indexes = [
             models.Index(fields=["store", "is_active"]),
         ]
+        unique_together = ("store", "lsin")
+
 
     def __str__(self):
         return self.display_name
@@ -447,6 +449,9 @@ class ProductReviews(AuditModel):
 
 
 
+class StoreSequence(AuditModel):
+    store = models.OneToOneField(Store, on_delete=models.CASCADE)
+    last_lsin_number = models.PositiveIntegerField(default=0)
 
 
 

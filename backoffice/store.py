@@ -19,6 +19,7 @@ from enums.store import InventoryType, OrderStatus
 from mixins.drf_views import CustomResponse
 from rest_framework_simplejwt.tokens import RefreshToken
 
+from utils.store import generate_lsin
 from utils.user import generate_otp, send_otp_to_mobile
 
 
@@ -277,25 +278,13 @@ class DisplayProductAPIView(APIView):
                 description="default_product_id is required"
             )
 
-        if not data.get("product_name"):
+        if not data.get("display_name"):
             return CustomResponse.errorResponse(
-                description="product_name is required"
+                description="display_name is required"
             )
 
         default_product_id = data["default_product_id"]
         product_ids = data.get("product_ids", [])
-
-        # If product_ids not provided or empty → fallback
-        if not product_ids:
-            product_ids = [default_product_id]
-
-        # If provided, default must be included
-        if default_product_id not in product_ids:
-            return CustomResponse.errorResponse(
-                description="default_product_id must be part of product_ids"
-            )
-
-        # Fetch products
         products = Product.objects.filter(
             id__in=product_ids,
             store=store,
@@ -307,18 +296,28 @@ class DisplayProductAPIView(APIView):
                 description="Invalid product_ids provided"
             )
 
-        default_product = products.get(id=default_product_id)
+        default_product = Product.objects.filter(
+            id=default_product_id,
+            store=store,
+            is_active=True
+        )
+        if not default_product:
+            return CustomResponse.errorResponse(
+                description="Invalid product_id provided"
+            )
+        lsin = generate_lsin(store, "SRU")
 
         # Create ProductVariant
         variant = ProductVariant.objects.create(
             store=store,
             default_product=default_product,
-            product_name=data["product_name"].strip(),
-            product_tag_line=data.get("product_tag_line"),
+            display_name=data["display_name"].strip(),
             description=data.get("description"),
-            highlights=data.get("highlights", []),
+            highlights=data.get("highlights", ""),
             gender=data.get("gender"),
             is_active=True,
+            lsin=lsin,
+            search_tags=data.get("search_tags", []),
             created_by=request.user.mobile
         )
 
@@ -373,7 +372,13 @@ class DisplayProductAPIView(APIView):
         queryset = ProductVariant.objects.filter(
             store=store,
             is_active=True
-        )
+        ).select_related(
+            "default_product"
+        ).prefetch_related(
+            "products__media",  # 👈 REQUIRED
+            "categories",
+            "tags"
+        ).distinct().order_by("-created_at")
 
         # 3️⃣ Optional filters
         category_id = params.get("category_id")
@@ -395,54 +400,78 @@ class DisplayProductAPIView(APIView):
                 Q(product_tag_line__icontains=search)
             )
 
-        # 4️⃣ Optimize relations
-        queryset = queryset.select_related(
-            "default_product"
-        ).prefetch_related(
-            "products",
-            "categories",
-            "tags"
-        ).distinct().order_by("-created_at")
+
 
         total_count = queryset.count()
         variants = queryset[offset:limit]
 
         # 5️⃣ Build response
         results = []
+
         for v in variants:
+
+            # 🔹 Build default product block
+            dp = v.default_product
+            default_product_data = {
+                "id": str(dp.id),
+                "sku": dp.sku,
+                "name": dp.name,
+                "is_active": dp.is_active,
+                "size": dp.size,
+                "colour": dp.colour,
+                "mrp": dp.mrp,
+                "selling_price": dp.selling_price,
+                "gst_percentage": dp.gst_percentage,
+                "gst_amount": dp.gst_amount,
+                "stock": dp.current_stock,
+                "media": [m.url for m in dp.media.all()]
+            }
+
+            # 🔹 Build products list
+            products_data = []
+            for p in v.products.all():
+                products_data.append({
+                "id": str(p.id),
+                "sku": p.sku,
+                "name": p.name,
+                "is_active": p.is_active,
+                "size": p.size,
+                "colour": p.colour,
+                "mrp": p.mrp,
+                "selling_price": p.selling_price,
+                "gst_percentage": p.gst_percentage,
+                "gst_amount": p.gst_amount,
+                "stock": p.current_stock,
+                "media": [m.url for m in p.media.all()]
+                })
+
             results.append({
                 "id": str(v.id),
-                "product_name": v.product_name,
-                "product_tag_line": v.product_tag_line,
+                "product_name": v.display_name,
+                "description": v.description,
                 "gender": v.gender,
                 "is_active": v.is_active,
-
-                "default_product": {
-                    "id": str(v.default_product.id),
-                    "sku": v.default_product.sku,
-                    "price": v.default_product.selling_price,
-                    "stock": v.default_product.current_stock
-                },
-
-                "products_count": v.products.count(),
-
+                "default_product": default_product_data,
+                "products": products_data,
+                "highlights": v.highlights,
+                "search_tags": v.search_tags,
                 "categories": [
                     {
                         "id": str(c.id),
                         "name": c.name
-                    } for c in v.categories.all()
+                    }
+                    for c in v.categories.all()
                 ],
-
                 "tags": [
                     {
                         "id": str(t.id),
                         "name": t.name
-                    } for t in v.tags.all()
-                ],
-
-                "created_at": v.created_at
+                    }
+                    for t in v.tags.all()
+                ]
             })
-        return CustomResponse().successResponse(data=results)
+
+        return CustomResponse().successResponse(data=results, total=total_count)
 
 
 
@@ -659,6 +688,75 @@ class CategoriesAPIView(APIView):
 
 
 
+
+
+
+class TagsAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        data = request.data
+        store = request.store
+
+        if not data.get("name"):
+            return CustomResponse.errorResponse(
+                description="name is required"
+            )
+
+        slug = data.get("slug") or data["name"].strip().lower().replace(" ", "-")
+
+        if Tag.objects.filter(store=store, slug=slug).exists():
+            return CustomResponse.errorResponse(
+                description="Tag with this slug already exists"
+            )
+
+        if Tag.objects.filter(store=store, name=data["name"]).exists():
+            return CustomResponse.errorResponse(
+                description="Tag with this name already exists"
+            )
+
+        Tag.objects.create(
+            store=store,
+            name=data["name"].strip(),
+            slug=slug,
+            is_active=data.get("is_active", True),
+            created_by=request.user.mobile
+        )
+
+        return CustomResponse.successResponse(
+            data={},
+            description="Tag created successfully"
+        )
+
+    def get(self, request):
+        store = request.store
+        params = request.query_params
+
+        page = int(params.get("page", 1))
+        page_size = min(int(params.get("page_size", 20)), 100)
+
+        offset = (page - 1) * page_size
+
+        queryset = Tag.objects.filter(
+            store=store,
+            is_active=True
+        )
+
+        total_count = queryset.count()
+        tags = queryset.order_by("name")[offset:offset + page_size]
+
+        data = [{
+            "id": str(t.id),
+            "name": t.name,
+            "slug": t.slug,
+            "created_at": t.created_at
+        } for t in tags]
+
+        return CustomResponse.successResponse(
+            data=data,
+            total=total_count,
+            description="Tags fetched successfully"
+        )
 
 class BannerAPIView(APIView):
     permission_classes = [IsAuthenticated]
