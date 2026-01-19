@@ -296,11 +296,13 @@ class MobileVerifyOTPView(APIView):
 
         # ---------------- Tokens ----------------
         refresh = RefreshToken.for_user(user)
+        access = str(refresh.access_token)
+        refresh_token = str(refresh)
         UserSession.objects.create(
             user=user,
             store=request.store,
-            session_token=str(refresh.access_token),
-            refresh_token=str(refresh),
+            session_token=access,
+            refresh_token=refresh_token,
             device_id=request.data.get("device_id"),
             device_type=request.client_type,
             ip_address=request.META.get("REMOTE_ADDR"),
@@ -312,8 +314,8 @@ class MobileVerifyOTPView(APIView):
             description="OTP verified successfully",
             data={
                 "is_new_user": is_new_user,
-                "access": str(refresh.access_token),
-                "refresh": str(refresh),
+                "access": access,
+                "refresh": refresh_token,
                 "user": {
                     "id": str(user.id),
                     "mobile": user.mobile,

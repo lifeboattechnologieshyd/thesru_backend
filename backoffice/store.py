@@ -1,5 +1,7 @@
 from datetime import timedelta
 from unicodedata import category
+
+from django.core.exceptions import ObjectDoesNotExist
 from django.db import transaction
 from django.db import IntegrityError
 from rest_framework.views import APIView
@@ -7,9 +9,10 @@ from django.utils import timezone
 from django.db.models import Count, Sum
 
 from rest_framework.permissions import IsAuthenticated, AllowAny
+from urllib3 import request
 
 from config.settings.common import DEBUG
-from db.models import Category, Product, DisplayProduct, Banner, Inventory, PinCode, Coupon, Store, WebBanner, \
+from db.models import Category, Product, ProductVariant, Banner, Inventory, PinCode, Coupon, Store, WebBanner, \
     FlashSaleBanner, Order, User, Cart, OrderProducts, UserOTP, StoreClient, UserSession
 from enums.store import InventoryType, OrderStatus
 from mixins.drf_views import CustomResponse
@@ -85,11 +88,13 @@ class Login(APIView):
             otp_obj.is_used = True
             otp_obj.save(update_fields=["is_used"])
             refresh = RefreshToken.for_user(user)
+            access = str(refresh.access_token)
+            refresh_token = str(refresh)
             UserSession.objects.create(
                 user=user,
                 store=request.store,
-                session_token=str(refresh.access_token),
-                refresh_token=str(refresh),
+                session_token=access,
+                refresh_token=refresh_token,
                 device_id=request.data.get("device_id"),
                 device_type=request.client_type,
                 ip_address=request.META.get("REMOTE_ADDR"),
@@ -99,8 +104,8 @@ class Login(APIView):
             return CustomResponse().successResponse(
                 description="OTP verified successfully",
                 data={
-                    "access": str(refresh.access_token),
-                    "refresh": str(refresh),
+                    "access": access,
+                    "refresh": refresh_token,
                     "user": {
                         "id": str(user.id),
                         "mobile": user.mobile,
@@ -437,60 +442,98 @@ class DisplayProductAPIView(APIView):
 class CategoriesAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
-    def post(self,request):
+    def post(self, request):
         data = request.data
         store = request.store
 
-
-        required_fields = ["name","icon","search_tags","is_active"]
+        # 1. Required fields
+        required_fields = ["name", "slug", "icon"]
         for field in required_fields:
             if not data.get(field):
-                return CustomResponse.errorResponse(description=f"{field} is required")
-
-        Category.objects.create(
-            store_id=store.id,
-            name = data.get("name"),
-            icon = data.get("icon"),
-            search_tags = data.get("search_tags"),
-            is_active = data.get("is_active")
-
-
-        )
-        return CustomResponse.successResponse(data={},description="category created successfully")
-
-    def get(self, request, id=None):
-        if id:
-            category = Category.objects.filter(id=id).values().first()
-            if not category:
                 return CustomResponse.errorResponse(
-                    description="category not found"
+                    description=f"{field} is required"
                 )
 
-            return CustomResponse.successResponse(
-                data=[category],
-                total=1
-            )
+        name = data.get("name").strip()
+        icon = data.get("icon")
+        slug = data.get("slug").strip().lower()
+        parent_id = data.get("parent_id")
 
-        page = int(request.query_params.get("page", 1))
-        page_size = int(request.query_params.get("page_size", 10))
-
-        if page < 1 or page_size < 1:
+        # 2. Unique slug per store
+        if Category.objects.filter(store=store, slug=slug).exists():
             return CustomResponse.errorResponse(
-                description="page and page_size must be positive integers"
+                description="Category with this slug already exists"
             )
 
-        queryset = Category.objects.all().order_by("-created_at")
+        # 3. Parent validation (optional)
+        parent = None
+        if parent_id:
+            try:
+                parent = Category.objects.get(
+                    id=parent_id,
+                    store=store,
+                    is_active=True
+                )
+            except ObjectDoesNotExist:
+                return CustomResponse.errorResponse(
+                    description="Invalid parent category"
+                )
 
-        total = queryset.count()
-        offset = (page - 1) * page_size
-        queryset = queryset[offset: offset + page_size]
-
-        data = list(queryset.values())
+        # 4. Create category
+        Category.objects.create(
+            store=store,
+            name=name,
+            slug=slug,
+            parent=parent,
+            icon=icon,
+            is_active=data.get("is_active", True),
+            created_by=request.user.mobile
+        )
 
         return CustomResponse.successResponse(
-            data=data,
-            total=total,
+            data={},
+            description="Category created successfully"
+        )
 
+    def get(self, request):
+        store = request.store
+        # Pagination params
+        try:
+            page = int(request.query_params.get("page", 1))
+            page_size = int(request.query_params.get("page_size", 20))
+        except ValueError:
+            return CustomResponse.errorResponse(
+                description="Invalid pagination parameters"
+            )
+        if page < 1:
+            page = 1
+        if page_size < 1:
+            page_size = 20
+        elif page_size > 100:
+            page_size = 100
+        offset = (page - 1) * page_size
+        limit = offset + page_size
+        queryset = Category.objects.filter(
+            store=store,
+        ).select_related("parent").order_by("name")
+        total_count = queryset.count()
+        categories = queryset[offset:limit]
+        data = []
+        for cat in categories:
+            data.append({
+                "id": str(cat.id),
+                "name": cat.name,
+                "icon":cat.icon,
+                "search_tags": cat.search_tags,
+                "is_active": cat.is_active,
+                "slug": cat.slug,
+                "parent_id": str(cat.parent_id) if cat.parent_id else None,
+                "parent_name": cat.parent.name if cat.parent else None,
+                "created_at": cat.created_at
+            })
+        return CustomResponse.successResponse(
+            data=data,
+            total=total_count,
         )
 
     def put(self,request,id=None):
@@ -501,19 +544,16 @@ class CategoriesAPIView(APIView):
         if not category:
             return CustomResponse.errorResponse(description="category not found")
         for field in [
-            "name","icon","search_tags","is_active"
+            "name","icon","search_tags","is_active", "slug"
         ]:
             if field in request.data:
                 setattr(category,field,request.data.get(field))
-
         category.save()
-
         return CustomResponse.successResponse(data={},description="category updated successfully")
 
     def delete(self,request,id=None):
         if not id:
             return CustomResponse.errorResponse(description="category id required")
-
         category = Category.objects.filter(id=id).first()
         if not category:
             return CustomResponse.errorResponse(description="category not found")

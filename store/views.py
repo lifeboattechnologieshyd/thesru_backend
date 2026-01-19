@@ -10,7 +10,7 @@ from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated,AllowAny
 
 from django.conf import settings
-from db.models import AddressMaster, PinCode, Product, DisplayProduct, Order, OrderProducts, Payment, OrderTimeLines, \
+from db.models import AddressMaster, PinCode, Product, ProductVariant, Order, OrderProducts, Payment, OrderTimeLines, \
     Banner, Category, Cart, Wishlist, WebBanner, FlashSaleBanner, CashFree, Store, ProductReviews, ContactMessage
 from enums.store import OrderStatus, PaymentStatus
 from mixins.drf_views import CustomResponse

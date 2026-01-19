@@ -3,67 +3,42 @@ from django.contrib.postgres.fields import ArrayField
 from db.mixins import AuditModel
 from django.db import models
 
+from db.models import Store
 from enums.store import BannerScreen, InventoryType, AddressType, OrderStatus, PaymentStatus
 
 
-class Product(AuditModel):
+class Tag(AuditModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    store_id = models.UUIDField()
-    sku = models.CharField(max_length=20,unique=True)
-    name = models.CharField(max_length=100)
-    size = models.CharField(max_length=50,null=True)
-    colour = models.CharField(max_length=50,null=True)
-    inr = models.DecimalField(decimal_places=2, max_digits=10,null=True)
-    mrp = models.DecimalField(decimal_places=2, max_digits=10)
-    mrp_others = models.JSONField(null=True)
-    selling_price = models.DecimalField(decimal_places=2, max_digits=10)
-    selling_price_others = models.JSONField(null=True)
-    gst_percentage = models.CharField(max_length=50,null=True)
-    gst_amount = models.DecimalField(decimal_places=2, max_digits=10)
-    current_stock = models.PositiveIntegerField(default=0)
-    images =  ArrayField(models.CharField(max_length=300), null=True)
-    videos =  ArrayField(models.CharField(max_length=300), null=True)
-    thumbnail_image = models.CharField(max_length=300)
-
-    class Meta:
-        db_table = "product"
-        ordering = ["-created_at"]
-
-class DisplayProduct(AuditModel):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    store_id = models.UUIDField()
-    default_product = models.ForeignKey(
-        Product,
-        null=True,
+    store = models.ForeignKey(
+        Store,
         on_delete=models.CASCADE,
-        related_name="display_products"
+        related_name="tags"
     )
-    old_default_product_id = models.UUIDField(null=True,blank=True)
-
-    variant_product_id = ArrayField(models.CharField(max_length=50),null=True)
+    name = models.CharField(max_length=50)
+    slug = models.SlugField(max_length=60)
     is_active = models.BooleanField(default=True)
-    category = ArrayField(models.CharField(max_length=50),null=True)
-    gender = models.CharField(max_length=20,null=True)
-    tags  = ArrayField(models.CharField(max_length=50),null=True)
-    search_tags = ArrayField(models.CharField(max_length=50),null=True)
-    product_name = models.CharField(max_length=100,null=True)
-    product_tagline = models.CharField(max_length=100,null=True)
-    age = models.PositiveIntegerField(default=0)
-    description = models.TextField(null=True)
-    highlights = ArrayField(models.CharField(max_length=50),null=True)
-    rating = models.CharField(max_length=50,null=True)
-    total_rating = models.PositiveIntegerField(default=0)
-    number_of_reviews = models.PositiveIntegerField(default=0)
-
 
     class Meta:
-        db_table = "display_product"
+        db_table = "tags"
+        unique_together = ("store", "slug")
 
 
 class Category(AuditModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    store_id = models.UUIDField()
+    store = models.ForeignKey(
+        Store,
+        on_delete=models.CASCADE,
+        related_name="categories"
+    )
+    parent = models.ForeignKey(
+        "self",
+        null=True,
+        blank=True,
+        related_name="children",
+        on_delete=models.CASCADE
+    )
     name = models.CharField(max_length=50)
+    slug = models.SlugField(max_length=60)
     icon = models.CharField(max_length=255, null=True)
     search_tags = ArrayField(models.CharField(max_length=50),null=True)
     is_active = models.BooleanField(default=True)
@@ -71,6 +46,134 @@ class Category(AuditModel):
     class Meta:
         db_table = "categories"
         ordering = ["-created_at"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["store", "name"],
+                name="unique_category_per_store"
+            )
+        ]
+
+        indexes = [
+            models.Index(fields=["store", "is_active"]),
+            models.Index(fields=["name"]),
+        ]
+
+    def __str__(self):
+        return f"{self.name} ({self.store})"
+
+
+class Product(AuditModel):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    store = models.ForeignKey(
+        Store,
+        on_delete=models.CASCADE,
+        related_name="products"
+    )
+    sku = models.CharField(max_length=20,unique=True)
+    name = models.CharField(max_length=100)
+    size = models.CharField(max_length=50,null=True)
+    colour = models.CharField(max_length=50,null=True)
+    is_active = models.BooleanField(default=True)
+    mrp = models.DecimalField(decimal_places=2, max_digits=10)
+    selling_price = models.DecimalField(decimal_places=2, max_digits=10)
+
+    gst_percentage = models.CharField(max_length=50,null=True)
+    gst_amount = models.DecimalField(decimal_places=2, max_digits=10)
+    current_stock = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        db_table = "product"
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["store", "is_active"]),
+            models.Index(fields=["sku"]),
+        ]
+
+    def __str__(self):
+        return self.sku
+class ProductMedia(AuditModel):
+    IMAGE = "image"
+    VIDEO = "video"
+
+    MEDIA_TYPE_CHOICES = (
+        (IMAGE, "Image"),
+        (VIDEO, "Video"),
+    )
+
+    product = models.ForeignKey(
+        Product,
+        on_delete=models.CASCADE,
+        related_name="media"
+    )
+
+    url = models.CharField(max_length=300)
+    media_type = models.CharField(max_length=10, choices=MEDIA_TYPE_CHOICES)
+    position = models.PositiveSmallIntegerField(default=0)
+
+    class Meta:
+        db_table = "product_media"
+        ordering = ["position"]
+
+
+class ProductVariant(AuditModel):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    lsin = models.CharField(
+        max_length=12,
+        unique=True,
+        db_index=True,
+        help_text="Lifeboat standard identification number. Business-facing display product ID"
+    )
+    store = models.ForeignKey(
+        Store,
+        on_delete=models.CASCADE,
+        related_name="display_products"
+    )
+    default_product = models.ForeignKey(
+        Product,
+        on_delete=models.PROTECT,
+        related_name="as_default_variant"
+    )
+
+    products = models.ManyToManyField(
+        Product,
+        related_name="variant_groups",
+        help_text="All SKU products belonging to this display product"
+    )
+
+    categories = models.ManyToManyField(
+        Category,
+        related_name="display_products",
+        blank=True
+    )
+
+    tags = models.ManyToManyField(
+        Tag,
+        related_name="display_products",
+        blank=True
+    )
+    is_active = models.BooleanField(default=True)
+    gender = models.CharField(max_length=20,null=True)
+    search_tags = ArrayField(models.CharField(max_length=50),null=True)
+    display_name = models.CharField(max_length=200,null=True)
+    display_info = models.CharField(max_length=200,null=True)
+    description = models.TextField(null=True)
+    highlights = models.TextField(null=True)
+    rating = models.DecimalField(
+        max_digits=3,
+        decimal_places=2,
+        default=0.0
+    )
+    total_rating = models.PositiveIntegerField(default=0)
+    number_of_reviews = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        db_table = "product_variants"
+        indexes = [
+            models.Index(fields=["store", "is_active"]),
+        ]
+
+    def __str__(self):
+        return self.display_name
 
 
 class Inventory(AuditModel):
@@ -207,7 +310,7 @@ class OrderProducts(AuditModel):
     store_id = models.UUIDField()
     order_id = models.CharField(max_length=50, null=False)
     product = models.ForeignKey(
-        DisplayProduct,
+        ProductVariant,
         null=True,
         on_delete=models.PROTECT,
         related_name="order_items"
@@ -341,6 +444,7 @@ class ProductReviews(AuditModel):
             models.Index(fields=["user_id"]),
             # models.Index(fields=["product_id"]),
         ]
+
 
 
 
