@@ -20,3 +20,10 @@ def generate_order_id():
 
         if not Order.objects.filter(order_id=order_id).exists():
             return order_id
+
+
+
+ALPHANUM = string.ascii_uppercase + string.digits
+
+def generate_alphanumeric_lsin(length=12):
+    return "".join(random.choices(ALPHANUM, k=length))
