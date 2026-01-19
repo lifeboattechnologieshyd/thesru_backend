@@ -14,6 +14,8 @@ urlpatterns = [
 
 
     path("category",CategoriesAPIView.as_view()),
+    path("category/<str:id>",CategoriesAPIView.as_view()),
+
 
 
     path("banner",BannerAPIView.as_view()),

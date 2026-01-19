@@ -542,6 +542,123 @@ class CategoriesAPIView(APIView):
             data=data,
             total=total_count,
         )
+    def put(self, request, id=None):
+        store = request.store
+        data = request.data
+
+        if not id:
+            return CustomResponse.errorResponse(
+                description="Category id is required"
+            )
+
+        try:
+            category = Category.objects.get(id=id, store=store)
+        except Category.DoesNotExist:
+            return CustomResponse.errorResponse(
+                description="Category not found"
+            )
+
+        if "name" in data:
+            name = data.get("name")
+            if not name:
+                return CustomResponse.errorResponse(
+                    description="name cannot be empty"
+                )
+            category.name = name.strip()
+
+        if "slug" in data:
+            slug = data.get("slug")
+            if not slug:
+                return CustomResponse.errorResponse(
+                    description="slug cannot be empty"
+                )
+
+            slug = slug.strip().lower()
+
+            if Category.objects.filter(
+                    store=store,
+                    slug=slug
+            ).exclude(id=category.id).exists():
+                return CustomResponse.errorResponse(
+                    description="Category with this slug already exists"
+                )
+
+            category.slug = slug
+
+        if "icon" in data:
+            category.icon = data.get("icon")
+
+        if "is_active" in data:
+            category.is_active = bool(data.get("is_active"))
+
+        if "parent_id" in data:
+            parent_id = data.get("parent_id")
+
+            if parent_id:
+                try:
+                    parent = Category.objects.get(
+                        id=parent_id,
+                        store=store,
+                        is_active=True
+                    )
+                except Category.DoesNotExist:
+                    return CustomResponse.errorResponse(
+                        description="Invalid parent category"
+                    )
+
+                if parent.id == category.id:
+                    return CustomResponse.errorResponse(
+                        description="Category cannot be its own parent"
+                    )
+
+                category.parent = parent
+            else:
+                category.parent = None
+
+        category.updated_by = request.user.mobile
+        category.save()
+
+        return CustomResponse.successResponse(
+            data={},
+            description="Category updated successfully"
+        )
+    def delete(self, request, id=None):
+        store = request.store
+
+        if not id:
+            return CustomResponse.errorResponse(
+                description="Category id is required"
+            )
+
+        try:
+            category = Category.objects.get(
+                id=id,
+                store=store,
+                is_active=True
+            )
+        except Category.DoesNotExist:
+            return CustomResponse.errorResponse(
+                description="Category not found"
+            )
+
+        # Optional: prevent delete if category has children
+        if Category.objects.filter(parent=category, is_active=True).exists():
+            return CustomResponse.errorResponse(
+                description="Cannot delete category with active subcategories"
+            )
+
+        # category.is_active = False
+        # category.updated_by = request.user.mobile
+        # category.save()
+        category.delete()
+
+        return CustomResponse.successResponse(
+            data={},
+            description="Category deleted successfully"
+        )
+
+
+
 
 class BannerAPIView(APIView):
     permission_classes = [IsAuthenticated]
