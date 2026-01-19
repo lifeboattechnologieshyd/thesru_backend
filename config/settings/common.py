@@ -231,6 +231,8 @@ CORS_ALLOW_HEADERS = [
     *default_headers,
     "x-request-id",
     "x-store-id",
+    "X-Client-Type",
+    "X-Client-Identifier",
 ]
 CORS_EXPOSE_HEADERS = [
     "x-request-id",
