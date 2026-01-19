@@ -10,13 +10,12 @@ urlpatterns = [
     path("verify-otp",Login.as_view()),
 
     path("product", ProductAPIView.as_view()),
-    # path("product/<str:id>",ProductAPIView.as_view()),
     path("product-variants",DisplayProductAPIView.as_view()),
 
-    # path("display/product/<str:id>",DisplayProductAPIView.as_view()),
 
     path("category",CategoriesAPIView.as_view()),
-    path("category/<str:id>",CategoriesAPIView.as_view()),
+
+
     path("banner",BannerAPIView.as_view()),
     path("banner/<str:id>",BannerAPIView.as_view()),
     path("inventory",InventoryAPIView.as_view()),

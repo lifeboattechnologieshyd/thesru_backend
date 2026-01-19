@@ -543,31 +543,6 @@ class CategoriesAPIView(APIView):
             total=total_count,
         )
 
-    def put(self,request,id=None):
-        if not id:
-            return CustomResponse.errorResponse(description="category id required")
-
-        category = Category.objects.filter(id=id).first()
-        if not category:
-            return CustomResponse.errorResponse(description="category not found")
-        for field in [
-            "name","icon","search_tags","is_active", "slug"
-        ]:
-            if field in request.data:
-                setattr(category,field,request.data.get(field))
-        category.save()
-        return CustomResponse.successResponse(data={},description="category updated successfully")
-
-    def delete(self,request,id=None):
-        if not id:
-            return CustomResponse.errorResponse(description="category id required")
-        category = Category.objects.filter(id=id).first()
-        if not category:
-            return CustomResponse.errorResponse(description="category not found")
-        category.delete()
-        return CustomResponse.successResponse(data={},description="category deleted successfully")
-
-
 class BannerAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
