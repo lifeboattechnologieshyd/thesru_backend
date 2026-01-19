@@ -3,7 +3,7 @@ from django.contrib.postgres.fields import ArrayField
 from db.mixins import AuditModel
 from django.db import models
 
-from db.models import Store
+from db.models import Store, User
 from enums.store import BannerScreen, InventoryType, AddressType, OrderStatus, PaymentStatus
 
 
@@ -407,23 +407,28 @@ class Cart(AuditModel):
 
 class Wishlist(AuditModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    store_id = models.UUIDField()
+    store = models.ForeignKey(Store, on_delete=models.CASCADE)
     product = models.ForeignKey(
-        Product,
+        ProductVariant,
         null=True,
         on_delete=models.CASCADE,
         related_name="wishlist_items"
     )
-    user_id = models.UUIDField(null=False)
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name="wishlists"
+    )
+    is_active = models.BooleanField(default=True)
 
     class Meta:
         db_table = "wishlist"
-
-        # unique_together = ("user_id", "product_id")
-        # indexes = [
-        #     models.Index(fields=["user_id"]),
-        #     models.Index(fields=["product_id"]),
-        # ]
+        unique_together = ("store", "user", "product")
+        indexes = [
+            models.Index(fields=["store", "user", "is_active"]),
+            models.Index(fields=["user"]),
+            models.Index(fields=["product"]),
+        ]
 
 
 class ProductReviews(AuditModel):

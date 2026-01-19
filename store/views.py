@@ -1,6 +1,7 @@
 import uuid
 from unicodedata import category
 import requests
+from django.contrib.admin.templatetags.admin_list import results
 from django.db import transaction
 from django.db import IntegrityError
 from django.db.models import Q
@@ -11,11 +12,402 @@ from rest_framework.permissions import IsAuthenticated,AllowAny
 
 from django.conf import settings
 from db.models import AddressMaster, PinCode, Product, ProductVariant, Order, OrderProducts, Payment, OrderTimeLines, \
-    Banner, Category, Cart, Wishlist, WebBanner, FlashSaleBanner, CashFree, Store, ProductReviews, ContactMessage
+    Banner, Category, Cart, Wishlist, WebBanner, FlashSaleBanner, CashFree, Store, ProductReviews, ContactMessage, Tag
 from enums.store import OrderStatus, PaymentStatus
 from mixins.drf_views import CustomResponse
 from utils.store import generate_order_id
 from django.db.models import OuterRef, Subquery
+
+
+class CategoryListView(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        store = request.store
+        queryset = Category.objects.filter(is_active=True,store=store)
+        #  LIST ALL CATEGORIES
+        data = []
+        for category in queryset.order_by("-created_at"):
+            data.append({
+                "id": str(category.id),
+                "name": category.name,
+                "slug": category.slug,
+                "icon": category.icon,
+                "search_tags": category.search_tags,
+                "is_active": category.is_active,
+            })
+        return CustomResponse.successResponse(
+            data=data,
+            total=len(data)
+        )
+
+class TagsListView(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        store = request.store
+        queryset = Tag.objects.filter(is_active=True, store=store)
+        #  LIST ALL TAGS
+        data = []
+        for tag in queryset.order_by("-created_at"):
+            data.append({
+                "id": str(tag.id),
+                "name": tag.name,
+                "slug": tag.slug,
+                "is_active": tag.is_active,
+            })
+        return CustomResponse.successResponse(
+            data=data,
+            total=len(data)
+        )
+
+class ProductListAPIView(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        store = request.store
+        params = request.query_params
+        # ---------- Query params ----------
+        categories = params.get("category")  # comma-separated UUIDs
+        gender = params.get("gender")
+        tags = params.get("tags")  # comma-separated UUIDs
+        min_price = params.get("min_price")
+        max_price = params.get("max_price")
+
+        page = int(params.get("page", 1))
+        page_size = min(int(params.get("page_size", 10)), 50)
+
+        # ---------- Base queryset ----------
+        queryset = ProductVariant.objects.filter(
+            store=store,
+            is_active=True
+        )
+
+        # ---------- Category filter (M2M) ----------
+        if categories:
+            category_ids = []
+            for c in categories.split(","):
+                try:
+                    category_ids.append(uuid.UUID(c.strip()))
+                except ValueError:
+                    return CustomResponse.errorResponse(
+                        description=f"Invalid category UUID: {c}"
+                    )
+
+            queryset = queryset.filter(categories__id__in=category_ids)
+
+        # ---------- Tag filter (M2M) ----------
+        if tags:
+            tag_ids = []
+            for t in tags.split(","):
+                try:
+                    tag_ids.append(uuid.UUID(t.strip()))
+                except ValueError:
+                    return CustomResponse.errorResponse(
+                        description=f"Invalid tag UUID: {t}"
+                    )
+
+            queryset = queryset.filter(tags__id__in=tag_ids)
+
+        # ---------- Gender ----------
+        if gender:
+            queryset = queryset.filter(gender__iexact=gender)
+
+        # ---------- Optimize relations ----------
+        queryset = queryset.select_related(
+            "default_product"
+        ).prefetch_related(
+            "default_product__media",
+            "categories",
+            "tags"
+        ).distinct().order_by("-created_at")
+
+        # ---------- Price filter (on default product) ----------
+        if min_price:
+            queryset = queryset.filter(
+                default_product__selling_price__gte=min_price
+            )
+
+        if max_price:
+            queryset = queryset.filter(
+                default_product__selling_price__lte=max_price
+            )
+
+        # ---------- Pagination ----------
+        total = queryset.count()
+        offset = (page - 1) * page_size
+        variants = queryset[offset: offset + page_size]
+
+        # ---------- Response ----------
+        data = []
+
+        for v in variants:
+            p = v.default_product
+
+            thumbnail_media = [
+                m.url for m in p.media.all()[:1]
+            ]
+
+            data.append({
+                # ---- ProductVariant ----
+                "product_variant_id": str(v.id),
+                "lsin": v.lsin,
+                "display_name": v.display_name,
+                "description": v.description,
+                "gender": v.gender,
+                "is_active": v.is_active,
+                # ---- Categories ----
+                "categories": [
+                    {"id": str(c.id), "name": c.name}
+                    for c in v.categories.all()
+                ],
+
+                # ---- Tags ----
+                "tags": [
+                    {"id": str(t.id), "name": t.name}
+                    for t in v.tags.all()
+                ],
+
+                # ---- Default Product (SKU) ----
+                "default_product": {
+                    "id": str(p.id),
+                    "sku": p.sku,
+                    "name": p.name,
+                    "size": p.size,
+                    "colour": p.colour,
+                    "selling_price": str(p.selling_price),
+                    "mrp": str(p.mrp),
+                    "gst_percentage": p.gst_percentage,
+                    "gst_amount": str(p.gst_amount) if p.gst_amount else None,
+                    "current_stock": p.current_stock,
+                    "thumbnail": thumbnail_media[0] if thumbnail_media else None
+                }
+            })
+
+        return CustomResponse.successResponse(
+            data=data,
+            total=total
+        )
+
+class ProductDetailAPIView(APIView):
+    permission_classes = [AllowAny]  # Public API
+
+    def get(self, request, id):
+        store = request.store
+        try:
+            variant = ProductVariant.objects.filter(
+                store=store,
+                id=id,
+                is_active=True
+            ).select_related(
+                "default_product"
+            ).prefetch_related(
+                "products__media",
+                "default_product__media",
+                "categories",
+                "tags"
+            ).get()
+        except ProductVariant.DoesNotExist:
+            return CustomResponse.errorResponse(
+                description="Product not found"
+            )
+
+        # ---------- Build variants (products / SKUs) ----------
+        variants_data = []
+
+        for p in variant.products.all():
+            variants_data.append({
+                "id": str(p.id),
+                "sku": p.sku,
+                "name": p.name,
+                "size": p.size,
+                "colour": p.colour,
+                "selling_price": str(p.selling_price),
+                "mrp": str(p.mrp),
+                "current_stock": p.current_stock,
+                "media": [
+                    {
+                        "url": m.url,
+                        "type": m.media_type,
+                        "position": m.position
+                    } for m in p.media.all()
+                ]
+            })
+
+        # ---------- Final response ----------
+        response_data = {
+            "lsin": variant.lsin,
+            "display_name": variant.display_name,
+            "description": variant.description,
+            "highlights": variant.highlights,
+            "gender": variant.gender,
+            "rating": variant.rating,
+            "numbef_of_reviews": variant.number_of_reviews,
+            "categories": [
+                {"id": str(c.id), "name": c.name}
+                for c in variant.categories.all()
+            ],
+            "tags": [
+                {"id": str(t.id), "name": t.name}
+                for t in variant.tags.all()
+            ],
+            "default_product": {
+                "id": str(variant.default_product.id),
+                "sku": variant.default_product.sku,
+                "name": variant.default_product.name,
+                "size": variant.default_product.size,
+                "colour": variant.default_product.colour,
+                "selling_price": str(variant.default_product.selling_price),
+                "mrp": str(variant.default_product.mrp),
+                "current_stock": variant.default_product.current_stock,
+                "media": [
+                    {
+                        "url": m.url,
+                        "type": m.media_type,
+                        "position": m.position
+                    } for m in variant.default_product.media.all()
+                ],
+            },
+            "variants": variants_data,
+        }
+        return CustomResponse.successResponse(data=response_data)
+
+class AddToWishlistAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        user = request.user
+        store = request.store
+        product_id = request.data.get("product_id")
+
+        if not product_id:
+            return CustomResponse().errorResponse(
+                description="product_id is required"
+            )
+
+        try:
+            product_variant = ProductVariant.objects.get(
+                store=store,
+                id=product_id,
+                is_active=True
+            )
+        except ProductVariant.DoesNotExist:
+            return CustomResponse.errorResponse(
+                description="product variant not found"
+            )
+
+        wishlist, created = Wishlist.objects.get_or_create(
+            store=store,
+            user=user,
+            product=product_variant,
+            # defaults={"is_active": True}
+        )
+
+        if not created:
+            return CustomResponse().successResponse(data={},
+                description="Product already in wishlist"
+            )
+
+        return CustomResponse().successResponse(data={},
+            description="Product added to wishlist"
+        )
+
+class RemoveFromWishlistAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def delete(self, request, id):
+        try:
+            product_variant = ProductVariant.objects.get(
+                store=request.store,
+                id=id,
+                is_active=True
+            )
+        except ProductVariant.DoesNotExist:
+            return CustomResponse.errorResponse(
+                description="product variant not found"
+            )
+        deleted, _ = Wishlist.objects.filter(
+            store=request.store,
+            user=request.user,
+            product=product_variant
+        ).delete()
+
+        if not deleted:
+            return CustomResponse().errorResponse(
+                description="Wishlist item not found",
+            )
+
+        return CustomResponse().successResponse(data={},
+            description="Item removed from wishlist"
+        )
+
+class WishlistListAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        store = request.store
+        user = request.user
+
+        wishlists = Wishlist.objects.filter(
+            store=store,
+            user=user,
+            is_active=True
+        ).select_related(
+            "product",
+            "product__default_product"
+        ).prefetch_related(
+            "product__default_product__media",
+            "product__categories",
+            "product__tags"
+        ).order_by("-created_at")
+
+        data = []
+
+        for w in wishlists:
+            v = w.product
+            p = v.default_product
+
+            # thumbnail
+            thumbnail = None
+            media_qs = p.media.all()
+            if media_qs:
+                thumbnail = media_qs[0].url
+
+            data.append({
+                "product_variant_id": str(v.id),
+                "lsin": v.lsin,
+                "display_name": v.display_name,
+                "description": v.description,
+                "gender": v.gender,
+                "is_active": v.is_active,
+
+                "default_product": {
+                    "id": str(p.id),
+                    "sku": p.sku,
+                    "selling_price": str(p.selling_price),
+                    "mrp": str(p.mrp),
+                    "current_stock": p.current_stock,
+                    "thumbnail": thumbnail
+                },
+
+                "categories": [
+                    {"id": str(c.id), "name": c.name}
+                    for c in v.categories.all()
+                ],
+
+                "tags": [
+                    {"id": str(t.id), "name": t.name}
+                    for t in v.tags.all()
+                ]
+            })
+
+        return CustomResponse.successResponse(
+            data=data,
+            description="Wishlist products fetched successfully"
+        )
+
+
+
 
 
 class AddressAPIView(APIView):
@@ -146,572 +538,8 @@ class PinListView(APIView):
 
         return CustomResponse.successResponse(data=data,total=1)
 
-# class ProductAPIView(APIView):
-#     permission_classes = [AllowAny]
-#
-#     def get(self, request):
-#         category = request.query_params.get("category")
-#
-#         if not category:
-#             return CustomResponse.errorResponse(
-#                 description="category is required"
-#             )
-#
-#         #  Filter display products by category
-#         display_products = (
-#             DisplayProduct.objects
-#             .filter(is_active=True, category__contains=[category])
-#             .order_by("-created_at")
-#         )
-#
-#         if not display_products.exists():
-#             return CustomResponse.successResponse(
-#                 data=[],
-#                 total=0,
-#                 description="No products found for this category"
-#             )
-#
-#         response_data = []
-#
-#         for dp in display_products:
-#             #  Fetch variant products
-#             variants = []
-#             if dp.variant_product_id:
-#                 variant_qs = Product.objects.filter(
-#                     id__in=dp.variant_product_id
-#                 )
-#
-#                 for v in variant_qs:
-#                     variants.append({
-#                         "id": str(v.id),
-#                         "name": v.name,
-#                         "size": v.size,
-#                         "colour": v.colour,
-#                         "mrp": v.mrp,
-#                         "selling_price": v.selling_price,
-#                         "gst_percentage": v.gst_percentage,
-#                         "gst_amount": v.gst_amount,
-#                         "current_stock": v.current_stock,
-#                         "images": v.images,
-#                         "videos": v.videos,
-#                         "thumbnail_image": v.thumbnail_image,
-#                     })
-#
-#             # Display product payload
-#             response_data.append({
-#                 "display_product_id": str(dp.id),
-#                 "product_name": dp.product_name,
-#                 "product_tagline": dp.product_tagline,
-#                 "description": dp.description,
-#                 "highlights": dp.highlights,
-#                 "category": dp.category,
-#                 "gender": dp.gender,
-#                 "age": dp.age,
-#                 "rating": dp.rating,
-#                 "number_of_reviews": dp.number_of_reviews,
-#                 "tags": dp.tags,
-#                 "search_tags": dp.search_tags,
-#                 "variants": variants,
-#             })
-#
-#         return CustomResponse.successResponse(
-#             data=response_data,
-#             total=len(response_data),
-#             description="Products fetched successfully"
-#         )
 
 
-# class ProductListAPIView(APIView):
-#     permission_classes = [AllowAny]
-#
-#     def get(self, request):
-#         category = request.query_params.get("category")
-#         page = int(request.query_params.get("page", 1))
-#         page_size = int(request.query_params.get("page_size", 10))
-#
-#
-#         queryset = DisplayProduct.objects.filter(
-#             is_active=True,
-#         )
-#
-#         if category:
-#             queryset = queryset.filter(category__contains=[category])
-#         #     gender,tags,
-#
-#
-#
-#         total = queryset.count()
-#         offset = (page - 1) * page_size
-#         queryset = queryset[offset:offset + page_size]
-#
-#         data = []
-#         for product in queryset:
-#             data.append({
-#                     "id": str(product.id),
-#                     "default_product_id": str(product.default_product_id),
-#                     "variant_product_id": product.variant_product_id or [],
-#                     "category": product.category,
-#                     "gender": product.gender,
-#                     "tags": product.tags,
-#                     "search_tags": product.search_tags,
-#                     "product_name": product.product_name,
-#                     "product_tagline": product.product_tagline,
-#                     "age": product.age,
-#                     "description": product.description,
-#                     "highlights": product.highlights,
-#                     "rating": product.rating,
-#                     "number_of_reviews": product.number_of_reviews,
-#                     "is_active": product.is_active,
-#                 })
-#
-#         return CustomResponse.successResponse(
-#             data=data,
-#             total=total
-#         )
-
-
-class ProductListAPIView(APIView):
-    permission_classes = [AllowAny]
-
-
-    def get(self, request):
-        store_id = request.store.id
-
-        # ---------- Query params ----------
-        categories = request.query_params.get("category")
-        gender = request.query_params.get("gender")
-        tags = request.query_params.get("tags")  # comma-separated
-        min_price = request.query_params.get("min_price")
-        max_price = request.query_params.get("max_price")
-
-        page = int(request.query_params.get("page", 1))
-        page_size = int(request.query_params.get("page_size", 10))
-
-        # ---------- DisplayProduct base queryset ----------
-        queryset = DisplayProduct.objects.filter(is_active=True,store_id=store_id)
-
-
-        if categories:
-            category_list = []
-
-            for c in categories.split(","):
-                c = c.strip()
-                if not c:
-                    continue
-                try:
-                    # Validate UUID
-                    uuid.UUID(c)
-                    category_list.append(c)
-                except ValueError:
-                    return CustomResponse.errorResponse(
-                        description=f"Invalid category UUID: {c}"
-                    )
-
-            queryset = queryset.filter(category__overlap=category_list)
-
-
-        if gender:
-            queryset = queryset.filter(gender__iexact=gender)
-
-        if tags:
-            tag_list = [t.strip() for t in tags.split(",") if t.strip()]
-            queryset = queryset.filter(tags__overlap=tag_list)
-
-        # ---------- Pagination ----------
-        total = queryset.count()
-        offset = (page - 1) * page_size
-        queryset = queryset[offset:offset + page_size]
-
-        # ---------- Fetch related products ----------
-        product_ids = queryset.values_list("default_product_id", flat=True)
-
-        product_qs = Product.objects.filter(id__in=product_ids,store_id=store_id)
-
-        # ---------- Price filters (Product table) ----------
-        if min_price:
-            product_qs = product_qs.filter(selling_price__gte=min_price)
-
-        if max_price:
-            product_qs = product_qs.filter(selling_price__lte=max_price)
-
-        products = list(product_qs)
-        product_map = {str(p.id): p for p in products}
-
-        data = []
-
-        for display in queryset:
-            product = product_map.get(str(display.default_product_id))
-
-            # Skip if price filter excluded the product
-            if (min_price or max_price) and not product:
-                continue
-
-            data.append({
-                # ---------- unified product identity ----------
-                "default_product_id": str(display.default_product_id),
-
-                # ---------- DisplayProduct fields ----------
-                "category": display.category,
-                "gender": display.gender,
-                "tags": display.tags,
-                "search_tags": display.search_tags,
-                "product_name": display.product_name,
-                "product_tagline": display.product_tagline,
-                "age": display.age,
-                "description": display.description,
-                "highlights": display.highlights,
-                "rating": display.rating,
-                "number_of_reviews": display.number_of_reviews,
-                "is_active": display.is_active,
-
-                # ---------- Product fields ----------
-                "name": product.name if product else None,
-                "size": product.size if product else None,
-                "colour": product.colour if product else None,
-
-                "selling_price": str(product.selling_price) if product else None,
-                "mrp": str(product.mrp) if product else None,
-
-                "gst_percentage": product.gst_percentage if product else None,
-                "gst_amount": str(product.gst_amount) if product else None,
-
-                "current_stock": product.current_stock if product else 0,
-                "images": product.images if product else [],
-                "videos": product.videos if product else [],
-                "thumbnail_image": product.thumbnail_image if product else None,
-            })
-
-        return CustomResponse.successResponse(
-            data=data,
-            total=total
-        )
-
-
-# class WishlistListAPIView(APIView):
-#     permission_classes = [IsAuthenticated]
-#
-#     def get(self, request):
-#         user_id = request.user.id
-#
-#         page = int(request.query_params.get("page", 1))
-#         limit = int(request.query_params.get("limit", 10))
-#
-#         if page < 1 or limit < 1:
-#             return CustomResponse().errorResponse(
-#                 description="page and limit must be positive integers"
-#             )
-#
-#         offset = (page - 1) * limit
-#
-#         # ---------- WISHLIST QUERY ----------
-#         qs = Wishlist.objects.filter(user_id=user_id).order_by("-created_at")
-#         total = qs.count()
-#
-#         wishlist_items = qs[offset: offset + limit]
-#
-#         # ---------- FETCH PRODUCTS (ONE QUERY) ----------
-#         product_ids = [item.product_id for item in wishlist_items]
-#
-#         products = Product.objects.filter(id__in=product_ids)
-#         product_map = {str(p.id): p for p in products}
-#
-#         # ---------- BUILD RESPONSE ----------
-#         data = []
-#         for item in wishlist_items:
-#             product = product_map.get(str(item.product_id))
-#
-#             data.append({
-#                 "wishlist_id": str(item.id),
-#
-#                 # ---- PRODUCT DETAILS ----
-#                 "product": {
-#                     "id": str(product.id) if product else None,
-#                     "sku": product.sku if product else None,
-#                     "name": product.name if product else None,
-#                     "size": product.size if product else None,
-#                     "colour": product.colour if product else None,
-#                     "mrp": product.mrp if product else None,
-#                     "selling_price": product.selling_price if product else None,
-#                     "inr": product.inr if product else None,
-#                     "gst_percentage": product.gst_percentage if product else None,
-#                     "gst_amount": product.gst_amount if product else None,
-#                     "current_stock": product.current_stock if product else None,
-#                     "thumbnail_image": product.thumbnail_image if product else None,
-#                     "images": product.images if product else [],
-#                     "videos": product.videos if product else [],
-#
-#                 }
-#             })
-#
-#         return CustomResponse().successResponse(
-#             data=data,
-#             total=total
-#         )
-
-
-class WishlistListAPIView(APIView):
-    permission_classes = [IsAuthenticated]
-
-    def get(self, request):
-        user_id = request.user.id
-        store = request.store
-
-
-        page = int(request.query_params.get("page", 1))
-        page_size = int(request.query_params.get("page_size", 10))
-
-        if page < 1 or page_size < 1:
-            return CustomResponse.errorResponse(
-                description="page and page_size must be positive integers"
-            )
-
-        offset = (page - 1) * page_size
-
-        # ------------------------------------------------
-        # 1️⃣ Wishlist
-        # ------------------------------------------------
-        wishlist_qs = Wishlist.objects.filter(
-            user_id=user_id,store_id=store.id
-
-        ).order_by("-created_at")
-
-        wishlist_items = wishlist_qs[offset: offset + page_size]
-
-        product_ids = [str(w.product_id) for w in wishlist_items]
-
-        if not product_ids:
-            return CustomResponse.successResponse(data=[], total=0)
-
-        # ------------------------------------------------
-        # 2️⃣ Products (default + variants)
-        # ------------------------------------------------
-        products = Product.objects.filter(id__in=product_ids)
-
-        product_map = {
-            str(p.id): p for p in products
-        }
-
-        # ------------------------------------------------
-        # 3️⃣ DisplayProducts (MATCH DEFAULT OR VARIANT)
-        # ------------------------------------------------
-        display_products = DisplayProduct.objects.filter(
-            Q(default_product_id__in=product_ids) |
-            Q(variant_product_id__overlap=product_ids),
-            is_active=True
-        )
-
-        # Build lookup:
-        # product_id -> display_product
-        display_map = {}
-
-        for dp in display_products:
-            # default product
-            display_map[str(dp.default_product_id)] = dp
-
-            # variant products
-            if dp.variant_product_id:
-                for vid in dp.variant_product_id:
-                    display_map[str(vid)] = dp
-
-        # ------------------------------------------------
-        # 4️⃣ RESPONSE
-        # ------------------------------------------------
-        data = []
-
-        for item in wishlist_items:
-            pid = str(item.product_id)
-
-            product = product_map.get(pid)
-            if not product:
-                continue  # product truly missing (rare)
-
-            display = display_map.get(pid)  # may be same DP for both
-
-            data.append({
-                # Wishlist
-                "wishlist_id": str(item.id),
-
-                # DisplayProduct (same for default + variant)
-                "product_id": pid,
-                "category": display.category if display else [],
-                "gender": display.gender if display else None,
-                "tags": display.tags if display else [],
-                "search_tags": display.search_tags if display else [],
-                "product_name": display.product_name if display else product.name,
-                "product_tagline": display.product_tagline if display else None,
-                "age": display.age if display else 0,
-                "description": display.description if display else None,
-                "highlights": display.highlights if display else [],
-                "rating": display.rating if display else None,
-                "number_of_reviews": display.number_of_reviews if display else 0,
-                "is_active": display.is_active if display else False,
-
-                #  Product (DIFFERENT for default & variant)
-                "sku": product.sku,
-                "name": product.name,
-                "size": product.size,
-                "colour": product.colour,
-                "selling_price": str(product.selling_price),
-                "mrp": str(product.mrp),
-                "gst_percentage": product.gst_percentage,
-                "gst_amount": str(product.gst_amount),
-                "current_stock": product.current_stock,
-                "images": product.images or [],
-                "videos": product.videos or [],
-                "thumbnail_image": product.thumbnail_image,
-            })
-
-
-        return CustomResponse.successResponse(
-            data=data,
-            total=len(data)
-        )
-
-class ProductDetailAPIView(APIView):
-    permission_classes = [AllowAny]
-
-    def get(self, request, id):
-        store = request.store
-
-        #  Fetch DisplayProduct using default_product_id
-        display_product = DisplayProduct.objects.filter(
-            default_product_id=id,
-            is_active=True,
-            store_id=store.id
-
-        ).first()
-
-        if not display_product:
-            return CustomResponse.errorResponse(
-                description="Product not found"
-            )
-
-        #  Fetch Variant Products
-        variants = Product.objects.filter(
-            id__in=display_product.variant_product_id or []
-        )
-
-        variant_data = []
-        for v in variants:
-            variant_data.append({
-                "id": str(v.id),
-                "sku": v.sku,
-                "name": v.name,
-                "size": v.size,
-                "colour": v.colour,
-                "mrp": v.mrp,
-                "selling_price": v.selling_price,
-                "mrp_others": v.mrp_others,
-                "selling_price_others": v.selling_price_others,
-                "inr": v.inr,
-                "gst_percentage": v.gst_percentage,
-                "gst_amount": v.gst_amount,
-                "current_stock": v.current_stock,
-                "images": v.images,
-                "videos": v.videos,
-                "thumbnail_image": v.thumbnail_image,
-            })
-
-        return CustomResponse.successResponse(
-            data={
-                #  DISPLAY PRODUCT
-                "id": str(display_product.id),
-                "default_product_id": str(display_product.default_product_id),
-                "variant_product_id": display_product.variant_product_id or [],
-                "is_active": display_product.is_active,
-                "category": display_product.category,
-                "gender": display_product.gender,
-                "tags": display_product.tags,
-                "search_tags": display_product.search_tags,
-                "product_name": display_product.product_name,
-                "product_tagline": display_product.product_tagline,
-                "age": display_product.age,
-                "description": display_product.description,
-                "highlights": display_product.highlights,
-                "rating": display_product.rating,
-                "number_of_reviews": display_product.number_of_reviews,
-
-                #  VARIANTS
-                "variants": variant_data
-            },
-            description="Product details fetched successfully"
-        )
-
-#
-# class InitiateOrder(APIView):
-#
-#     permission_classes = [IsAuthenticated]
-#
-#     def post(self, request):
-#         user = request.user
-#         order_id = generate_order_id()
-#         payload = request.data
-#         address = payload.get("address", {})
-#         products = payload.get("products", [])
-#         selling_price = payload.get("selling_price", 0)
-#         coupon_discount = payload.get("coupon_discount", 0)
-#         wallet_paid = payload.get("wallet_paid", 0)
-#         amount = payload.get("amount", 0)
-#         # create record in order table
-#         order = Order()
-#         order.order_id = order_id
-#         order.user_id = user.id
-#         order.address = address
-#         order.selling_price = selling_price
-#         order.coupon_discount = coupon_discount
-#         order.wallet_paid = wallet_paid
-#         order.amount = amount
-#         order.status = OrderStatus.INITIATED
-#         # create record in order_products
-#         for item in products:
-#             o_product = OrderProducts()
-#             o_product.order_id = order_id
-#             product = Product.object.filter(id=item["product_id"]).first()
-#             if not product:
-#                 return CustomResponse().errorResponse(data={}, description="Something wrong with product selection")
-#             product_ratio = product.selling_price / selling_price
-#             product_discount = coupon_discount * product_ratio
-#             product_wallet = wallet_paid * product_ratio
-#             product_online = amount * product_ratio
-#             product_total = product.selling_price * item["qty"]
-#             taxable_amount = product_total - product_discount - product_wallet
-#             base_amount = taxable_amount / (1 + product.gst_percentage)
-#             gst_amount = taxable_amount - base_amount
-#             o_product.product_id = product.id
-#             o_product.sku = product.sku
-#             o_product.qty = item["qty"]
-#             o_product.mrp = item.mrp
-#             o_product.selling_price = product.selling_price
-#             o_product.Apportioned_discount = product_discount
-#             o_product.Apportioned_wallet = product_wallet
-#             o_product.Apportioned_gst = gst_amount
-#             o_product.Apportioned_online = product_online
-#             o_product.save()
-#         order.save()
-#
-#         # create record in payment table
-#         payment = Payment()
-#         payment.order_id = order_id
-#         payment.amount = amount
-#         payment.user_id = user.id
-#         payment.mobile = user.mobile
-#         payment.email = user.email
-#         # contact cashfree
-#         payment_resp = initiateOrder(user, amount, order_id,)
-#         payment.session_id = payment_resp["cf_order_id"]
-#         payment.txn_id = payment_resp["payment_session_id"]
-#         payment.save()
-#         # create record in timeline
-#
-#         timeline = OrderTimeLines()
-#         timeline.order_id = order_id
-#         timeline.status = OrderStatus.INITIATED
-#         timeline.remarks = payload.get("remarks")
-#
-#
-#
-#         # prepare the response
-#         return CustomResponse().successResponse(data=payment_resp, description="Order initiated. Please continue the payment flow")
 
 class InitiateOrder(APIView):
     permission_classes = [IsAuthenticated]
@@ -1141,49 +969,6 @@ class OrderView(APIView):
         )
 
 
-# class BannerListView(APIView):
-#     permission_classes = [AllowAny]
-#
-#     def get(self, request, id=None):
-#         action = request.query_params.get("action")
-#
-#         # BASE QUERY → only active banners
-#         queryset = Banner.objects.filter(is_active=True)
-#
-#         #  ACTION FILTER (optional)
-#         if action is not None:
-#             if action.lower() == "true":
-#                 queryset = queryset.filter(action=True)
-#             elif action.lower() == "false":
-#                 queryset = queryset.filter(action=False)
-#
-#         #  SINGLE BANNER (active only)
-#         if id:
-#             banner = (
-#                 queryset
-#                 .filter(id=id)
-#                 .values()
-#                 .first()
-#             )
-#
-#             if not banner:
-#                 return CustomResponse.errorResponse(
-#                     description="Active banner not found"
-#                 )
-#
-#             return CustomResponse.successResponse(
-#                 data=[banner],
-#                 total=1
-#             )
-#
-#         # LIST BANNERS
-#         banners = queryset.order_by("-created_at").values()
-#         data = list(banners)
-#
-#         return CustomResponse.successResponse(
-#             data=data,
-#             total=len(data)
-#         )
 
 class BannerListView(APIView):
     permission_classes = [AllowAny]
@@ -1403,92 +1188,8 @@ class FlashSaleBannerListView(APIView):
             total=len(data)
         )
 
-# # class CategoryListView(APIView):
-#     permission_classes = [AllowAny]
-#
-#     def get(self, request, id=None):
-#
-#         #  SINGLE CATEGORY (only active)
-#         if id:
-#             category = (
-#                 Category.objects
-#                 .filter(id=id, is_active=True)
-#                 .values()
-#                 .first()
-#             )
-#
-#             if not category:
-#                 return CustomResponse.errorResponse(
-#                     description="Active category not found"
-#                 )
-#
-#             return CustomResponse.successResponse(
-#                 data=[category],
-#                 total=1
-#             )
-#
-#         #  LIST ALL ACTIVE CATEGORIES
-#         categories = (
-#             Category.objects
-#             .filter(is_active=True)
-#             .order_by("-created_at")
-#             .values()
-#         )
-#
-#         data = list(categories)
-#
-#         return CustomResponse.successResponse(
-#             data=data,
-#             total=len(data)
-#         )
-
-class CategoryListView(APIView):
-    permission_classes = [AllowAny]
-
-    def get(self, request, id=None):
-        store = request.store
 
 
-        queryset = Category.objects.filter(is_active=True,store_id=store.id
-)
-
-        # SINGLE CATEGORY
-        if id:
-            category = queryset.filter(id=id).first()
-
-            if not category:
-                return CustomResponse.errorResponse(
-                    description="Active category not found"
-                )
-
-            return CustomResponse.successResponse(
-                data=[{
-                    "id": str(category.id),
-                    "name": category.name,
-                    "icon": category.icon,
-                    "search_tags": category.search_tags,
-                    "is_active": category.is_active,
-
-                }],
-                total=1
-            )
-
-        #  LIST ALL CATEGORIES
-        data = []
-        for category in queryset.order_by("-created_at"):
-            data.append({
-                "id": str(category.id),
-                "name": category.name,
-                "icon": category.icon,
-                "search_tags": category.search_tags,
-                "is_active": category.is_active,
-
-            })
-
-        return CustomResponse.successResponse(
-            data=data,
-            total=len(data)
-        )
 
 
 class AddToCartAPIView(APIView):
@@ -1538,27 +1239,6 @@ class AddToCartAPIView(APIView):
         )
 
 
-#
-# class CartListAPIView(APIView):
-#     permission_classes = [IsAuthenticated]
-#
-#     def get(self, request):
-#         user_id = request.user.id
-#         page = int(request.query_params.get("page", 1))
-#         limit = int(request.query_params.get("limit", 10))
-#         offset = (page - 1) * limit
-#
-#         qs = Cart.objects.filter(user_id=user_id)
-#         total = qs.count()
-#
-#         data = qs.values(
-#             "id", "product_id", "quantity"
-#         )[offset:offset + limit]
-#
-#         return CustomResponse().successResponse(
-#             data=list(data),
-#             total=total
-#         )
 
 
 
@@ -1688,75 +1368,12 @@ class RemoveFromCartAPIView(APIView):
             description="Item removed from cart"
         )
 
-class AddToWishlistAPIView(APIView):
-    permission_classes = [IsAuthenticated]
-
-    def post(self, request):
-        user_id = request.user.id
-        store = request.store
-        product_id = request.data.get("product_id")
-
-        if not product_id:
-            return CustomResponse().errorResponse(
-                description="product_id is required"
-            )
-
-        obj, created = Wishlist.objects.get_or_create(
-            store_id=store.id,
-            user_id=user_id,
-            product_id=product_id
-        )
-
-        if not created:
-            return CustomResponse().successResponse(data={},
-                description="Product already in wishlist"
-            )
-
-        return CustomResponse().successResponse(data={},
-            description="Product added to wishlist"
-        )
-
-
-# class WishlistListAPIView(APIView):
-#     permission_classes = [IsAuthenticated]
-#
-#     def get(self, request):
-#         user_id = request.user.id
-#         page = int(request.query_params.get("page", 1))
-#         limit = int(request.query_params.get("limit", 10))
-#         offset = (page - 1) * limit
-#
-#         qs = Wishlist.objects.filter(user_id=user_id)
-#         total = qs.count()
-#
-#         data = qs.values(
-#             "id", "product_id"
-#         )[offset:offset + limit]
-#
-#         return CustomResponse().successResponse(
-#             data=list(data),
-#             total=total
-#         )
 
 
 
-class RemoveFromWishlistAPIView(APIView):
-    permission_classes = [IsAuthenticated]
 
-    def delete(self, request, id):
-        deleted, _ = Wishlist.objects.filter(
-            id=id,
-            user_id=request.user.id
-        ).delete()
 
-        if not deleted:
-            return CustomResponse().errorResponse(
-                description="Wishlist item not found",
-            )
 
-        return CustomResponse().successResponse(data={},
-            description="Item removed from wishlist"
-        )
 
 
 class MoveWishlistToCartAPIView(APIView):

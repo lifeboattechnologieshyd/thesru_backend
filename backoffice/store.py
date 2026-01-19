@@ -300,7 +300,7 @@ class DisplayProductAPIView(APIView):
             id=default_product_id,
             store=store,
             is_active=True
-        )
+        ).first()
         if not default_product:
             return CustomResponse.errorResponse(
                 description="Invalid product_id provided"
