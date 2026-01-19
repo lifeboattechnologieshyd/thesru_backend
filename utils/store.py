@@ -27,16 +27,7 @@ def generate_lsin(store, brand_code):
         seq, _ = StoreSequence.objects.select_for_update().get_or_create(
             store=store
         )
-
         seq.last_lsin_number += 1
         seq.save(update_fields=["last_lsin_number"])
 
         return f"{brand_code}-{str(seq.last_lsin_number).zfill(6)}"
-
-
-
-
-ALPHANUM = string.ascii_uppercase + string.digits
-
-def generate_alphanumeric_lsin(length=12):
-    return "".join(random.choices(ALPHANUM, k=length))
