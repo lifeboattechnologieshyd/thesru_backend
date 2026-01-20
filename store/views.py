@@ -181,11 +181,11 @@ class ProductListAPIView(APIView):
                     {"id": str(t.id), "name": t.name}
                     for t in v.tags.all()
                 ],
-                "reviews": [{
+                "reviews": {
         "rating": round(v.default_product_avg_rating, 1)
                   if v.default_product_avg_rating else 0,
         "number_of_reviews": v.default_product_total_reviews,
-                }],
+                },
 
 
                 # ---- Default Product (SKU) ----
