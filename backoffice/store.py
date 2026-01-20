@@ -676,10 +676,10 @@ class CategoriesAPIView(APIView):
                 description="Cannot delete category with active subcategories"
             )
 
-        # category.is_active = False
-        # category.updated_by = request.user.mobile
-        # category.save()
-        category.delete()
+        category.is_active = False
+        category.updated_by = request.user.mobile
+        category.save()
+        # category.delete()
 
         return CustomResponse.successResponse(
             data={},
@@ -757,6 +757,118 @@ class TagsAPIView(APIView):
             total=total_count,
             description="Tags fetched successfully"
         )
+    def put(self, request, id=None):
+        store = request.store
+        data = request.data
+
+        if not id:
+            return CustomResponse.errorResponse(
+                description="Tag id is required"
+            )
+
+        # 1. Fetch tag (store-safe)
+        try:
+            tag = Tag.objects.get(id=id, store=store)
+        except Tag.DoesNotExist:
+            return CustomResponse.errorResponse(
+                description="Tag not found"
+            )
+
+        # 2. Name update
+        if "name" in data:
+            name = data.get("name")
+            if not name:
+                return CustomResponse.errorResponse(
+                    description="name cannot be empty"
+                )
+
+            name = name.strip()
+
+            # Unique name per store (exclude self)
+            if Tag.objects.filter(
+                    store=store,
+                    name=name
+            ).exclude(id=tag.id).exists():
+                return CustomResponse.errorResponse(
+                    description="Tag with this name already exists"
+                )
+
+            tag.name = name
+
+            # Auto-update slug if slug not explicitly provided
+            if "slug" not in data:
+                slug = name.lower().replace(" ", "-")
+                if Tag.objects.filter(
+                        store=store,
+                        slug=slug
+                ).exclude(id=tag.id).exists():
+                    return CustomResponse.errorResponse(
+                        description="Tag slug conflict after name change"
+                    )
+                tag.slug = slug
+
+        # 3. Slug update
+        if "slug" in data:
+            slug = data.get("slug")
+            if not slug:
+                return CustomResponse.errorResponse(
+                    description="slug cannot be empty"
+                )
+
+            slug = slug.strip().lower()
+
+            if Tag.objects.filter(
+                    store=store,
+                    slug=slug
+            ).exclude(id=tag.id).exists():
+                return CustomResponse.errorResponse(
+                    description="Tag with this slug already exists"
+                )
+
+            tag.slug = slug
+
+        # 4. is_active update
+        if "is_active" in data:
+            tag.is_active = bool(data.get("is_active"))
+
+        # 5. Audit
+        tag.updated_by = request.user.mobile
+        tag.save()
+
+        return CustomResponse.successResponse(
+            data={},
+            description="Tag updated successfully"
+        )
+    def delete(self, request, id=None):
+        store = request.store
+
+        if not id:
+            return CustomResponse.errorResponse(
+                description="Tag id is required"
+            )
+
+        try:
+            tag = Tag.objects.get(
+                id=id,
+                store=store,
+                is_active=True
+            )
+        except Tag.DoesNotExist:
+            return CustomResponse.errorResponse(
+                description="Tag not found"
+            )
+
+        # Soft delete
+        tag.is_active = False
+        tag.updated_by = request.user.mobile
+        tag.save(update_fields=["is_active", "updated_by"])
+
+        return CustomResponse.successResponse(
+            data={},
+            description="Tag deleted successfully"
+        )
+
+
 
 class BannerAPIView(APIView):
     permission_classes = [IsAuthenticated]
