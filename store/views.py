@@ -181,6 +181,12 @@ class ProductListAPIView(APIView):
                     {"id": str(t.id), "name": t.name}
                     for t in v.tags.all()
                 ],
+                "reviews": [{
+        "rating": round(v.default_product_avg_rating, 1)
+                  if v.default_product_avg_rating else 0,
+        "number_of_reviews": v.default_product_total_reviews,
+                }],
+
 
                 # ---- Default Product (SKU) ----
                 "default_product": {
@@ -195,9 +201,7 @@ class ProductListAPIView(APIView):
                     "gst_amount": str(p.gst_amount) if p.gst_amount else None,
                     "current_stock": p.current_stock,
                     "thumbnail": thumbnail_media[0] if thumbnail_media else None,
-                    "rating": round(v.default_product_avg_rating, 1)
-                    if v.default_product_avg_rating else 0,
-                    "number_of_reviews": v.default_product_total_reviews,
+
                 }
             })
 
