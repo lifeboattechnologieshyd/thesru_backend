@@ -1607,7 +1607,7 @@ class StoreAPIView(APIView):
     # ---------------- CREATE STORE ----------------
     def post(self, request):
         data = request.data
-        required_fields = ["name", "mobile", "address", "logo"]
+        required_fields = ["name", "mobile", "address", "logo","product_code"]
         clients = request.data.get("clients")
         for field in required_fields:
             if not data.get(field):
@@ -1623,7 +1623,8 @@ class StoreAPIView(APIView):
                 mobile=data.get("mobile"),
                 address=data.get("address"),
                 logo=data.get("logo"),
-                created_by="SUPERADMIN"
+                created_by="SUPERADMIN",
+                product_code = data.get("product_code")
             )
             User.objects.create(
                 mobile=store.mobile,

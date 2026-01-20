@@ -36,6 +36,7 @@ class Store(AuditModel):
     client_secret = models.CharField(null=False, unique=True)
     webhook = models.CharField(max_length=100)
     url = models.CharField(max_length=100)
+    product_code = models.CharField(max_length=3,null=True)
 
     class Meta:
         db_table = "store"
