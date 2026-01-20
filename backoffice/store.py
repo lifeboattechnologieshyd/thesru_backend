@@ -223,8 +223,8 @@ class ProductAPIView(APIView):
                 "stock": p.current_stock,
                 "created_at": p.created_at,
 
-                "rating": round(p.avg_rating or 0, 1),
-                "number_of_reviews": p.review_count,
+                # "rating": round(p.avg_rating or 0, 1),
+                # "number_of_reviews": p.review_count,
             })
 
         return CustomResponse.successResponse(

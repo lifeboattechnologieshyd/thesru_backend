@@ -7,6 +7,7 @@ from django.db import IntegrityError
 from django.db.models import Q
 from decimal import Decimal
 
+from django.db.models.aggregates import Count, Avg
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated,AllowAny
 
@@ -78,10 +79,23 @@ class ProductListAPIView(APIView):
         page_size = min(int(params.get("page_size", 10)), 50)
 
         # ---------- Base queryset ----------
+        # queryset = ProductVariant.objects.filter(
+        #     store=store,
+        #     is_active=True
+        # )
         queryset = ProductVariant.objects.filter(
             store=store,
             is_active=True
+        ).select_related(
+            "default_product"
+        ).annotate(
+            default_product_avg_rating=Avg("default_product__reviews__rating"),
+            default_product_total_reviews=Count(
+                "default_product__reviews", distinct=True
+            ),
         )
+
+
 
         # ---------- Category filter (M2M) ----------
         if categories:
@@ -180,7 +194,10 @@ class ProductListAPIView(APIView):
                     "gst_percentage": p.gst_percentage,
                     "gst_amount": str(p.gst_amount) if p.gst_amount else None,
                     "current_stock": p.current_stock,
-                    "thumbnail": thumbnail_media[0] if thumbnail_media else None
+                    "thumbnail": thumbnail_media[0] if thumbnail_media else None,
+                    "rating": round(v.default_product_avg_rating, 1)
+                    if v.default_product_avg_rating else 0,
+                    "number_of_reviews": v.default_product_total_reviews,
                 }
             })
 
