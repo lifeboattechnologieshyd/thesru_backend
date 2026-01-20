@@ -5,6 +5,7 @@ from django.db.models import Q
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import transaction
 from django.db import IntegrityError
+from django.db.models.aggregates import Avg
 from rest_framework.views import APIView
 from django.utils import timezone
 from django.db.models import Count, Sum
@@ -193,15 +194,18 @@ class ProductAPIView(APIView):
         store = request.store
 
         page = int(request.query_params.get("page", 1))
-        page_size = int(request.query_params.get("page_size", 20))
-        page_size = min(page_size, 100)
-
+        page_size = min(int(request.query_params.get("page_size", 20)), 100)
         offset = (page - 1) * page_size
 
-        queryset = Product.objects.filter(
-            store=store,
-            is_active=True
-        ).order_by("-created_at")
+        queryset = (
+            Product.objects
+            .filter(store_id=store.id, is_active=True)
+            .annotate(
+                avg_rating=Avg("reviews__rating"),
+                review_count=Count("reviews")
+            )
+            .order_by("-created_at")
+        )
 
         total_count = queryset.count()
         products = queryset[offset: offset + page_size]
@@ -217,7 +221,10 @@ class ProductAPIView(APIView):
                 "mrp": p.mrp,
                 "selling_price": p.selling_price,
                 "stock": p.current_stock,
-                "created_at": p.created_at
+                "created_at": p.created_at,
+
+                "rating": round(p.avg_rating or 0, 1),
+                "number_of_reviews": p.review_count,
             })
 
         return CustomResponse.successResponse(
@@ -226,41 +233,104 @@ class ProductAPIView(APIView):
             description="Products fetched successfully"
         )
 
+    @transaction.atomic
     def put(self, request, id=None):
+        store = request.store
+        data = request.data
+
         if not id:
-            return CustomResponse().errorResponse(description="Product id is required")
+            return CustomResponse.errorResponse(
+                description="Product id is required"
+            )
 
-        product = Product.objects.filter(id=id).first()
-        if not product:
-            return CustomResponse().errorResponse(description="Product not found")
+        # 1. Fetch product (store-safe)
+        try:
+            product = Product.objects.get(
+                id=id,
+                store=store,
+                is_active=True
+            )
+        except Product.DoesNotExist:
+            return CustomResponse.errorResponse(
+                description="Product not found"
+            )
 
-        for field in [
-            "name", "size", "colour", "mrp", "selling_price","selling_price_others","mrp_others","inr"
-            "gst_percentage", "gst_amount", "current_stock",
-            "images", "videos", "thumbnail_image"
-        ]:
-            if field in request.data:
-                setattr(product, field, request.data.get(field))
+        # 2. SKU update (if allowed)
+        if "sku" in data:
+            sku = data.get("sku")
+            if not sku:
+                return CustomResponse.errorResponse(
+                    description="sku cannot be empty"
+                )
 
+            sku = sku.strip()
+
+            if Product.objects.filter(
+                    sku=sku
+            ).exclude(id=product.id).exists():
+                return CustomResponse.errorResponse(
+                    description="SKU already exists"
+                )
+
+            product.sku = sku
+
+        # 3. Allowed field updates
+        updatable_fields = [
+            "name",
+            "size",
+            "colour",
+            "mrp",
+            "selling_price",
+            "gst_percentage",
+            "gst_amount",
+            "current_stock",
+            "is_active"
+        ]
+
+        for field in updatable_fields:
+            if field in data:
+                setattr(product, field, data.get(field))
+
+        # 4. Audit
+        product.updated_by = request.user.mobile
         product.save()
 
-        return CustomResponse().successResponse(
-            data={}, description="Product updated successfully"
+        return CustomResponse.successResponse(
+            data={},
+            description="Product updated successfully"
         )
 
+
+    @transaction.atomic
     def delete(self, request, id=None):
+        store = request.store
+
         if not id:
-            return CustomResponse().errorResponse(description="Product id is required")
+            return CustomResponse.errorResponse(
+                description="Product id is required"
+            )
 
-        product = Product.objects.filter(id=id).first()
-        if not product:
-            return CustomResponse().errorResponse(description="Product not found")
+        try:
+            product = Product.objects.get(
+                id=id,
+                store=store,
+                is_active=True
+            )
+        except Product.DoesNotExist:
+            return CustomResponse.errorResponse(
+                description="Product not found"
+            )
 
-        product.delete()
+        # Soft delete
+        product.is_active = False
+        product.updated_by = request.user.mobile
+        product.save(update_fields=["is_active", "updated_by"])
 
-        return CustomResponse().successResponse(
-            data={}, description="Product deleted successfully"
+        return CustomResponse.successResponse(
+            data={},
+            description="Product deleted successfully"
         )
+
 
 
 
@@ -472,6 +542,135 @@ class DisplayProductAPIView(APIView):
             })
 
         return CustomResponse().successResponse(data=results, total=total_count)
+    @transaction.atomic
+    def put(self, request, id=None):
+        store = request.store
+        data = request.data
+
+        if not id:
+            return CustomResponse.errorResponse(
+                description="display product id is required"
+            )
+
+        # 1️⃣ Fetch variant (store-safe)
+        try:
+            variant = ProductVariant.objects.get(
+                id=id,
+                store=store,
+                is_active=True
+            )
+        except ProductVariant.DoesNotExist:
+            return CustomResponse.errorResponse(
+                description="Display product not found"
+            )
+
+        #  Update basic fields
+        for field in [
+            "display_name",
+            "description",
+            "highlights",
+            "gender",
+            "search_tags",
+            "is_active"
+        ]:
+            if field in data:
+                setattr(variant, field, data.get(field))
+
+        #  Update default product
+        if "default_product_id" in data:
+            default_product_id = data.get("default_product_id")
+            if not default_product_id:
+                return CustomResponse.errorResponse(
+                    description="default_product_id cannot be empty"
+                )
+
+            default_product = Product.objects.filter(
+                id=default_product_id,
+                store=store,
+                is_active=True
+            ).first()
+
+            if not default_product:
+                return CustomResponse.errorResponse(
+                    description="Invalid default_product_id"
+                )
+
+            variant.default_product = default_product
+
+        # 4️⃣ Update products (replace list)
+        if "product_ids" in data:
+            product_ids = data.get("product_ids", [])
+            products = Product.objects.filter(
+                id__in=product_ids,
+                store=store,
+                is_active=True
+            )
+
+            if products.count() != len(product_ids):
+                return CustomResponse.errorResponse(
+                    description="Invalid product_ids provided"
+                )
+
+            variant.products.set(products)
+
+        # 5️⃣ Update categories
+        if "category_ids" in data:
+            category_ids = data.get("category_ids", [])
+            categories = Category.objects.filter(
+                id__in=category_ids,
+                store=store,
+                is_active=True
+            )
+            variant.categories.set(categories)
+
+        # 6️⃣ Update tags
+        if "tag_ids" in data:
+            tag_ids = data.get("tag_ids", [])
+            tags = Tag.objects.filter(
+                id__in=tag_ids,
+                store=store,
+                is_active=True
+            )
+            variant.tags.set(tags)
+
+        # 7️⃣ Audit
+        variant.updated_by = request.user.mobile
+        variant.save()
+
+        return CustomResponse.successResponse(
+            data={},
+            description="Display product updated successfully"
+        )
+    @transaction.atomic
+    def delete(self, request, id=None):
+        store = request.store
+
+        if not id:
+            return CustomResponse.errorResponse(
+                description="display product id is required"
+            )
+
+        try:
+            variant = ProductVariant.objects.get(
+                id=id,
+                store=store,
+                is_active=True
+            )
+        except ProductVariant.DoesNotExist:
+            return CustomResponse.errorResponse(
+                description="Display product not found"
+            )
+
+        variant.is_active = False
+        variant.updated_by = request.user.mobile
+        variant.save(update_fields=["is_active", "updated_by"])
+
+        return CustomResponse.successResponse(
+            data={},
+            description="Display product deleted successfully"
+        )
+
+
 
 
 
@@ -1549,6 +1748,8 @@ class WebBannerAPIView(APIView):
         WebBanner.objects.create(
             store_id=store.id,
             screen = data.get("screen"),
+            title = data.get("title"),
+            description = data.get("description"),
             image = data.get("image"),
             is_active = data.get("is_active"),
             priority = data.get("priority"),

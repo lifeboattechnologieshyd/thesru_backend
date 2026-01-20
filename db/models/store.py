@@ -221,6 +221,8 @@ class WebBanner(AuditModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     store_id = models.UUIDField()
     screen = models.CharField(max_length=20,choices=BannerScreen.choices)
+    title = models.CharField(max_length=100,null=True)
+    description = models.CharField(max_length=1000,null=True)
     image = models.CharField(max_length=300, null=True)
     is_active = models.BooleanField(default=True)
     priority = models.PositiveIntegerField(default=1)
