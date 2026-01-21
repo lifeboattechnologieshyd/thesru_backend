@@ -79,21 +79,21 @@ class ProductListAPIView(APIView):
         page_size = min(int(params.get("page_size", 10)), 50)
 
         # ---------- Base queryset ----------
-        # queryset = ProductVariant.objects.filter(
-        #     store=store,
-        #     is_active=True
-        # )
         queryset = ProductVariant.objects.filter(
             store=store,
             is_active=True
-        ).select_related(
-            "default_product"
-        ).annotate(
-            default_product_avg_rating=Avg("default_product__reviews__rating"),
-            default_product_total_reviews=Count(
-                "default_product__reviews", distinct=True
-            ),
         )
+        # queryset = ProductVariant.objects.filter(
+        #     store=store,
+        #     is_active=True
+        # ).select_related(
+        #     "default_product"
+        # ).annotate(
+        #     default_product_avg_rating=Avg("default_product__reviews__rating"),
+        #     default_product_total_reviews=Count(
+        #         "default_product__reviews", distinct=True
+        #     ),
+        # )
 
 
 
@@ -181,11 +181,11 @@ class ProductListAPIView(APIView):
                     {"id": str(t.id), "name": t.name}
                     for t in v.tags.all()
                 ],
-                "reviews": {
-        "rating": round(v.default_product_avg_rating, 1)
-                  if v.default_product_avg_rating else 0,
-        "number_of_reviews": v.default_product_total_reviews,
-                },
+                "rating": float(v.rating),
+                "number_of_reviews": v.number_of_reviews,
+
+
+
 
 
                 # ---- Default Product (SKU) ----
