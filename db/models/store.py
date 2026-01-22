@@ -374,13 +374,13 @@ class Payment(AuditModel):
     order = models.ForeignKey(
         Order,
         on_delete=models.CASCADE,
-        related_name="payments="
+        related_name="payments"
     )
     gateway = models.CharField(
         max_length=20,
         default="cashfree"
     )
-    order_id = models.CharField(max_length=20, null=False) #cf_order_id
+    cf_order_id = models.CharField(max_length=20, null=False) #cf_order_id
     session_id = models.CharField(max_length=200, null=False)
     amount = models.DecimalField(decimal_places=2, max_digits=10, default=0)
     status = models.CharField(choices=PaymentStatus.choices)

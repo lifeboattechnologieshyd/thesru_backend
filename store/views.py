@@ -11,8 +11,8 @@ from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated,AllowAny
 
 from django.conf import settings
-from db.models import AddressMaster, PinCode, Product, Product, Order, OrderProducts, Payment, OrderTimeLines, \
-    Banner, Category, Cart, Wishlist, WebBanner, FlashSaleBanner, CashFree, Store, ProductReviews, ContactMessage, Tag
+from db.models import AddressMaster, PinCode, Product, Order, OrderProducts, Payment, OrderTimeLines, \
+    Banner, Category, Cart, Wishlist, WebBanner, FlashSaleBanner, ProductReviews, ContactMessage, Tag
 from enums.store import OrderStatus, PaymentStatus
 from mixins.drf_views import CustomResponse
 from utils.store import generate_order_number
@@ -586,7 +586,7 @@ class InitiateOrder(APIView):
 
 
                 payment.session_id = payment_resp["payment_session_id"]
-                payment.txn_id = payment_resp["cf_order_id"]
+                payment.cf_order_id = payment_resp["cf_order_id"]
                 payment.save(update_fields=["session_id", "order_id"])
 
             return CustomResponse().successResponse(
