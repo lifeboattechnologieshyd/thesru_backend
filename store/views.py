@@ -849,17 +849,101 @@ class OrderedProducts(APIView):
 class OrderView(APIView):
     permission_classes = [IsAuthenticated]
 
+    STATUS_FILTER_MAP = {
+        "ONGOING": [
+            OrderStatus.INITIATED,
+            OrderStatus.PLACED,
+            OrderStatus.CONFIRMED,
+            OrderStatus.PACKED,
+            OrderStatus.SHIPPED,
+            OrderStatus.OUT_FOR_DELIVERY,
+        ],
+        "DELIVERED": [
+            OrderStatus.DELIVERED,
+        ],
+        "CANCELLED": [
+            OrderStatus.CANCELLED,
+            OrderStatus.FAILED,
+            OrderStatus.UNFULFILLED,
+        ],
+    }
+
+
     def get(self, request):
+        store = request.store
         user = request.user
-        status = request.query_params.get("status")
-        orders_qs = Order.objects.filter(user_id=user.id).order_by("-created_at")
-        if status:
-            orders_qs = orders_qs.filter(status=status)
-        orders = list(orders_qs.values())
-        return CustomResponse().successResponse(
-            data=orders,
-            total=len(orders)
-        )
+        status_filter = request.query_params.get("status")
+        orders_qs = Order.objects.filter(
+            store=store,
+            user=user
+        ).order_by("-created_at")
+        # ---------- Status filter ----------
+        if status_filter:
+            status_filter = status_filter.upper()
+            if status_filter not in self.STATUS_FILTER_MAP:
+                return CustomResponse.errorResponse(
+                    description="Invalid status filter"
+                )
+
+            orders_qs = orders_qs.filter(
+                status__in=self.STATUS_FILTER_MAP[status_filter]
+            )
+            # ---------- Prefetch order items ----------
+            orders_qs = orders_qs.prefetch_related(
+                "items__product"
+            )
+
+            data = []
+
+            for order in orders_qs:
+                items = []
+
+                for item in order.items.all():
+                    product = item.product
+
+                    items.append({
+                        "order_product_id": str(item.id),
+                        "product_id": str(product.id),
+                        "sku": item.sku,
+
+                        "name": product.name,
+                        "colour": product.colour,
+                        "size": product.size,
+
+                        "qty": item.qty,
+                        "selling_price": str(item.selling_price),
+                        "mrp": str(item.mrp),
+                        "total_price": str(item.selling_price * item.qty),
+
+                        "rating": float(item.rating),
+                        "reviewed": item.review
+                    })
+
+                data.append({
+                    "order": {
+                        "order_id": str(order.id),
+                        "order_number": order.order_number,
+                        "status": order.status,
+
+                        "subtotal": str(order.subtotal),
+                        "coupon_discount": str(order.coupon_discount),
+                        "amount": str(order.amount),
+
+                        "wallet_paid": str(order.wallet_paid),
+                        "paid_online": str(order.paid_online),
+                        "cash_on_delivery": str(order.cash_on_delivery),
+
+                        "created_at": order.created_at,
+                        "address": order.address
+                    },
+                    "items": items
+                })
+
+            return CustomResponse.successResponse(
+                data=data,
+                description="Orders fetched successfully"
+            )
+
 
 
 
