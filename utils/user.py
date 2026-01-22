@@ -83,3 +83,20 @@ def send_otp_to_mobile(otp, mobile):
     except Exception as e:
         print("Error sending OTP SMS:", str(e))
         return False
+
+
+from django.conf import settings
+
+def get_storage_path_from_url(url):
+    if not url:
+        return None
+
+    media_url = settings.MEDIA_URL.rstrip("/")
+
+    if url.startswith(media_url):
+        return url.replace(media_url, "", 1).lstrip("/")
+
+    if "/media/" in url:
+        return url.split("/media/", 1)[1]
+
+    return None
