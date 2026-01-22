@@ -514,11 +514,11 @@ class InitiateOrder(APIView):
 
         subtotal = Decimal("0.00")
         for item in cart_items:
-            if item.product.current_stock < item.qty:
+            if item.product.current_stock < item.quantity:
                 return CustomResponse.errorResponse(
                     f"{item.product.name} is out of stock"
                 )
-            subtotal += item.product.selling_price * item.qty
+            subtotal += item.product.selling_price * item.quantity
         coupon_discount = Decimal("0.00")
         # todo : validatae coupon if applied
         total_amount = subtotal - coupon_discount
@@ -543,7 +543,6 @@ class InitiateOrder(APIView):
                     user=user,
                     order_number=order_number,
                     address=data.get("address"),
-                    subtotal=subtotal,
                     coupon_discount=coupon_discount,
                     amount=total_amount,
                     wallet_paid=Decimal("0.00"),
@@ -556,11 +555,11 @@ class InitiateOrder(APIView):
                         order=order,
                         product=item.product,
                         sku=item.product.sku,
-                        qty=item.qty,
+                        qty=item.quantity,
                         mrp=item.product.mrp,
                         selling_price=item.product.selling_price,
                         apportioned_discount=Decimal("0.00"), # coupon discount if any
-                        apportioned_online=item.product.selling_price * item.qty,
+                        apportioned_online=item.product.selling_price * item.quantity,
                         apportioned_wallet=Decimal("0.00"), # wallet paid if any
                         apportioned_gst=item.product.gst_amount
                     )
