@@ -166,7 +166,8 @@ STORAGES = {
     },
 }
 
-
+DATA_UPLOAD_MAX_MEMORY_SIZE = 4294967296  # 4GB
+FILE_UPLOAD_MAX_MEMORY_SIZE = 4294967296  # 4GB
 #############################
 #       STATIC FILES        #
 #############################
