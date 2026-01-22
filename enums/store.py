@@ -27,16 +27,16 @@ class PaymentStatus(models.TextChoices):
     PENDING = "PENDING"
 
 class OrderStatus(models.TextChoices):
-    INITIATED = "Initiated"
-    PLACED = "Placed"
-    FAILED = "Failed"
-    CONFIRMED = "Confirmed"
-    PACKED = "Packed" # after this address change for this order won't be there  from here on
-    SHIPPED = "Shipped" # shipping details like partner name, url, id, expected_delivery_date,
-    OUT_FOR_DELIVERY = "Outfordelivery" # we are not using this.
-    DELIVERED = "Delivered" # manual for now
-    RETURN_REQUESTED = "Returnrequested"
-    RETURNED = "Returned"
-    REFUNDED = "Refunded"
-    UNFULFILLED = "Unfulfilled"
-    CANCELLED = "Cancelled"
+    INITIATED = "INITIATED"
+    PLACED = "CREATED"
+    FAILED = "FAILED"
+    CONFIRMED = "CONFIRMED"
+    PACKED = "PACKED" # after this address change for this order won't be there  from here on
+    SHIPPED = "SHIPPED" # shipping details like partner name, url, id, expected_delivery_date,
+    OUT_FOR_DELIVERY = "OUT_FOR_DELIVERY" # we are not using this.
+    DELIVERED = "DELIVERED" # manual for now
+    RETURN_REQUESTED = "RETURN_REQUESTED"
+    RETURNED = "RETURNED"
+    REFUNDED = "REFUNDED"
+    UNFULFILLED = "UNFULFILLED"
+    CANCELLED = "CANCELLED"

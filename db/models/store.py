@@ -279,9 +279,17 @@ class PinCode(AuditModel):
 
 class Order(AuditModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    store_id = models.UUIDField()
-    user_id = models.UUIDField()
-    order_id = models.CharField(unique=True, max_length=50, null=False)
+    store = models.ForeignKey(
+        Store,
+        on_delete=models.CASCADE,
+        related_name="orders"
+    )
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name="orders"
+    )
+    order_number = models.CharField(unique=True, max_length=50, null=False)
     address = models.JSONField()
     mrp = models.DecimalField(decimal_places=2, max_digits=10)
     selling_price = models.DecimalField(decimal_places=2, max_digits=10)
@@ -290,7 +298,7 @@ class Order(AuditModel):
     wallet_paid = models.DecimalField(decimal_places=2, max_digits=10, default=0)
     paid_online = models.DecimalField(decimal_places=2, max_digits=10, default=0)
     cash_on_delivery = models.DecimalField(decimal_places=2, max_digits=10, default=0)
-    status = models.CharField(choices=OrderStatus.choices)
+    status = models.CharField(choices=OrderStatus.choices, max_length=30, default=OrderStatus.INITIATED)
 
     class Meta:
         db_table = "order"

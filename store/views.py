@@ -221,12 +221,10 @@ class ProductDetailAPIView(APIView):
                 "images": [m.url for m in p.media.all()],
                 "is_active": p.is_active
             }
-
+        products = [serialize_product(current)]
+        products += [serialize_product(p) for p in related_products]
         return CustomResponse.successResponse(
-            data={
-                "product": serialize_product(current),
-                "variants": [serialize_product(p) for p in related_products]
-            },
+            data=products,
             description="Product details fetched successfully"
         )
 class AddToWishlistAPIView(APIView):
@@ -504,7 +502,6 @@ class InitiateOrder(APIView):
         user = request.user
         payload = request.data
         store = request.store
-
 
         order_id = generate_order_id()
         address = payload.get("address", {})
@@ -1240,7 +1237,8 @@ class CartListAPIView(APIView):
                 "search_tags": p.search_tags,
 
                 "images": [m.url for m in p.media.all()],
-                "is_active": p.is_active
+                "is_active": p.is_active,
+                "quantity": w.quantity
             })
         return CustomResponse.successResponse(
             data=data,
@@ -1265,9 +1263,15 @@ class UpdateCartAPIView(APIView):
                 description="Valid quantity is required"
             )
 
+        product = Product.objects.filter(id=id).first()
+        if not product:
+            return CustomResponse().errorResponse(
+                description="Product not found"
+            )
+
         try:
             cart_item = Cart.objects.get(
-                id=id,
+                product=product,
                 user=request.user
             )
         except Cart.DoesNotExist:
@@ -1287,8 +1291,14 @@ class RemoveFromCartAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
     def delete(self, request, id):
+
+        product = Product.objects.filter(id=id).first()
+        if not product:
+            return CustomResponse().errorResponse(
+                description="Product not found"
+            )
         deleted, _ = Cart.objects.filter(
-            id=id,
+            product=product,
             user=request.user
         ).delete()
 

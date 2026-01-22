@@ -33,7 +33,7 @@ urlpatterns = [
     path("web/banner/<str:id>",WebBannerListView.as_view()),
     path("flash/sale/banner/<str:id>",FlashSaleBannerListView.as_view()),
 
-    path("initiateorder", InitiateOrder.as_view()),
+    path("order/initiate", InitiateOrder.as_view()),
     path("payment/status/update",PaymentStatusAPIView.as_view()),
     path("paymentWebhook", Webhook.as_view()),
 
