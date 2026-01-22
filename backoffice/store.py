@@ -17,7 +17,7 @@ from rest_framework.permissions import IsAuthenticated, AllowAny
 from urllib3 import request
 
 from config.settings.common import DEBUG
-from db.models import Category, Product, ProductVariant, Banner, Inventory, PinCode, Coupon, Store, WebBanner, \
+from db.models import Category, Product,  Banner, Inventory, PinCode, Coupon, Store, WebBanner, \
     FlashSaleBanner, Order, User, Cart, OrderProducts, UserOTP, StoreClient, UserSession, ProductMedia, Tag
 from enums.store import InventoryType, OrderStatus
 from mixins.drf_views import CustomResponse
