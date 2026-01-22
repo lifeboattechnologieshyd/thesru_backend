@@ -146,7 +146,8 @@ class ProductListAPIView(APIView):
                     for t in p.tags.all()
                 ],
                 "search_tags": p.search_tags,
-
+                "gst_percentage": p.gst_percentage,
+                "gst_amount": p.gst_amount,
                 "images": [m.url for m in p.media.all()],
                 "is_active": p.is_active
             })
@@ -217,7 +218,8 @@ class ProductDetailAPIView(APIView):
                     for t in p.tags.all()
                 ],
                 "search_tags": p.search_tags,
-
+                "gst_percentage": p.gst_percentage,
+                "gst_amount": p.gst_amount,
                 "images": [m.url for m in p.media.all()],
                 "is_active": p.is_active
             }
@@ -350,7 +352,8 @@ class WishlistListAPIView(APIView):
                     for t in p.tags.all()
                 ],
                 "search_tags": p.search_tags,
-
+                "gst_percentage": p.gst_percentage,
+                "gst_amount": p.gst_amount,
                 "images": [m.url for m in p.media.all()],
                 "is_active": p.is_active
             })
@@ -1235,7 +1238,8 @@ class CartListAPIView(APIView):
                     for t in p.tags.all()
                 ],
                 "search_tags": p.search_tags,
-
+                "gst_percentage": p.gst_percentage,
+                "gst_amount": p.gst_amount,
                 "images": [m.url for m in p.media.all()],
                 "is_active": p.is_active,
                 "quantity": w.quantity
