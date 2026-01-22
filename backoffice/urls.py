@@ -1,6 +1,6 @@
 from django.urls import path
 
-from backoffice.store import ProductAPIView, DisplayProductAPIView, CategoriesAPIView, BannerAPIView, InventoryAPIView, \
+from backoffice.store import ProductAPIView, CategoriesAPIView, BannerAPIView, InventoryAPIView, \
     PinCodeAPIView, StoreAPIView, WebBannerAPIView, FlashSaleBannerAPIView, OrderStatsAPIView, \
     CartListView, OrderListAPIView, AbandonedOrderListAPIView, Login, SendOTP, TagsAPIView
 
@@ -13,17 +13,9 @@ urlpatterns = [
     path("store/<str:id>", StoreAPIView.as_view()),
 
     path("product", ProductAPIView.as_view()),
-    path("product/<str:id>", ProductAPIView.as_view()),
-
-    path("product-variants",DisplayProductAPIView.as_view()),
-    path("product-variants/<str:id>",DisplayProductAPIView.as_view()),
-
+    # path("product-variants",DisplayProductAPIView.as_view()),
     path("category",CategoriesAPIView.as_view()),
-    path("category/<str:id>",CategoriesAPIView.as_view()),
     path("tag",TagsAPIView.as_view()),
-    path("tag/<str:id>",TagsAPIView.as_view()),
-
-
 
     path("banner",BannerAPIView.as_view()),
     path("banner/<str:id>",BannerAPIView.as_view()),

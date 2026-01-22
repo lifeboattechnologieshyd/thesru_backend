@@ -69,28 +69,77 @@ class Product(AuditModel):
         on_delete=models.CASCADE,
         related_name="products"
     )
-    sku = models.CharField(max_length=20,unique=True)
-    name = models.CharField(max_length=100)
-    size = models.CharField(max_length=50,null=True)
-    colour = models.CharField(max_length=50,null=True)
-    is_active = models.BooleanField(default=True)
-    mrp = models.DecimalField(decimal_places=2, max_digits=10)
-    selling_price = models.DecimalField(decimal_places=2, max_digits=10)
+    # 👇 LSIN = Product family / PDP identifier
+    lsin = models.CharField(
+        max_length=20,
+        db_index=True,
+        help_text="Lifeboat Standard Identification Number"
+    )
+    # 👇 Group identifier for variants
+    group_code = models.CharField(
+        max_length=30,
+        db_index=True,
+        help_text="Product family code (same for all variants)"
+    )
+    # SKU identity
+    sku = models.CharField(max_length=30, unique=True)
 
-    gst_percentage = models.CharField(max_length=50,null=True)
-    gst_amount = models.DecimalField(decimal_places=2, max_digits=10)
+    # Display
+    name = models.CharField(max_length=150)
+    colour = models.CharField(max_length=50)
+    size = models.CharField(max_length=50, null=True, blank=True)
+
+    # Pricing
+    mrp = models.DecimalField(max_digits=10, decimal_places=2)
+    selling_price = models.DecimalField(max_digits=10, decimal_places=2)
+
+    gst_percentage = models.DecimalField(
+        max_digits=5, decimal_places=2, null=True, blank=True
+    )
+    gst_amount = models.DecimalField(
+        max_digits=10, decimal_places=2, null=True, blank=True
+    )
+
+    # Inventory
     current_stock = models.PositiveIntegerField(default=0)
 
+    # Discovery / PDP
+    description = models.TextField(null=True, blank=True)
+    highlights = models.TextField(null=True, blank=True)
+
+    categories = models.ManyToManyField(
+        Category,
+        related_name="display_products",
+        blank=True
+    )
+
+    tags = models.ManyToManyField(
+        Tag,
+        related_name="display_products",
+        blank=True
+    )
+    search_tags = ArrayField(models.CharField(max_length=50),null=True)
+    is_active = models.BooleanField(default=True)
+    rating = models.DecimalField(
+        max_digits=3,
+        decimal_places=2,
+        default=0.0
+    )
+    total_rating = models.PositiveIntegerField(default=0)
+    number_of_reviews = models.PositiveIntegerField(default=0)
+
     class Meta:
-        db_table = "product"
-        ordering = ["-created_at"]
+        db_table = "products"
+        unique_together = ("store", "group_code", "sku")
         indexes = [
             models.Index(fields=["store", "is_active"]),
-            models.Index(fields=["sku"]),
+            models.Index(fields=["store", "group_code"]),
+            models.Index(fields=["name"]),
         ]
 
     def __str__(self):
-        return self.sku
+        return f"{self.name} - {self.colour} ({self.sku})"
+
 class ProductMedia(AuditModel):
     IMAGE = "image"
     VIDEO = "video"
@@ -113,69 +162,6 @@ class ProductMedia(AuditModel):
     class Meta:
         db_table = "product_media"
         ordering = ["position"]
-
-
-class ProductVariant(AuditModel):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    lsin = models.CharField(
-        max_length=12,
-        db_index=True,
-        help_text="Lifeboat standard identification number. Business-facing display product ID"
-    )
-
-    store = models.ForeignKey(
-        Store,
-        on_delete=models.CASCADE,
-        related_name="display_products"
-    )
-    default_product = models.ForeignKey(
-        Product,
-        on_delete=models.PROTECT,
-        related_name="as_default_variant"
-    )
-
-    products = models.ManyToManyField(
-        Product,
-        related_name="variant_groups",
-        help_text="All SKU products belonging to this display product"
-    )
-
-    categories = models.ManyToManyField(
-        Category,
-        related_name="display_products",
-        blank=True
-    )
-
-    tags = models.ManyToManyField(
-        Tag,
-        related_name="display_products",
-        blank=True
-    )
-    is_active = models.BooleanField(default=True)
-    gender = models.CharField(max_length=20,null=True)
-    search_tags = ArrayField(models.CharField(max_length=50),null=True)
-    display_name = models.CharField(max_length=200,null=True)
-    display_info = models.CharField(max_length=200,null=True)
-    description = models.TextField(null=True)
-    highlights = models.TextField(null=True)
-    rating = models.DecimalField(
-        max_digits=3,
-        decimal_places=2,
-        default=0.0
-    )
-    total_rating = models.PositiveIntegerField(default=0)
-    number_of_reviews = models.PositiveIntegerField(default=0)
-
-    class Meta:
-        db_table = "product_variants"
-        indexes = [
-            models.Index(fields=["store", "is_active"]),
-        ]
-        unique_together = ("store", "lsin")
-
-
-    def __str__(self):
-        return self.display_name
 
 
 class Inventory(AuditModel):
@@ -314,7 +300,7 @@ class OrderProducts(AuditModel):
     store_id = models.UUIDField()
     order_id = models.CharField(max_length=50, null=False)
     product = models.ForeignKey(
-        ProductVariant,
+        Product,
         null=True,
         on_delete=models.PROTECT,
         related_name="order_items"
@@ -389,7 +375,13 @@ class CashFree(AuditModel):
 
 class Cart(AuditModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    store_id = models.UUIDField()
+    store = models.ForeignKey(
+        Store,
+        null=True,
+        on_delete=models.CASCADE,
+        related_name="cart_items"
+
+    )
     product = models.ForeignKey(
         Product,
         null=True,
@@ -397,21 +389,31 @@ class Cart(AuditModel):
         related_name="cart_items"
     )
     quantity = models.PositiveIntegerField()
-    user_id = models.UUIDField()
+    user = models.ForeignKey(
+        User,
+        null=True,
+        on_delete=models.CASCADE,
+        related_name="cart_items"
+    )
+    is_active = models.BooleanField(default=True)
+
 
     class Meta:
         db_table = "cart"
-        # unique_together = ("user_id", "product_id")
-        # indexes = [
-        #     models.Index(fields=["user_id"]),
-        #     models.Index(fields=["product_id"]),
-        # ]
+        unique_together = (
+            "store",
+            "user",
+            "product"
+        )
+        indexes = [
+            models.Index(fields=["store", "user", "is_active"]),
+        ]
 
 class Wishlist(AuditModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     store = models.ForeignKey(Store, on_delete=models.CASCADE)
     product = models.ForeignKey(
-        ProductVariant,
+        Product,
         null=True,
         on_delete=models.CASCADE,
         related_name="wishlist_items"
@@ -435,15 +437,18 @@ class Wishlist(AuditModel):
 
 class ProductReviews(AuditModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    store_id = models.UUIDField()
+    store = models.ForeignKey(Store, on_delete=models.CASCADE)
     product = models.ForeignKey(
         Product,
         null=True,
         on_delete=models.CASCADE,
         related_name="reviews"
     )
-    user_id = models.UUIDField(null=False)
-    username = models.CharField(max_length=30,null=False, default="System")
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name="reviews"
+    )
     rating = models.PositiveIntegerField()
     review = models.CharField(max_length=1000, null=True, default="")
 

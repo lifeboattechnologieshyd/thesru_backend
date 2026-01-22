@@ -7,12 +7,11 @@ from django.db import IntegrityError
 from django.db.models import Q
 from decimal import Decimal
 
-from django.db.models.aggregates import Count, Avg
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated,AllowAny
 
 from django.conf import settings
-from db.models import AddressMaster, PinCode, Product, ProductVariant, Order, OrderProducts, Payment, OrderTimeLines, \
+from db.models import AddressMaster, PinCode, Product, Product, Order, OrderProducts, Payment, OrderTimeLines, \
     Banner, Category, Cart, Wishlist, WebBanner, FlashSaleBanner, CashFree, Store, ProductReviews, ContactMessage, Tag
 from enums.store import OrderStatus, PaymentStatus
 from mixins.drf_views import CustomResponse
@@ -67,147 +66,95 @@ class ProductListAPIView(APIView):
 
     def get(self, request):
         store = request.store
-        params = request.query_params
-        # ---------- Query params ----------
-        categories = params.get("category")  # comma-separated UUIDs
-        gender = params.get("gender")
-        tags = params.get("tags")  # comma-separated UUIDs
-        min_price = params.get("min_price")
-        max_price = params.get("max_price")
 
-        page = int(params.get("page", 1))
-        page_size = min(int(params.get("page_size", 10)), 50)
+        # ---------- Query params ----------
+        search = request.query_params.get("search")
+        category_id = request.query_params.get("category")
+        tags = request.query_params.get("tags")
+
+        page = int(request.query_params.get("page", 1))
+        page_size = int(request.query_params.get("page_size", 12))
 
         # ---------- Base queryset ----------
-        queryset = ProductVariant.objects.filter(
+        queryset = Product.objects.filter(
             store=store,
             is_active=True
-        )
-        # queryset = ProductVariant.objects.filter(
-        #     store=store,
-        #     is_active=True
-        # ).select_related(
-        #     "default_product"
-        # ).annotate(
-        #     default_product_avg_rating=Avg("default_product__reviews__rating"),
-        #     default_product_total_reviews=Count(
-        #         "default_product__reviews", distinct=True
-        #     ),
-        # )
-
-
-
-        # ---------- Category filter (M2M) ----------
-        if categories:
-            category_ids = []
-            for c in categories.split(","):
-                try:
-                    category_ids.append(uuid.UUID(c.strip()))
-                except ValueError:
-                    return CustomResponse.errorResponse(
-                        description=f"Invalid category UUID: {c}"
-                    )
-
-            queryset = queryset.filter(categories__id__in=category_ids)
-
-        # ---------- Tag filter (M2M) ----------
-        if tags:
-            tag_ids = []
-            for t in tags.split(","):
-                try:
-                    tag_ids.append(uuid.UUID(t.strip()))
-                except ValueError:
-                    return CustomResponse.errorResponse(
-                        description=f"Invalid tag UUID: {t}"
-                    )
-
-            queryset = queryset.filter(tags__id__in=tag_ids)
-
-        # ---------- Gender ----------
-        if gender:
-            queryset = queryset.filter(gender__iexact=gender)
-
-        # ---------- Optimize relations ----------
-        queryset = queryset.select_related(
-            "default_product"
         ).prefetch_related(
-            "default_product__media",
             "categories",
-            "tags"
-        ).distinct().order_by("-created_at")
+            "tags",
+            "media"
+        ).order_by("-created_at")
 
-        # ---------- Price filter (on default product) ----------
-        if min_price:
+        # ---------- Search ----------
+        if search:
             queryset = queryset.filter(
-                default_product__selling_price__gte=min_price
+                Q(name__icontains=search) |
+                Q(search_tags__icontains=search)
             )
 
-        if max_price:
+        # ---------- Category filter ----------
+        if category_id:
             queryset = queryset.filter(
-                default_product__selling_price__lte=max_price
+                categories__id=category_id
             )
+
+        # ---------- Tags filter ----------
+        if tags:
+            tag_ids = [t.strip() for t in tags.split(",") if t.strip()]
+            queryset = queryset.filter(
+                tags__id__in=tag_ids
+            )
+
+        queryset = queryset.distinct()
 
         # ---------- Pagination ----------
         total = queryset.count()
         offset = (page - 1) * page_size
-        variants = queryset[offset: offset + page_size]
+        queryset = queryset[offset: offset + page_size]
 
         # ---------- Response ----------
         data = []
 
-        for v in variants:
-            p = v.default_product
-
-            thumbnail_media = [
-                m.url for m in p.media.all()[:1]
-            ]
-
+        for p in queryset:
             data.append({
-                # ---- ProductVariant ----
-                "product_variant_id": str(v.id),
-                "lsin": v.lsin,
-                "display_name": v.display_name,
-                "description": v.description,
-                "gender": v.gender,
-                "is_active": v.is_active,
-                # ---- Categories ----
+                "id": str(p.id),
+                "lsin": p.lsin,
+                "group_code": p.group_code,
+                "sku": p.sku,
+
+                "name": p.name,
+                "colour": p.colour,
+                "size": p.size,
+
+                "selling_price": str(p.selling_price),
+                "mrp": str(p.mrp),
+                "current_stock": p.current_stock,
+
+                "description": p.description,
+                "highlights": p.highlights,
+
+                "rating": float(p.rating),
+                "total_rating": p.total_rating,
+                "number_of_reviews": p.number_of_reviews,
+
                 "categories": [
                     {"id": str(c.id), "name": c.name}
-                    for c in v.categories.all()
+                    for c in p.categories.all()
                 ],
-
-                # ---- Tags ----
                 "tags": [
                     {"id": str(t.id), "name": t.name}
-                    for t in v.tags.all()
+                    for t in p.tags.all()
                 ],
-                "rating": float(v.rating),
-                "number_of_reviews": v.number_of_reviews,
+                "search_tags": p.search_tags,
 
-
-
-
-
-                # ---- Default Product (SKU) ----
-                "default_product": {
-                    "id": str(p.id),
-                    "sku": p.sku,
-                    "name": p.name,
-                    "size": p.size,
-                    "colour": p.colour,
-                    "selling_price": str(p.selling_price),
-                    "mrp": str(p.mrp),
-                    "gst_percentage": p.gst_percentage,
-                    "gst_amount": str(p.gst_amount) if p.gst_amount else None,
-                    "current_stock": p.current_stock,
-                    "thumbnail": thumbnail_media[0] if thumbnail_media else None,
-
-                }
+                "images": [m.url for m in p.media.all()],
+                "is_active": p.is_active
             })
 
         return CustomResponse.successResponse(
             data=data,
-            total=total
+            total=total,
+            description="Products fetched successfully"
         )
 
 class ProductDetailAPIView(APIView):
@@ -215,84 +162,73 @@ class ProductDetailAPIView(APIView):
 
     def get(self, request, id):
         store = request.store
+
         try:
-            variant = ProductVariant.objects.filter(
-                store=store,
-                id=id,
-                is_active=True
-            ).select_related(
-                "default_product"
-            ).prefetch_related(
-                "products__media",
-                "default_product__media",
+            current = Product.objects.prefetch_related(
                 "categories",
-                "tags"
-            ).get()
-        except ProductVariant.DoesNotExist:
+                "tags",
+                "media"
+            ).get(
+                id=id,
+                store=store,
+                is_active=True
+            )
+        except Product.DoesNotExist:
             return CustomResponse.errorResponse(
                 description="Product not found"
             )
 
-        # ---------- Build variants (products / SKUs) ----------
-        variants_data = []
+        related_products = Product.objects.filter(
+            store=store,
+            lsin=current.lsin,
+            is_active=True
+        ).exclude(
+            id=current.id
+        ).prefetch_related("media")
 
-        for p in variant.products.all():
-            variants_data.append({
+        def serialize_product(p):
+            return {
                 "id": str(p.id),
+                "lsin": p.lsin,
+                "group_code": p.group_code,
                 "sku": p.sku,
+
                 "name": p.name,
-                "size": p.size,
                 "colour": p.colour,
+                "size": p.size,
+
                 "selling_price": str(p.selling_price),
                 "mrp": str(p.mrp),
                 "current_stock": p.current_stock,
-                "media": [
-                    {
-                        "url": m.url,
-                        "type": m.media_type,
-                        "position": m.position
-                    } for m in p.media.all()
-                ]
-            })
 
-        # ---------- Final response ----------
-        response_data = {
-            "lsin": variant.lsin,
-            "display_name": variant.display_name,
-            "description": variant.description,
-            "highlights": variant.highlights,
-            "gender": variant.gender,
-            "rating": variant.rating,
-            "numbef_of_reviews": variant.number_of_reviews,
-            "categories": [
-                {"id": str(c.id), "name": c.name}
-                for c in variant.categories.all()
-            ],
-            "tags": [
-                {"id": str(t.id), "name": t.name}
-                for t in variant.tags.all()
-            ],
-            "default_product": {
-                "id": str(variant.default_product.id),
-                "sku": variant.default_product.sku,
-                "name": variant.default_product.name,
-                "size": variant.default_product.size,
-                "colour": variant.default_product.colour,
-                "selling_price": str(variant.default_product.selling_price),
-                "mrp": str(variant.default_product.mrp),
-                "current_stock": variant.default_product.current_stock,
-                "media": [
-                    {
-                        "url": m.url,
-                        "type": m.media_type,
-                        "position": m.position
-                    } for m in variant.default_product.media.all()
+                "description": p.description,
+                "highlights": p.highlights,
+
+                "rating": float(p.rating),
+                "total_rating": p.total_rating,
+                "number_of_reviews": p.number_of_reviews,
+
+                "categories": [
+                    {"id": str(c.id), "name": c.name}
+                    for c in p.categories.all()
                 ],
-            },
-            "variants": variants_data,
-        }
-        return CustomResponse.successResponse(data=response_data)
+                "tags": [
+                    {"id": str(t.id), "name": t.name}
+                    for t in p.tags.all()
+                ],
+                "search_tags": p.search_tags,
 
+                "images": [m.url for m in p.media.all()],
+                "is_active": p.is_active
+            }
+
+        return CustomResponse.successResponse(
+            data={
+                "product": serialize_product(current),
+                "variants": [serialize_product(p) for p in related_products]
+            },
+            description="Product details fetched successfully"
+        )
 class AddToWishlistAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -307,12 +243,12 @@ class AddToWishlistAPIView(APIView):
             )
 
         try:
-            product_variant = ProductVariant.objects.get(
+            product_variant = Product.objects.get(
                 store=store,
                 id=product_id,
                 is_active=True
             )
-        except ProductVariant.DoesNotExist:
+        except Product.DoesNotExist:
             return CustomResponse.errorResponse(
                 description="product variant not found"
             )
@@ -338,12 +274,12 @@ class RemoveFromWishlistAPIView(APIView):
 
     def delete(self, request, id):
         try:
-            product_variant = ProductVariant.objects.get(
+            product_variant = Product.objects.get(
                 store=request.store,
                 id=id,
                 is_active=True
             )
-        except ProductVariant.DoesNotExist:
+        except Product.DoesNotExist:
             return CustomResponse.errorResponse(
                 description="product variant not found"
             )
@@ -375,9 +311,8 @@ class WishlistListAPIView(APIView):
             is_active=True
         ).select_related(
             "product",
-            "product__default_product"
         ).prefetch_related(
-            "product__default_product__media",
+            "product__media",
             "product__categories",
             "product__tags"
         ).order_by("-created_at")
@@ -385,41 +320,41 @@ class WishlistListAPIView(APIView):
         data = []
 
         for w in wishlists:
-            v = w.product
-            p = v.default_product
-
-            # thumbnail
-            thumbnail = None
-            media_qs = p.media.all()
-            if media_qs:
-                thumbnail = media_qs[0].url
+            p = w.product
 
             data.append({
-                "product_variant_id": str(v.id),
-                "lsin": v.lsin,
-                "display_name": v.display_name,
-                "description": v.description,
-                "gender": v.gender,
-                "is_active": v.is_active,
+                "id": str(p.id),
+                "lsin": p.lsin,
+                "group_code": p.group_code,
+                "sku": p.sku,
 
-                "default_product": {
-                    "id": str(p.id),
-                    "sku": p.sku,
-                    "selling_price": str(p.selling_price),
-                    "mrp": str(p.mrp),
-                    "current_stock": p.current_stock,
-                    "thumbnail": thumbnail
-                },
+                "name": p.name,
+                "colour": p.colour,
+                "size": p.size,
+
+                "selling_price": str(p.selling_price),
+                "mrp": str(p.mrp),
+                "current_stock": p.current_stock,
+
+                "description": p.description,
+                "highlights": p.highlights,
+
+                "rating": float(p.rating),
+                "total_rating": p.total_rating,
+                "number_of_reviews": p.number_of_reviews,
 
                 "categories": [
                     {"id": str(c.id), "name": c.name}
-                    for c in v.categories.all()
+                    for c in p.categories.all()
                 ],
-
                 "tags": [
                     {"id": str(t.id), "name": t.name}
-                    for t in v.tags.all()
-                ]
+                    for t in p.tags.all()
+                ],
+                "search_tags": p.search_tags,
+
+                "images": [m.url for m in p.media.all()],
+                "is_active": p.is_active
             })
 
         return CustomResponse.successResponse(
@@ -1217,12 +1152,10 @@ class AddToCartAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
-        user_id = request.user.id
+        user = request.user
         store = request.store
-
         product_id = request.data.get("product_id")
         quantity = int(request.data.get("quantity", 1))
-
         if not product_id:
             return CustomResponse().errorResponse(
                 description="product_id is required"
@@ -1235,109 +1168,88 @@ class AddToCartAPIView(APIView):
             )
 
         cart_item, created = Cart.objects.get_or_create(
-            store_id=store.id,
-            user_id=user_id,
-            product_id=product_id,
+            store=store,
+            user=user,
+            product=product,
             defaults={"quantity": quantity}
         )
+        if not created:
+            cart_item.quantity += quantity
+            cart_item.save(update_fields=["quantity"])
+        else:
+            cart_item.is_active = True
+            cart_item.save(update_fields=["is_active"])
 
-        new_quantity = quantity if created else cart_item.quantity + quantity
-
-        if new_quantity > product.current_stock:
-            return CustomResponse().errorResponse(
-                description="Insufficient stock"
-            )
-
-        cart_item.quantity = new_quantity
-        cart_item.save()
-
-        return CustomResponse().successResponse(
-            message="Product added to cart",
-            data={
-                "product_id": str(product_id),
-                "quantity": cart_item.quantity
-            }
+        return CustomResponse.successResponse(
+            data={},
+            description="Product added to cart"
         )
-
-
-
-
-
 
 class CartListAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        user_id = request.user.id
         store = request.store
+        user = request.user
 
+        cart_items = Cart.objects.filter(
+            store=store,
+            user=user,
+            is_active=True
+        ).select_related(
+            "product",
+        ).prefetch_related(
+            "product__media",
+            "product__categories",
+            "product__tags"
+        ).order_by("-created_at")
 
-
-        page = int(request.query_params.get("page", 1))
-        limit = int(request.query_params.get("limit", 10))
-
-        if page < 1 or limit < 1:
-            return CustomResponse().errorResponse(
-                description="page and limit must be positive integers"
-            )
-
-        offset = (page - 1) * limit
-
-        qs = Cart.objects.filter(user_id=user_id,store_id=store.id).order_by("-created_at")
-        total = qs.count()
-
-        cart_items = qs[offset: offset + limit]
-
-        product_ids = [
-            uuid.UUID(str(item.product_id))
-            for item in cart_items
-            if item.product_id
-        ]
-
-        products = Product.objects.filter(id__in=product_ids)
-        product_map = {str(p.id): p for p in products}
-
-        # 🔥 AUTO-REMOVE INVALID CART ITEMS
-        invalid_cart_ids = [
-            item.id for item in cart_items
-            if str(item.product_id) not in product_map
-        ]
-
-        if invalid_cart_ids:
-            Cart.objects.filter(id__in=invalid_cart_ids).delete()
-
-        # BUILD RESPONSE (ONLY VALID ITEMS)
         data = []
-        for item in cart_items:
-            product = product_map.get(str(item.product_id))
-            if not product:
-                continue
 
+        for w in cart_items:
+            p = w.product
             data.append({
-                "cart_id": str(item.id),
-                "quantity": item.quantity,
-                "product": {
-                    "id": str(product.id),
-                    "sku": product.sku,
-                    "name": product.name,
-                    "size": product.size,
-                    "colour": product.colour,
-                    "mrp": product.mrp,
-                    "selling_price": product.selling_price,
-                    "inr": product.inr,
-                    "gst_percentage": product.gst_percentage,
-                    "gst_amount": product.gst_amount,
-                    "current_stock": product.current_stock,
-                    "thumbnail_image": product.thumbnail_image,
-                    "images": product.images or [],
-                    "videos": product.videos or [],
-                }
-            })
+                "id": str(p.id),
+                "lsin": p.lsin,
+                "group_code": p.group_code,
+                "sku": p.sku,
 
-        return CustomResponse().successResponse(
+                "name": p.name,
+                "colour": p.colour,
+                "size": p.size,
+
+                "selling_price": str(p.selling_price),
+                "mrp": str(p.mrp),
+                "current_stock": p.current_stock,
+
+                "description": p.description,
+                "highlights": p.highlights,
+
+                "rating": float(p.rating),
+                "total_rating": p.total_rating,
+                "number_of_reviews": p.number_of_reviews,
+
+                "categories": [
+                    {"id": str(c.id), "name": c.name}
+                    for c in p.categories.all()
+                ],
+                "tags": [
+                    {"id": str(t.id), "name": t.name}
+                    for t in p.tags.all()
+                ],
+                "search_tags": p.search_tags,
+
+                "images": [m.url for m in p.media.all()],
+                "is_active": p.is_active
+            })
+        return CustomResponse.successResponse(
             data=data,
-            total=len(data)
+            description="Cart items fetched successfully"
         )
+
+
+
+
 
 
 
@@ -1356,7 +1268,7 @@ class UpdateCartAPIView(APIView):
         try:
             cart_item = Cart.objects.get(
                 id=id,
-                user_id=request.user.id
+                user=request.user
             )
         except Cart.DoesNotExist:
             return CustomResponse().errorResponse(
@@ -1377,7 +1289,7 @@ class RemoveFromCartAPIView(APIView):
     def delete(self, request, id):
         deleted, _ = Cart.objects.filter(
             id=id,
-            user_id=request.user.id
+            user=request.user
         ).delete()
 
         if not deleted:
@@ -1397,50 +1309,6 @@ class RemoveFromCartAPIView(APIView):
 
 
 
-class MoveWishlistToCartAPIView(APIView):
-    permission_classes = [IsAuthenticated]
-
-    def post(self, request):
-        user_id = request.user.id
-        store = request.store
-
-        product_id = request.data.get("product_id")
-
-        if not product_id:
-            return CustomResponse().errorResponse(
-                description="product_id is required"
-            )
-
-        wishlist_exists = Wishlist.objects.filter(
-            user_id=user_id,
-            product_id=product_id,
-            store_id=store.id
-
-        ).exists()
-
-        if not wishlist_exists:
-            return CustomResponse().errorResponse(
-                description="Product not found in wishlist",
-            )
-
-        cart_item, created = Cart.objects.get_or_create(
-            user_id=user_id,
-            product_id=product_id,
-            defaults={"quantity": 1}
-        )
-
-        if not created:
-            cart_item.quantity += 1
-            cart_item.save()
-
-        Wishlist.objects.filter(
-            user_id=user_id,
-            product_id=product_id
-        ).delete()
-
-        return CustomResponse().successResponse(data={},
-            description="Product moved from wishlist to cart"
-        )
 
 
 class CartTotalAPIView(APIView):
@@ -1489,7 +1357,7 @@ class Reviews(APIView):
     def post(self, request):
         payload = request.data
         user = request.user
-        store_id = request.store.id
+        store = request.store
 
         product_id = payload.get("product_id")
         if not product_id:
@@ -1497,16 +1365,15 @@ class Reviews(APIView):
                 description="product_id is required"
             )
 
-        product = DisplayProduct.objects.filter(default_product_id=product_id).first()
+        product = Product.objects.filter(id=product_id).first()
         if not product:
             return CustomResponse().errorResponse(
                 description="We couldn’t find any product with the provided ID."
             )
 
-
         has_purchased = OrderProducts.objects.filter(
             product_id=product.default_product_id,
-            store_id=store_id,
+            store=store,
             order_id__in=[
                 str(order_id) for order_id in
                 Order.objects.filter(user_id=user.id, status='Placed')
@@ -1522,16 +1389,14 @@ class Reviews(APIView):
                 description="You can review this product only after purchasing it."
             )
 
-
-        product_review = ProductReviews.objects.filter(user_id=user.id, product_id=payload["product_id"]).first()
+        product_review = ProductReviews.objects.filter(user=user, product=product).first()
         if product_review:
             return CustomResponse().errorResponse(data={}, description="You have already submitted a review for this product.")
         rating = ProductReviews()
-        rating.product_id = payload.get("product_id","")
+        rating.product = product
         rating.rating = payload.get("rating",5)
-        rating.user_id = user.id
-        rating.username = user.username
-        rating.store_id = request.store.id
+        rating.user = user
+        rating.store = request.store
         rating.review = payload.get("review","")
         rating.save()
         product.number_of_reviews += 1

@@ -2,7 +2,7 @@ from django.urls import path
 
 from store.views import PinListView, AddressAPIView, ProductDetailAPIView, ProductListAPIView, InitiateOrder, OrderView, \
     BannerListView, CategoryListView, AddToCartAPIView, CartListAPIView, UpdateCartAPIView, RemoveFromCartAPIView, \
-    AddToWishlistAPIView, WishlistListAPIView, RemoveFromWishlistAPIView, MoveWishlistToCartAPIView, CartTotalAPIView, \
+    AddToWishlistAPIView, WishlistListAPIView, RemoveFromWishlistAPIView, CartTotalAPIView, \
     FlashSaleBannerListView, WebBannerListView, Webhook, PaymentStatusAPIView, Reviews, ContactMessageAPIView, \
     OrderedProducts, TagsListView
 
@@ -17,6 +17,10 @@ urlpatterns = [
     path("get/wishlist",WishlistListAPIView.as_view()),
     path("remove/wishlist/<str:id>",RemoveFromWishlistAPIView.as_view()),
 
+    path("add/cart", AddToCartAPIView.as_view()),
+    path("get/cart", CartListAPIView.as_view()),
+    path("update/cart/<str:id>", UpdateCartAPIView.as_view()),
+    path("remove/cart/<str:id>", RemoveFromCartAPIView.as_view()),
 
 
     path("pin",PinListView.as_view()),
@@ -36,12 +40,7 @@ urlpatterns = [
     path("order",OrderView.as_view()),
     path("order/products",OrderedProducts.as_view()),
 
-    path("add/cart",AddToCartAPIView.as_view()),
-    path("get/cart",CartListAPIView.as_view()),
-    path("update/cart/<str:id>",UpdateCartAPIView.as_view()),
-    path("remove/cart/<str:id>",RemoveFromCartAPIView.as_view()),
 
-    path("wishlist/to/cart",MoveWishlistToCartAPIView.as_view()),
     path("cart/total",CartTotalAPIView.as_view()),
 
     path("productreview",Reviews.as_view()),
