@@ -925,7 +925,6 @@ class OrderView(APIView):
                         "order_number": order.order_number,
                         "status": order.status,
 
-                        "subtotal": str(order.subtotal),
                         "coupon_discount": str(order.coupon_discount),
                         "amount": str(order.amount),
 
