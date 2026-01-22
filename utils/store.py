@@ -2,7 +2,7 @@ import string
 import time
 import random
 
-from db.models import Order, StoreSequence
+from db.models import Order, StoreSequence, OrderSequence
 
 
 # def generate_order_id():
@@ -31,3 +31,13 @@ def generate_lsin(store, brand_code):
         seq.save(update_fields=["last_lsin_number"])
 
         return f"{brand_code}-{str(seq.last_lsin_number).zfill(6)}"
+
+def generate_order_number(store, prefix):
+    with transaction.atomic():
+        seq, _ = OrderSequence.objects.select_for_update().get_or_create(
+            store=store
+        )
+        seq.order_number += 1
+        seq.save(update_fields=["order_number"])
+
+        return f"{prefix}-{store.id.hex[:4].upper()}-{seq.order_number:08d}"

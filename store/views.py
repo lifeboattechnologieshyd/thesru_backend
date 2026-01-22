@@ -15,8 +15,7 @@ from db.models import AddressMaster, PinCode, Product, Product, Order, OrderProd
     Banner, Category, Cart, Wishlist, WebBanner, FlashSaleBanner, CashFree, Store, ProductReviews, ContactMessage, Tag
 from enums.store import OrderStatus, PaymentStatus
 from mixins.drf_views import CustomResponse
-from utils.store import generate_order_id
-from django.db.models import OuterRef, Subquery
+from utils.store import generate_order_number
 
 
 class CategoryListView(APIView):
@@ -502,144 +501,93 @@ class InitiateOrder(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
-        user = request.user
-        payload = request.data
         store = request.store
+        user = request.user
+        data = request.data
 
-        order_id = generate_order_id()
-        address = payload.get("address", {})
-        products = payload.get("products", [])
-        selling_price = payload.get("selling_price", 0)
-        coupon_discount = payload.get("coupon_discount", 0)
-        wallet_paid = payload.get("wallet_paid", 0)
-        amount = payload.get("amount", 0)
-        mrp = payload.get("mrp", 0)
-        print("DEBUG payload selling_price:", selling_price, type(selling_price))
-        print("DEBUG payload coupon_discount:", coupon_discount, type(coupon_discount))
-        print("DEBUG payload wallet_paid:", wallet_paid, type(wallet_paid))
-        print("DEBUG payload amount:", amount, type(amount))
-        print("DEBUG payload mrp:", mrp, type(mrp))
+        cart_items = Cart.objects.select_related("product").filter(
+            store=store,
+            user=user
+        )
+        if not cart_items.exists():
+            return CustomResponse.errorResponse("Cart is empty")
+
+        subtotal = Decimal("0.00")
+        for item in cart_items:
+            if item.product.current_stock < item.qty:
+                return CustomResponse.errorResponse(
+                    f"{item.product.name} is out of stock"
+                )
+            subtotal += item.product.selling_price * item.qty
+        coupon_discount = Decimal("0.00")
+        # todo : validatae coupon if applied
+        total_amount = subtotal - coupon_discount
 
 
+        order_number = generate_order_number(store, "ORD")
+        # address = data.get("address", {})
+        # products = data.get("products", [])
+        # selling_price = data.get("selling_price", 0)
+        # coupon_discount = data.get("coupon_discount", 0)
+        # wallet_paid = data.get("wallet_paid", 0)
+        # amount = data.get("amount", 0) # to be paid
+        # mrp = data.get("mrp", 0)
 
-        if not products:
-            return CustomResponse().errorResponse(description="Products required")
+        # if not products:
+        #     return CustomResponse().errorResponse(description="Products required")
 
         try:
             with transaction.atomic():
-                print("DEBUG order_id:", order_id, len(str(order_id)))
-
-
-                #  Create Order
                 order = Order.objects.create(
-                    store_id=store.id,
-                    order_id=order_id,
-                    user_id=user.id,
-                    address=address,
-                    selling_price=selling_price,
+                    store=store,
+                    user=user,
+                    order_number=order_number,
+                    address=data.get("address"),
+                    subtotal=subtotal,
                     coupon_discount=coupon_discount,
-                    wallet_paid=wallet_paid,
-                    amount=amount,
-                    mrp = mrp,
-                    status=OrderStatus.INITIATED
+                    amount=total_amount,
+                    wallet_paid=Decimal("0.00"),
+                    status=OrderStatus.INITIATED,
+                    created_by=user.id
                 )
 
-                #  Create Order Products
-                print("PRODUCTS:", products)
-                print("TYPE:", type(products))
-
-                for item in products:
-                    print("ITEM:", item, type(item))
-
-                    product = Product.objects.filter(id=item["product_id"]).first()
-                    if not product:
-                        raise ValueError("Invalid product selected")
-                    print("DEBUG product.selling_price:", product.selling_price, type(product.selling_price))
-                    print("DEBUG product.mrp:", product.mrp, type(product.mrp))
-                    print("DEBUG product.gst_percentage:", product.gst_percentage, type(product.gst_percentage))
-                    print("DEBUG before ratio:",
-                          "product.selling_price =", product.selling_price, type(product.selling_price),
-                          "selling_price =", selling_price, type(selling_price))
-
-
-                    product_ratio = product.selling_price / selling_price
-                    print("DEBUG coupon apportion:",
-                          "coupon_discount =", coupon_discount, type(coupon_discount),
-                          "product_ratio =", product_ratio, type(product_ratio))
-
-                    product_discount = coupon_discount * product_ratio
-                    product_wallet = wallet_paid * product_ratio
-                    product_online = amount * product_ratio
-                    print("DEBUG qty:", item.get("qty"), type(item.get("qty")))
-
-
-                    product_total = product.selling_price * item["qty"]
-                    print("DEBUG product_total:", product_total, type(product_total))
-                    print("DEBUG product_discount:", product_discount, type(product_discount))
-                    print("DEBUG product_wallet:", product_wallet, type(product_wallet))
-
-                    taxable_amount = product_total - product_discount - product_wallet
-                    gst_percentage = Decimal(product.gst_percentage)
-
-                    base_amount = taxable_amount / (Decimal("1") + gst_percentage / Decimal("100"))
-                    gst_amount = taxable_amount - base_amount
-
-
-
+                for item in cart_items:
                     OrderProducts.objects.create(
-                        store_id=store.id,
-                        order_id=order_id,
-                        product=product,
-                        old_product_id=product.id,
-                        sku=product.sku,
-                        qty = int(item.get("qty", 0)),
-                        mrp=product.mrp,
-                        selling_price=product.selling_price,
-                        Apportioned_discount=product_discount,
-                        Apportioned_wallet=product_wallet,
-                        Apportioned_gst=gst_amount,
-                        Apportioned_online=product_online,
-
-
-
+                        order=order,
+                        product=item.product,
+                        sku=item.product.sku,
+                        qty=item.qty,
+                        mrp=item.product.mrp,
+                        selling_price=item.product.selling_price,
+                        apportioned_discount=Decimal("0.00"), # coupon discount if any
+                        apportioned_online=item.product.selling_price * item.qty,
+                        apportioned_wallet=Decimal("0.00"), # wallet paid if any
+                        apportioned_gst=item.product.gst_amount
                     )
 
                 #  Create Order Timeline
                 OrderTimeLines.objects.create(
-                    store_id=store.id,
-                    order_id=order_id,
+                    order=order,
                     status=OrderStatus.INITIATED,
-                    remarks=payload.get("remarks", "Order initiated")
-                )
+                    remarks=data.get("remarks", "Order initiated")
+                ) # after 72hrs INITIATED orders remarks should be changed to auto cancelled.
 
                 #  Create Payment
                 payment = Payment.objects.create(
-                    store_id=store.id,
-                    order_id=order_id,
-                    amount=amount,
-                    user_id=user.id,
-                    mobile=user.mobile,
-                    email=user.email,
+                    store=store,
+                    order=order,
+                    gateway='CASHFREE',
+                    amount=total_amount,
+                    user=user,
                 )
-                cashfree = Store.objects.filter(
-                    id=store.id
-                ).first()
-
-                if not cashfree:
-                    raise ValueError("CashFree configuration not found for this store")
-
-
-
-                payment_resp = initiateOrder(user, amount, order_id,cashfree)
+                payment_resp = initiateOrder(user, total_amount, order, request.store)
                 print("DEBUG cf_order_id:", payment_resp["cf_order_id"], len(payment_resp["cf_order_id"]))
                 print("DEBUG payment_session_id:", payment_resp["payment_session_id"], len(payment_resp["payment_session_id"]))
 
 
                 payment.session_id = payment_resp["payment_session_id"]
                 payment.txn_id = payment_resp["cf_order_id"]
-                payment.save(update_fields=["session_id", "txn_id"])
-
-
+                payment.save(update_fields=["session_id", "order_id"])
 
             return CustomResponse().successResponse(
                 data=payment_resp,
@@ -651,35 +599,35 @@ class InitiateOrder(APIView):
                 description=str(e) or "Failed to initiate order"
             )
 
-def initiateOrder(user, amount, order_id,cashfree):
+def initiateOrder(user, amount, order, store):
     """
     Initiate payment using school-specific CashFree credentials from the database.
     """
-    print("DEBUG CASHFREE CLIENT ID:", cashfree.client_id)
-    print("DEBUG CASHFREE CLIENT SECRET:", cashfree.client_secret)
-    print("DEBUG CASHFREE URL:", cashfree.url)
-    print("DEBUG CASHFREE WEBHOOK:", cashfree.webhook)
+    print("DEBUG CASHFREE CLIENT ID:", store.client_id)
+    print("DEBUG CASHFREE CLIENT SECRET:", store.client_secret)
+    print("DEBUG CASHFREE URL:", store.url)
+    print("DEBUG CASHFREE WEBHOOK:", store.webhook)
 
     # --- Prepare payload ---
     payload = {
         "order_currency": "INR",
         "order_amount": float(amount),
-        "order_id": str(order_id),
+        "order_id": str(order.order_number),
         "customer_details": {
             "customer_id": str(user.id),
             "customer_phone": str(user.mobile),
             "customer_name": str(user.username),
         },
         "order_meta": {
-            "notify_url": cashfree.webhook,
+            "notify_url": store.webhook,
         },
     }
 
     # --- Prepare headers ---
     headers = {
         "x-api-version": settings.CASHFREE_API_VERSION,
-        "x-client-id": cashfree.client_id,
-        "x-client-secret": cashfree.client_secret,
+        "x-client-id": store.client_id,
+        "x-client-secret": store.client_secret,
         "Content-Type": "application/json",
     }
     print("headers",headers)
@@ -688,20 +636,20 @@ def initiateOrder(user, amount, order_id,cashfree):
 
     try:
         # --- Send request to CashFree ---
-        response = requests.post(cashfree.url, json=payload, headers=headers, timeout=15)
+        response = requests.post(store.url, json=payload, headers=headers, timeout=15)
 
 
         # --- Validate response ---
         if response.status_code == 200:
             resp_json = response.json()
-            cf_order_id = resp_json.get("cf_order_id")
+            order_id = resp_json.get("cf_order_id")
             session_id = resp_json.get("payment_session_id")
 
-            if cf_order_id and session_id:
+            if order_id and session_id:
                 return {
-                    "cf_order_id": cf_order_id,
+                    "cf_order_id": order_id,
                     "payment_session_id": session_id,
-                    "order_id":order_id
+                    "order_number":order.order_number
                 }
             else:
                 raise Exception("Could not found cf_order_id and payment_session_id")

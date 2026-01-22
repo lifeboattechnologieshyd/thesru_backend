@@ -305,8 +305,11 @@ class Order(AuditModel):
 
 class OrderProducts(AuditModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    store_id = models.UUIDField()
-    order_id = models.CharField(max_length=50, null=False)
+    order = models.ForeignKey(
+        Order,
+        on_delete=models.CASCADE,
+        related_name="items"
+    )
     product = models.ForeignKey(
         Product,
         null=True,
@@ -317,10 +320,10 @@ class OrderProducts(AuditModel):
     qty = models.PositiveIntegerField(default=0)
     mrp = models.DecimalField(decimal_places=2, max_digits=10)
     selling_price = models.DecimalField(decimal_places=2, max_digits=10)
-    Apportioned_discount = models.DecimalField(decimal_places=2, max_digits=10)
-    Apportioned_wallet = models.DecimalField(decimal_places=2, max_digits=10)
-    Apportioned_online = models.DecimalField(decimal_places=2, max_digits=10)
-    Apportioned_gst = models.DecimalField(decimal_places=2, max_digits=10)
+    apportioned_discount = models.DecimalField(decimal_places=2, max_digits=10)
+    apportioned_wallet = models.DecimalField(decimal_places=2, max_digits=10)
+    apportioned_online = models.DecimalField(decimal_places=2, max_digits=10)
+    apportioned_gst = models.DecimalField(decimal_places=2, max_digits=10)
     rating = models.DecimalField(decimal_places=2, max_digits=10,default=0)
     review = models.BooleanField(default=False)
 
@@ -331,8 +334,11 @@ class OrderProducts(AuditModel):
 
 class OrderTimeLines(AuditModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    store_id = models.UUIDField()
-    order_id = models.CharField(max_length=50, null=False)
+    order = models.ForeignKey(
+        Order,
+        on_delete=models.CASCADE,
+        related_name="timelines"
+    )
     status = models.CharField(max_length=20, null=False)
     remarks = models.CharField(max_length=250, null=True)
 
@@ -355,30 +361,33 @@ class OrderShippingDetails(AuditModel):
 
 class Payment(AuditModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    store_id = models.UUIDField()
-    order_id = models.CharField(max_length=20, null=False)
-    txn_id = models.CharField(max_length=20, null=False) #cf_order_id
+    store = models.ForeignKey(
+        Store,
+        on_delete=models.CASCADE,
+        related_name="payments"
+    )
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name="payments"
+    )
+    order = models.ForeignKey(
+        Order,
+        on_delete=models.CASCADE,
+        related_name="payments="
+    )
+    gateway = models.CharField(
+        max_length=20,
+        default="cashfree"
+    )
+    order_id = models.CharField(max_length=20, null=False) #cf_order_id
     session_id = models.CharField(max_length=200, null=False)
     amount = models.DecimalField(decimal_places=2, max_digits=10, default=0)
     status = models.CharField(choices=PaymentStatus.choices)
-    user_id = models.UUIDField(null=False)
-    mobile = models.CharField(null=False)
-    email = models.CharField(null=True)
 
     class Meta:
         db_table = "payment"
 
-
-class CashFree(AuditModel):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    store_id = models.UUIDField(null=True)
-    client_id = models.CharField(null=False, unique=True)
-    client_secret = models.CharField(null=False, unique=True)
-    webhook = models.CharField(max_length=100)
-    url = models.CharField(max_length=100)
-
-    class Meta:
-        db_table = "cashfree"
 
 
 class Cart(AuditModel):
@@ -473,5 +482,9 @@ class StoreSequence(AuditModel):
     store = models.OneToOneField(Store, on_delete=models.CASCADE)
     last_lsin_number = models.PositiveIntegerField(default=0)
 
+
+class OrderSequence(AuditModel):
+    store = models.OneToOneField(Store, on_delete=models.CASCADE)
+    order_number = models.PositiveIntegerField(default=0)
 
 

@@ -1,4 +1,5 @@
 from datetime import timedelta
+from tokenize import Double
 from unicodedata import category
 
 from django.core.files.storage import default_storage
@@ -155,10 +156,10 @@ class ProductAPIView(APIView):
             return CustomResponse.errorResponse(
                 description="SKU already exists"
             )
-
         # GST calculation (optional)
         gst_percentage = data.get("gst_percentage")
-        gst_amount = data.get("gst_amount")
+        product_cost = ((data["selling_price"]) / (100 + gst_percentage) ) * 100
+        gst_amount = data["selling_price"] - product_cost
         product=Product.objects.create(
             store=store,
             sku=sku,
@@ -173,6 +174,7 @@ class ProductAPIView(APIView):
             is_active=data.get("is_active", True),
             created_by=request.user.mobile
         )
+        #
         # 2️⃣ Attach media (optional)
         media_list = data.get("media", [])
 
