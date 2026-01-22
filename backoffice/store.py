@@ -346,340 +346,340 @@ class ProductAPIView(APIView):
 
 
 
-class DisplayProductAPIView(APIView):
-    permission_classes = [IsAuthenticated]
-
-    @transaction.atomic
-    def post(self, request):
-        data = request.data
-        store = request.store
-
-        if not data.get("default_product_id"):
-            return CustomResponse.errorResponse(
-                description="default_product_id is required"
-            )
-
-        if not data.get("display_name"):
-            return CustomResponse.errorResponse(
-                description="display_name is required"
-            )
-
-        default_product_id = data["default_product_id"]
-        product_ids = data.get("product_ids", [])
-        products = Product.objects.filter(
-            id__in=product_ids,
-            store=store,
-            is_active=True
-        )
-
-        if products.count() != len(product_ids):
-            return CustomResponse.errorResponse(
-                description="Invalid product_ids provided"
-            )
-
-        default_product = Product.objects.filter(
-            id=default_product_id,
-            store=store,
-            is_active=True
-        ).first()
-        if not default_product:
-            return CustomResponse.errorResponse(
-                description="Invalid product_id provided"
-            )
-        lsin = generate_lsin(store, "SRU")
-
-        # Create ProductVariant
-        variant = ProductVariant.objects.create(
-            store=store,
-            default_product=default_product,
-            display_name=data["display_name"].strip(),
-            description=data.get("description"),
-            highlights=data.get("highlights", ""),
-            gender=data.get("gender"),
-            is_active=True,
-            lsin=lsin,
-            search_tags=data.get("search_tags", []),
-            created_by=request.user.mobile
-        )
-
-        # Attach products
-        variant.products.set(products)
-        # 6️⃣ Attach categories (optional)
-        category_ids = data.get("category_ids", [])
-        if category_ids:
-            categories = Category.objects.filter(
-                id__in=category_ids,
-                store=store,
-                is_active=True
-            )
-            variant.categories.set(categories)
-
-        # 7️⃣ Attach tags (optional)
-        tag_ids = data.get("tag_ids", [])
-        if tag_ids:
-            tags = Tag.objects.filter(
-                id__in=tag_ids,
-                store=store,
-                is_active=True
-            )
-            variant.tags.set(tags)
-
-        return CustomResponse.successResponse(
-            data={"product_variant_id": str(variant.id)},
-            description="Product variant created successfully"
-        )
-
-    def get(self, request):
-        store = request.store
-        params = request.query_params
-
-        # 1️⃣ Pagination
-        try:
-            page = int(params.get("page", 1))
-            page_size = int(params.get("page_size", 20))
-        except ValueError:
-            return CustomResponse.errorResponse(
-                description="Invalid pagination parameters"
-            )
-
-        if page < 1:
-            page = 1
-        page_size = min(max(page_size, 1), 100)
-
-        offset = (page - 1) * page_size
-        limit = offset + page_size
-
-        # 2️⃣ Base queryset
-        queryset = ProductVariant.objects.filter(
-            store=store,
-            is_active=True
-        ).select_related(
-            "default_product"
-        ).prefetch_related(
-            "products__media",  # 👈 REQUIRED
-            "categories",
-            "tags"
-        ).distinct().order_by("-created_at")
-
-        # 3️⃣ Optional filters
-        category_id = params.get("category_id")
-        if category_id:
-            queryset = queryset.filter(categories__id=category_id)
-
-        tag_id = params.get("tag_id")
-        if tag_id:
-            queryset = queryset.filter(tags__id=tag_id)
-
-        gender = params.get("gender")
-        if gender:
-            queryset = queryset.filter(gender__iexact=gender)
-
-        search = params.get("search")
-        if search:
-            queryset = queryset.filter(
-                Q(product_name__icontains=search) |
-                Q(product_tag_line__icontains=search)
-            )
-
-
-
-        total_count = queryset.count()
-        variants = queryset[offset:limit]
-
-        # 5️⃣ Build response
-        results = []
-
-        for v in variants:
-
-            # 🔹 Build default product block
-            dp = v.default_product
-            default_product_data = {
-                "id": str(dp.id),
-                "sku": dp.sku,
-                "name": dp.name,
-                "is_active": dp.is_active,
-                "size": dp.size,
-                "colour": dp.colour,
-                "mrp": dp.mrp,
-                "selling_price": dp.selling_price,
-                "gst_percentage": dp.gst_percentage,
-                "gst_amount": dp.gst_amount,
-                "stock": dp.current_stock,
-                "media": [m.url for m in dp.media.all()]
-            }
-
-            # 🔹 Build products list
-            products_data = []
-            for p in v.products.all():
-                products_data.append({
-                "id": str(p.id),
-                "sku": p.sku,
-                "name": p.name,
-                "is_active": p.is_active,
-                "size": p.size,
-                "colour": p.colour,
-                "mrp": p.mrp,
-                "selling_price": p.selling_price,
-                "gst_percentage": p.gst_percentage,
-                "gst_amount": p.gst_amount,
-                "stock": p.current_stock,
-                "media": [m.url for m in p.media.all()]
-                })
-
-            results.append({
-                "id": str(v.id),
-                "display_name": v.display_name,
-                "description": v.description,
-                "gender": v.gender,
-                "is_active": v.is_active,
-                "default_product": default_product_data,
-                "products": products_data,
-                "highlights": v.highlights,
-                "search_tags": v.search_tags,
-                "categories": [
-                    {
-                        "id": str(c.id),
-                        "name": c.name
-                    }
-                    for c in v.categories.all()
-                ],
-                "tags": [
-                    {
-                        "id": str(t.id),
-                        "name": t.name
-                    }
-                    for t in v.tags.all()
-                ]
-            })
-
-        return CustomResponse().successResponse(data=results, total=total_count)
-    @transaction.atomic
-    def put(self, request, id=None):
-        store = request.store
-        data = request.data
-
-        if not id:
-            return CustomResponse.errorResponse(
-                description="display product id is required"
-            )
-
-        # 1️⃣ Fetch variant (store-safe)
-        try:
-            variant = ProductVariant.objects.get(
-                id=id,
-                store=store,
-                is_active=True
-            )
-        except ProductVariant.DoesNotExist:
-            return CustomResponse.errorResponse(
-                description="Display product not found"
-            )
-
-        #  Update basic fields
-        for field in [
-            "display_name",
-            "description",
-            "highlights",
-            "gender",
-            "search_tags",
-            "is_active"
-        ]:
-            if field in data:
-                setattr(variant, field, data.get(field))
-
-        #  Update default product
-        if "default_product_id" in data:
-            default_product_id = data.get("default_product_id")
-            if not default_product_id:
-                return CustomResponse.errorResponse(
-                    description="default_product_id cannot be empty"
-                )
-
-            default_product = Product.objects.filter(
-                id=default_product_id,
-                store=store,
-                is_active=True
-            ).first()
-
-            if not default_product:
-                return CustomResponse.errorResponse(
-                    description="Invalid default_product_id"
-                )
-
-            variant.default_product = default_product
-
-        # 4️⃣ Update products (replace list)
-        if "product_ids" in data:
-            product_ids = data.get("product_ids", [])
-            products = Product.objects.filter(
-                id__in=product_ids,
-                store=store,
-                is_active=True
-            )
-
-            if products.count() != len(product_ids):
-                return CustomResponse.errorResponse(
-                    description="Invalid product_ids provided"
-                )
-
-            variant.products.set(products)
-
-        # 5️⃣ Update categories
-        if "category_ids" in data:
-            category_ids = data.get("category_ids", [])
-            categories = Category.objects.filter(
-                id__in=category_ids,
-                store=store,
-                is_active=True
-            )
-            variant.categories.set(categories)
-
-        # 6️⃣ Update tags
-        if "tag_ids" in data:
-            tag_ids = data.get("tag_ids", [])
-            tags = Tag.objects.filter(
-                id__in=tag_ids,
-                store=store,
-                is_active=True
-            )
-            variant.tags.set(tags)
-
-        # 7️⃣ Audit
-        variant.updated_by = request.user.mobile
-        variant.save()
-
-        return CustomResponse.successResponse(
-            data={},
-            description="Display product updated successfully"
-        )
-    @transaction.atomic
-    def delete(self, request, id=None):
-        store = request.store
-
-        if not id:
-            return CustomResponse.errorResponse(
-                description="display product id is required"
-            )
-
-        try:
-            variant = ProductVariant.objects.get(
-                id=id,
-                store=store,
-                is_active=True
-            )
-        except ProductVariant.DoesNotExist:
-            return CustomResponse.errorResponse(
-                description="Display product not found"
-            )
-
-        variant.is_active = False
-        variant.updated_by = request.user.mobile
-        variant.save(update_fields=["is_active", "updated_by"])
-
-        return CustomResponse.successResponse(
-            data={},
-            description="Display product deleted successfully"
-        )
+# class DisplayProductAPIView(APIView):
+#     permission_classes = [IsAuthenticated]
+#
+#     @transaction.atomic
+#     def post(self, request):
+#         data = request.data
+#         store = request.store
+#
+#         if not data.get("default_product_id"):
+#             return CustomResponse.errorResponse(
+#                 description="default_product_id is required"
+#             )
+#
+#         if not data.get("display_name"):
+#             return CustomResponse.errorResponse(
+#                 description="display_name is required"
+#             )
+#
+#         default_product_id = data["default_product_id"]
+#         product_ids = data.get("product_ids", [])
+#         products = Product.objects.filter(
+#             id__in=product_ids,
+#             store=store,
+#             is_active=True
+#         )
+#
+#         if products.count() != len(product_ids):
+#             return CustomResponse.errorResponse(
+#                 description="Invalid product_ids provided"
+#             )
+#
+#         default_product = Product.objects.filter(
+#             id=default_product_id,
+#             store=store,
+#             is_active=True
+#         ).first()
+#         if not default_product:
+#             return CustomResponse.errorResponse(
+#                 description="Invalid product_id provided"
+#             )
+#         lsin = generate_lsin(store, "SRU")
+#
+#         # Create ProductVariant
+#         variant = ProductVariant.objects.create(
+#             store=store,
+#             default_product=default_product,
+#             display_name=data["display_name"].strip(),
+#             description=data.get("description"),
+#             highlights=data.get("highlights", ""),
+#             gender=data.get("gender"),
+#             is_active=True,
+#             lsin=lsin,
+#             search_tags=data.get("search_tags", []),
+#             created_by=request.user.mobile
+#         )
+#
+#         # Attach products
+#         variant.products.set(products)
+#         # 6️⃣ Attach categories (optional)
+#         category_ids = data.get("category_ids", [])
+#         if category_ids:
+#             categories = Category.objects.filter(
+#                 id__in=category_ids,
+#                 store=store,
+#                 is_active=True
+#             )
+#             variant.categories.set(categories)
+#
+#         # 7️⃣ Attach tags (optional)
+#         tag_ids = data.get("tag_ids", [])
+#         if tag_ids:
+#             tags = Tag.objects.filter(
+#                 id__in=tag_ids,
+#                 store=store,
+#                 is_active=True
+#             )
+#             variant.tags.set(tags)
+#
+#         return CustomResponse.successResponse(
+#             data={"product_variant_id": str(variant.id)},
+#             description="Product variant created successfully"
+#         )
+#
+#     def get(self, request):
+#         store = request.store
+#         params = request.query_params
+#
+#         # 1️⃣ Pagination
+#         try:
+#             page = int(params.get("page", 1))
+#             page_size = int(params.get("page_size", 20))
+#         except ValueError:
+#             return CustomResponse.errorResponse(
+#                 description="Invalid pagination parameters"
+#             )
+#
+#         if page < 1:
+#             page = 1
+#         page_size = min(max(page_size, 1), 100)
+#
+#         offset = (page - 1) * page_size
+#         limit = offset + page_size
+#
+#         # 2️⃣ Base queryset
+#         queryset = ProductVariant.objects.filter(
+#             store=store,
+#             is_active=True
+#         ).select_related(
+#             "default_product"
+#         ).prefetch_related(
+#             "products__media",  # 👈 REQUIRED
+#             "categories",
+#             "tags"
+#         ).distinct().order_by("-created_at")
+#
+#         # 3️⃣ Optional filters
+#         category_id = params.get("category_id")
+#         if category_id:
+#             queryset = queryset.filter(categories__id=category_id)
+#
+#         tag_id = params.get("tag_id")
+#         if tag_id:
+#             queryset = queryset.filter(tags__id=tag_id)
+#
+#         gender = params.get("gender")
+#         if gender:
+#             queryset = queryset.filter(gender__iexact=gender)
+#
+#         search = params.get("search")
+#         if search:
+#             queryset = queryset.filter(
+#                 Q(product_name__icontains=search) |
+#                 Q(product_tag_line__icontains=search)
+#             )
+#
+#
+#
+#         total_count = queryset.count()
+#         variants = queryset[offset:limit]
+#
+#         # 5️⃣ Build response
+#         results = []
+#
+#         for v in variants:
+#
+#             # 🔹 Build default product block
+#             dp = v.default_product
+#             default_product_data = {
+#                 "id": str(dp.id),
+#                 "sku": dp.sku,
+#                 "name": dp.name,
+#                 "is_active": dp.is_active,
+#                 "size": dp.size,
+#                 "colour": dp.colour,
+#                 "mrp": dp.mrp,
+#                 "selling_price": dp.selling_price,
+#                 "gst_percentage": dp.gst_percentage,
+#                 "gst_amount": dp.gst_amount,
+#                 "stock": dp.current_stock,
+#                 "media": [m.url for m in dp.media.all()]
+#             }
+#
+#             # 🔹 Build products list
+#             products_data = []
+#             for p in v.products.all():
+#                 products_data.append({
+#                 "id": str(p.id),
+#                 "sku": p.sku,
+#                 "name": p.name,
+#                 "is_active": p.is_active,
+#                 "size": p.size,
+#                 "colour": p.colour,
+#                 "mrp": p.mrp,
+#                 "selling_price": p.selling_price,
+#                 "gst_percentage": p.gst_percentage,
+#                 "gst_amount": p.gst_amount,
+#                 "stock": p.current_stock,
+#                 "media": [m.url for m in p.media.all()]
+#                 })
+#
+#             results.append({
+#                 "id": str(v.id),
+#                 "display_name": v.display_name,
+#                 "description": v.description,
+#                 "gender": v.gender,
+#                 "is_active": v.is_active,
+#                 "default_product": default_product_data,
+#                 "products": products_data,
+#                 "highlights": v.highlights,
+#                 "search_tags": v.search_tags,
+#                 "categories": [
+#                     {
+#                         "id": str(c.id),
+#                         "name": c.name
+#                     }
+#                     for c in v.categories.all()
+#                 ],
+#                 "tags": [
+#                     {
+#                         "id": str(t.id),
+#                         "name": t.name
+#                     }
+#                     for t in v.tags.all()
+#                 ]
+#             })
+#
+#         return CustomResponse().successResponse(data=results, total=total_count)
+#     @transaction.atomic
+#     def put(self, request, id=None):
+#         store = request.store
+#         data = request.data
+#
+#         if not id:
+#             return CustomResponse.errorResponse(
+#                 description="display product id is required"
+#             )
+#
+#         # 1️⃣ Fetch variant (store-safe)
+#         try:
+#             variant = ProductVariant.objects.get(
+#                 id=id,
+#                 store=store,
+#                 is_active=True
+#             )
+#         except ProductVariant.DoesNotExist:
+#             return CustomResponse.errorResponse(
+#                 description="Display product not found"
+#             )
+#
+#         #  Update basic fields
+#         for field in [
+#             "display_name",
+#             "description",
+#             "highlights",
+#             "gender",
+#             "search_tags",
+#             "is_active"
+#         ]:
+#             if field in data:
+#                 setattr(variant, field, data.get(field))
+#
+#         #  Update default product
+#         if "default_product_id" in data:
+#             default_product_id = data.get("default_product_id")
+#             if not default_product_id:
+#                 return CustomResponse.errorResponse(
+#                     description="default_product_id cannot be empty"
+#                 )
+#
+#             default_product = Product.objects.filter(
+#                 id=default_product_id,
+#                 store=store,
+#                 is_active=True
+#             ).first()
+#
+#             if not default_product:
+#                 return CustomResponse.errorResponse(
+#                     description="Invalid default_product_id"
+#                 )
+#
+#             variant.default_product = default_product
+#
+#         # 4️⃣ Update products (replace list)
+#         if "product_ids" in data:
+#             product_ids = data.get("product_ids", [])
+#             products = Product.objects.filter(
+#                 id__in=product_ids,
+#                 store=store,
+#                 is_active=True
+#             )
+#
+#             if products.count() != len(product_ids):
+#                 return CustomResponse.errorResponse(
+#                     description="Invalid product_ids provided"
+#                 )
+#
+#             variant.products.set(products)
+#
+#         # 5️⃣ Update categories
+#         if "category_ids" in data:
+#             category_ids = data.get("category_ids", [])
+#             categories = Category.objects.filter(
+#                 id__in=category_ids,
+#                 store=store,
+#                 is_active=True
+#             )
+#             variant.categories.set(categories)
+#
+#         # 6️⃣ Update tags
+#         if "tag_ids" in data:
+#             tag_ids = data.get("tag_ids", [])
+#             tags = Tag.objects.filter(
+#                 id__in=tag_ids,
+#                 store=store,
+#                 is_active=True
+#             )
+#             variant.tags.set(tags)
+#
+#         # 7️⃣ Audit
+#         variant.updated_by = request.user.mobile
+#         variant.save()
+#
+#         return CustomResponse.successResponse(
+#             data={},
+#             description="Display product updated successfully"
+#         )
+#     @transaction.atomic
+#     def delete(self, request, id=None):
+#         store = request.store
+#
+#         if not id:
+#             return CustomResponse.errorResponse(
+#                 description="display product id is required"
+#             )
+#
+#         try:
+#             variant = ProductVariant.objects.get(
+#                 id=id,
+#                 store=store,
+#                 is_active=True
+#             )
+#         except ProductVariant.DoesNotExist:
+#             return CustomResponse.errorResponse(
+#                 description="Display product not found"
+#             )
+#
+#         variant.is_active = False
+#         variant.updated_by = request.user.mobile
+#         variant.save(update_fields=["is_active", "updated_by"])
+#
+#         return CustomResponse.successResponse(
+#             data={},
+#             description="Display product deleted successfully"
+#         )
 
 
 
