@@ -40,7 +40,7 @@ urlpatterns = [
 
 
     path("orders",OrderView.as_view()),
-    path("order/products",OrderedProducts.as_view()),
+    # path("order/products",OrderedProducts.as_view()),
 
     path("cart/total",CartTotalAPIView.as_view()),
 

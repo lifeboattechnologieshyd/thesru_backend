@@ -663,6 +663,8 @@ def initiateOrder(user, amount, order, store):
 
 SYSTEM_UPDATED_BY = "CASHFREE_WEBHOOK"
 
+def remove_cart_items(user, store):
+    Cart.objects.filter(user=user, store=store).delete()
 
 class Webhook(APIView):
     permission_classes = [AllowAny]
@@ -710,7 +712,7 @@ class Webhook(APIView):
                     order.updated_by = SYSTEM_UPDATED_BY
                     order.save(update_fields=["status", "paid_online", "updated_by"])
 
-
+                    remove_cart_items(order.user, order.store)
                 elif event_type == "PAYMENT_FAILED_WEBHOOK":
                     payment.status = PaymentStatus.FAILED
                     order.updated_by = SYSTEM_UPDATED_BY
@@ -788,14 +790,21 @@ class PaymentStatusAPIView(APIView):
             if verified_status == PaymentStatus.COMPLETED:
                 order.status = OrderStatus.PLACED
                 order.paid_online = payment.amount
+                order.save(update_fields=["status", "paid_online"])
+
+                remove_cart_items(order.user, order.store)
+
 
             elif verified_status == PaymentStatus.FAILED:
                 order.status = OrderStatus.FAILED
+                order.save(update_fields=["status", "paid_online"])
+
 
             elif verified_status == PaymentStatus.CANCELLED:
                 order.status = OrderStatus.CANCELLED
+                order.save(update_fields=["status", "paid_online"])
 
-            order.save(update_fields=["status", "paid_online"])
+
 
         return CustomResponse().successResponse(
             data={
@@ -1410,7 +1419,7 @@ class Reviews(APIView):
             store=store,
             order_id__in=[
                 str(order_id) for order_id in
-                Order.objects.filter(user_id=user.id, status='Placed')
+                Order.objects.filter(user_id=user.id, status=OrderStatus.PLACED)
                 .values_list("order_id", flat=True)
             ]
         ).exists()
