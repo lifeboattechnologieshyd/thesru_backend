@@ -69,13 +69,13 @@ class Product(AuditModel):
         on_delete=models.CASCADE,
         related_name="products"
     )
-    # 👇 LSIN = Product family / PDP identifier
+    #  LSIN = Product family / PDP identifier
     lsin = models.CharField(
         max_length=20,
         db_index=True,
         help_text="Lifeboat Standard Identification Number"
     )
-    # 👇 Group identifier for variants
+    #  Group identifier for variants
     group_code = models.CharField(
         max_length=30,
         db_index=True,
