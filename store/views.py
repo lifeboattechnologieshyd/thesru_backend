@@ -1322,7 +1322,7 @@ class Reviews(APIView):
         has_purchased = OrderProducts.objects.filter(
             product_id=product.id,
             # store=store,
-            order__in=Order.objects.filter(user=user, status='Placed')
+            order__in=Order.objects.filter(user=user, status='CREATED')
         ).exists()
 
         if not has_purchased:
