@@ -1321,7 +1321,7 @@ class Reviews(APIView):
 
         has_purchased = OrderProducts.objects.filter(
             product_id=product.id,
-            store=store,
+            # store=store,
             order__in=Order.objects.filter(user=user, status='Placed')
         ).exists()
 
