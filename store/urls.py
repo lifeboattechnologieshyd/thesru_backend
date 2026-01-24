@@ -4,7 +4,7 @@ from store.views import PinListView, AddressAPIView, ProductDetailAPIView, Produ
     BannerListView, CategoryListView, AddToCartAPIView, CartListAPIView, UpdateCartAPIView, RemoveFromCartAPIView, \
     AddToWishlistAPIView, WishlistListAPIView, RemoveFromWishlistAPIView, CartTotalAPIView, \
     FlashSaleBannerListView, WebBannerListView, Webhook, PaymentStatusAPIView, Reviews, ContactMessageAPIView, \
-    OrderedProducts, TagsListView
+    TagsListView
 
 urlpatterns = [
     path("category", CategoryListView.as_view()),
@@ -27,23 +27,17 @@ urlpatterns = [
     path("paymentWebhook", Webhook.as_view()),
 
 
-    path("pin",PinListView.as_view()),
-    path("address",AddressAPIView.as_view()),
-    path("address/<str:id>",AddressAPIView.as_view()),
-
-    path("banner",BannerListView.as_view()),
-    path("web/banner",WebBannerListView.as_view()),
-    path("flash/sale/banner",FlashSaleBannerListView.as_view()),
-    path("web/banner/<str:id>",WebBannerListView.as_view()),
-    path("flash/sale/banner/<str:id>",FlashSaleBannerListView.as_view()),
-
-
-
     path("orders",OrderView.as_view()),
-    path("order/products",OrderedProducts.as_view()),
-
     path("cart/total",CartTotalAPIView.as_view()),
 
     path("productreview",Reviews.as_view()),
     path("contact/message",ContactMessageAPIView.as_view()),
+
+    path("pin", PinListView.as_view()),
+    path("address", AddressAPIView.as_view()),
+    path("address/<str:id>", AddressAPIView.as_view()),
+
+    path("banner", BannerListView.as_view()),
+    path("web/banner", WebBannerListView.as_view()),
+    path("flash/sale/banner", FlashSaleBannerListView.as_view()),
 ]

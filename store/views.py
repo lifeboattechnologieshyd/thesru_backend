@@ -526,16 +526,6 @@ class InitiateOrder(APIView):
 
 
         order_number = generate_order_number(store, "ORD")
-        # address = data.get("address", {})
-        # products = data.get("products", [])
-        # selling_price = data.get("selling_price", 0)
-        # coupon_discount = data.get("coupon_discount", 0)
-        # wallet_paid = data.get("wallet_paid", 0)
-        # amount = data.get("amount", 0) # to be paid
-        # mrp = data.get("mrp", 0)
-
-        # if not products:
-        #     return CustomResponse().errorResponse(description="Products required")
 
         try:
             with transaction.atomic():
@@ -736,7 +726,6 @@ class Webhook(APIView):
             )
 
         except Exception as e:
-            # IMPORTANT: Always return 200
             print("Webhook exception:", str(e))
             return CustomResponse().successResponse(data={},
                 description="Webhook received"
@@ -752,9 +741,8 @@ class PaymentStatusAPIView(APIView):
 
         order_number = data.get("order_number")
         cf_order_id = data.get("cf_order_id")
-        frontend_status = data.get("status")
 
-        if not order_number or not frontend_status:
+        if not order_number:
             return CustomResponse().errorResponse(
                 description="order_number and status are required"
             )
@@ -800,7 +788,6 @@ class PaymentStatusAPIView(APIView):
         return CustomResponse().successResponse(
             data={
                 "order_number": order_number,
-                "frontend_status": frontend_status,
                 "cashfree_status": cf_order_status,
                 "final_payment_status": payment.status,
                 "order_status": order.status,
@@ -1011,10 +998,7 @@ class WebBannerListView(APIView):
 
     def get(self, request, id=None):
         store = request.store
-
-
         action = request.query_params.get("action")
-
         queryset = WebBanner.objects.filter(is_active=True,store_id=store.id)
 
         #  ACTION FILTER
@@ -1023,28 +1007,6 @@ class WebBannerListView(APIView):
                 queryset = queryset.filter(action=True)
             elif action.lower() == "false":
                 queryset = queryset.filter(action=False)
-
-        #  SINGLE BANNER
-        if id:
-            banner = queryset.filter(id=id).first()
-            if not banner:
-                return CustomResponse.errorResponse(
-                    description="Active banner not found"
-                )
-
-            return CustomResponse.successResponse(
-                data=[{
-                    "id": str(banner.id),
-                    "screen": banner.screen,
-                    "image": banner.image,
-                    "is_active": banner.is_active,
-                    "priority": banner.priority,
-                    "action": banner.action,
-                    "destination": banner.destination,
-
-                }],
-                total=1
-            )
 
         #  LIST BANNERS
         data = []
@@ -1057,7 +1019,6 @@ class WebBannerListView(APIView):
                 "priority": banner.priority,
                 "action": banner.action,
                 "destination": banner.destination,
-
             })
 
         return CustomResponse.successResponse(
@@ -1068,7 +1029,7 @@ class WebBannerListView(APIView):
 class FlashSaleBannerListView(APIView):
     permission_classes = [AllowAny]
 
-    def get(self, request, id=None):
+    def get(self, request):
         store = request.store
         action = request.query_params.get("action")
 
@@ -1080,43 +1041,6 @@ class FlashSaleBannerListView(APIView):
         # ACTION FILTER
         if action is not None:
             queryset = queryset.filter(action=action.lower() == "true")
-
-        # ---------- SINGLE BANNER ----------
-        if id:
-            banner = queryset.filter(id=id).first()
-            if not banner:
-                return CustomResponse.errorResponse(
-                    description="Active banner not found"
-                )
-
-            product_names = []
-            if banner.product_id:
-                product_names = list(
-                    Product.objects.filter(
-                        id__in=banner.product_id
-                    ).values_list("name", flat=True)
-                )
-
-            return CustomResponse.successResponse(
-                data=[{
-                    "id": str(banner.id),
-                    "screen": banner.screen,
-                    "name":banner.name,
-                    "title":banner.title,
-                    "description":banner.description,
-                    "image": banner.image,
-                    "is_active": banner.is_active,
-                    "priority": banner.priority,
-                    "action": banner.action,
-                    "destination": banner.destination,
-                    "start_date": banner.start_date,
-                    "end_date": banner.end_date,
-                    "product_id": banner.product_id,
-                    "product_names": product_names,
-                    "discount": banner.discount
-                }],
-                total=1
-            )
 
         # ---------- LIST BANNERS ----------
         banners = list(queryset.order_by("-created_at"))
@@ -1349,36 +1273,17 @@ class CartTotalAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        user_id = request.user.id
+        user = request.user
         store = request.store
 
-
-        cart_items = Cart.objects.filter(user_id=user_id,store_id=store.id
-)
-
-        total_amount = 0
-        items = []
-
-        for item in cart_items:
-            product = Product.objects.filter(id=item.product_id).first()
-            price = product.selling_price if product else 0
-
-            item_total = price * item.quantity
-            total_amount += item_total
-
-            items.append({
-                "product_id": str(item.product_id),
-                "quantity": item.quantity,
-                "price": price,
-                "total": item_total
-            })
+        cart_items = Cart.objects.filter(user=user,store=store).count()
+        wishlist_items = Wishlist.objects.filter(user=user,store=store).count()
 
         return CustomResponse().successResponse(
             data={
-                "items": items,
-                "cart_total": total_amount
+                "wishlist_items": wishlist_items,
+                "cart_items": cart_items
             },
-            total=len(items)
         )
 
 
@@ -1406,17 +1311,10 @@ class Reviews(APIView):
             )
 
         has_purchased = OrderProducts.objects.filter(
-            product_id=product.default_product_id,
+            product_id=product.id,
             store=store,
-            order_id__in=[
-                str(order_id) for order_id in
-                Order.objects.filter(user_id=user.id, status='Placed')
-                .values_list("order_id", flat=True)
-            ]
+            order__in=Order.objects.filter(user=user, status='Placed')
         ).exists()
-
-
-
 
         if not has_purchased:
             return CustomResponse().errorResponse(
