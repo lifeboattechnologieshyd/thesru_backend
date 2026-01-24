@@ -13,6 +13,8 @@ urlpatterns = [
     path("store/<str:id>", StoreAPIView.as_view()),
 
     path("product", ProductAPIView.as_view()),
+    path("product/<str:id>", ProductAPIView.as_view()),
+
     # path("product-variants",DisplayProductAPIView.as_view()),
     path("category",CategoriesAPIView.as_view()),
     path("category/<str:id>",CategoriesAPIView.as_view()),
