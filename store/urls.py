@@ -22,6 +22,10 @@ urlpatterns = [
     path("update/cart/<str:id>", UpdateCartAPIView.as_view()),
     path("remove/cart/<str:id>", RemoveFromCartAPIView.as_view()),
 
+    path("order/initiate", InitiateOrder.as_view()),
+    path("payment/status/update", PaymentStatusAPIView.as_view()),
+    path("paymentWebhook", Webhook.as_view()),
+
 
     path("pin",PinListView.as_view()),
     path("address",AddressAPIView.as_view()),
@@ -33,13 +37,10 @@ urlpatterns = [
     path("web/banner/<str:id>",WebBannerListView.as_view()),
     path("flash/sale/banner/<str:id>",FlashSaleBannerListView.as_view()),
 
-    path("order/initiate", InitiateOrder.as_view()),
-    path("payment/status/update",PaymentStatusAPIView.as_view()),
-    path("paymentWebhook", Webhook.as_view()),
 
-    path("order",OrderView.as_view()),
-    path("order/products",OrderedProducts.as_view()),
 
+    path("orders",OrderView.as_view()),
+    # path("order/products",OrderedProducts.as_view()),
 
     path("cart/total",CartTotalAPIView.as_view()),
 

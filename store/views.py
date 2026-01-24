@@ -1,4 +1,5 @@
 import uuid
+from tokenize import Double
 from unicodedata import category
 import requests
 from django.contrib.admin.templatetags.admin_list import results
@@ -672,6 +673,7 @@ class Webhook(APIView):
 
             event_type = data.get("type")
             order_id = data.get("data", {}).get("order", {}).get("order_id")
+            order_amount = data.get("data", {}).get("order", {}).get("order_amount")
 
             print("Webhook received:", data)
 
@@ -681,12 +683,16 @@ class Webhook(APIView):
                 return CustomResponse().successResponse(data={},
                     description="Webhook received"
                 )
+            order = Order.objects.filter(order_number=order_id).first()
+            if not order:
+                return CustomResponse().successResponse(data={},
+                                                        description="No Order Found with Order Number"
+                                                        )
 
-            payment = Payment.objects.filter(order_id=order_id).first()
-            order = Order.objects.filter(order_id=order_id).first()
+            payment = Payment.objects.filter(order=order).first()
 
             # If no DB records → still return 200
-            if not payment or not order:
+            if not payment:
                 print("Order/Payment not found for order_id:", order_id)
                 return CustomResponse().successResponse(data={},
                     description="Webhook received"
@@ -700,18 +706,10 @@ class Webhook(APIView):
                     payment.save(update_fields=["status", "updated_by"])
 
                     order.status = OrderStatus.PLACED
-                    order.paid_online = payment.amount
+                    order.paid_online = order_amount
                     order.updated_by = SYSTEM_UPDATED_BY
                     order.save(update_fields=["status", "paid_online", "updated_by"])
-                    # ordered_product_ids = OrderProducts.objects.filter(
-                    #     order_id=order.order_id
-                    # ).values_list("product_id", flat=True)
-                    #
-                    # Cart.objects.filter(
-                    #     user_id=order.user_id,
-                    #     store_id=order.store_id,
-                    #     product_id__in=ordered_product_ids
-                    # ).delete()
+
 
                 elif event_type == "PAYMENT_FAILED_WEBHOOK":
                     payment.status = PaymentStatus.FAILED
@@ -752,36 +750,32 @@ class PaymentStatusAPIView(APIView):
     def post(self, request):
         data = request.data
 
-        order_id = data.get("order_id")
+        order_number = data.get("order_number")
+        cf_order_id = data.get("cf_order_id")
         frontend_status = data.get("status")
 
-        if not order_id or not frontend_status:
+        if not order_number or not frontend_status:
             return CustomResponse().errorResponse(
-                description="order_id and status are required"
+                description="order_number and status are required"
             )
 
-        payment = Payment.objects.filter(order_id=order_id).first()
-        order = Order.objects.filter(order_id=order_id).first()
-
-        if not payment or not order:
+        order = Order.objects.filter(order_number=order_number).first()
+        if not order:
             return CustomResponse().errorResponse(
-                description="Order or Payment not found"
+                description="Order Details Mismatched"
             )
-
-        # Do not override webhook-confirmed payment
+        payment = Payment.objects.filter(cf_order_id=cf_order_id).first()
+        if not payment:
+            return CustomResponse().errorResponse(
+                description="Payment not found"
+            )
         if payment.status == PaymentStatus.COMPLETED:
-            return CustomResponse().successResponse(
+            return CustomResponse().successResponse(data={},
                 description="Payment already completed (webhook confirmed)"
             )
 
         # 🔥 FETCH CASHFREE STATUS
-        cashfree = CashFree.objects.filter(store_id=order.store_id).first()
-        if not cashfree:
-            return CustomResponse().errorResponse(
-                description="Cashfree configuration not found"
-            )
-
-        cf_response = fetch_cashfree_payment_status(order_id, cashfree)
+        cf_response = fetch_cashfree_payment_status(order_number, request.store)
 
         cf_order_status = cf_response.get("order_status")  # PAID / ACTIVE / FAILED
         verified_status = map_cashfree_status(cf_order_status)
@@ -805,7 +799,7 @@ class PaymentStatusAPIView(APIView):
 
         return CustomResponse().successResponse(
             data={
-                "order_id": order_id,
+                "order_number": order_number,
                 "frontend_status": frontend_status,
                 "cashfree_status": cf_order_status,
                 "final_payment_status": payment.status,
@@ -823,8 +817,8 @@ def map_cashfree_status(cf_status):
     }
     return mapping.get(cf_status, PaymentStatus.PENDING)
 
-def fetch_cashfree_payment_status(order_id, cashfree):
-    url = f"{cashfree.url}/{order_id}"
+def fetch_cashfree_payment_status(order_number, cashfree):
+    url = f"{cashfree.url}/{order_number}"
 
     headers = {
         "x-api-version": settings.CASHFREE_API_VERSION,
@@ -855,21 +849,100 @@ class OrderedProducts(APIView):
 class OrderView(APIView):
     permission_classes = [IsAuthenticated]
 
+    STATUS_FILTER_MAP = {
+        "ONGOING": [
+            OrderStatus.INITIATED,
+            OrderStatus.PLACED,
+            OrderStatus.CONFIRMED,
+            OrderStatus.PACKED,
+            OrderStatus.SHIPPED,
+            OrderStatus.OUT_FOR_DELIVERY,
+        ],
+        "DELIVERED": [
+            OrderStatus.DELIVERED,
+        ],
+        "CANCELLED": [
+            OrderStatus.CANCELLED,
+            OrderStatus.FAILED,
+            OrderStatus.UNFULFILLED,
+        ],
+    }
+
+
     def get(self, request):
+        store = request.store
         user = request.user
-        status = request.query_params.get("status")
+        status_filter = request.query_params.get("status")
+        orders_qs = Order.objects.filter(
+            store=store,
+            user=user
+        ).order_by("-created_at")
+        # ---------- Status filter ----------
+        if status_filter:
+            status_filter = status_filter.upper()
+            if status_filter not in self.STATUS_FILTER_MAP:
+                return CustomResponse.errorResponse(
+                    description="Invalid status filter"
+                )
 
-        orders_qs = Order.objects.filter(user_id=user.id).order_by("-created_at")
+            orders_qs = orders_qs.filter(
+                status__in=self.STATUS_FILTER_MAP[status_filter]
+            )
+            # ---------- Prefetch order items ----------
+            orders_qs = orders_qs.prefetch_related(
+                "items__product"
+            )
 
-        if status:
-            orders_qs = orders_qs.filter(status=status)
+            data = []
 
-        orders = list(orders_qs.values())
+            for order in orders_qs:
+                items = []
 
-        return CustomResponse().successResponse(
-            data=orders,
-            total=len(orders)
-        )
+                for item in order.items.all():
+                    product = item.product
+
+                    items.append({
+                        "order_product_id": str(item.id),
+                        "product_id": str(product.id),
+                        "sku": item.sku,
+
+                        "name": product.name,
+                        "colour": product.colour,
+                        "size": product.size,
+
+                        "qty": item.qty,
+                        "selling_price": str(item.selling_price),
+                        "mrp": str(item.mrp),
+                        "total_price": str(item.selling_price * item.qty),
+
+                        "rating": float(item.rating),
+                        "reviewed": item.review
+                    })
+
+                data.append({
+                    "order": {
+                        "order_id": str(order.id),
+                        "order_number": order.order_number,
+                        "status": order.status,
+
+                        "coupon_discount": str(order.coupon_discount),
+                        "amount": str(order.amount),
+
+                        "wallet_paid": str(order.wallet_paid),
+                        "paid_online": str(order.paid_online),
+                        "cash_on_delivery": str(order.cash_on_delivery),
+
+                        "created_at": order.created_at,
+                        "address": order.address
+                    },
+                    "items": items
+                })
+
+            return CustomResponse.successResponse(
+                data=data,
+                description="Orders fetched successfully"
+            )
+
 
 
 
