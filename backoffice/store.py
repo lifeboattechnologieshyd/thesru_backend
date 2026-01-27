@@ -2011,132 +2011,80 @@ class AbandonedOrderListAPIView(APIView):
     def get(self, request):
         try:
             store = request.store
+
+            page = int(request.query_params.get("page", 1))
+            page_size = int(request.query_params.get("page_size", 20))
             from_date = request.query_params.get("from_date")
             to_date = request.query_params.get("to_date")
 
-            # -------- Pagination --------
-            page = int(request.query_params.get("page", 1))
-            page_size = int(request.query_params.get("page_size", 10))
-
-            if page < 1:
-                page = 1
-            if page_size < 1:
-                page_size = 10
-
-            offset = (page - 1) * page_size
-
-            # -------- Orders (Cancelled + Failed) --------
-            queryset = Order.objects.filter(
-                store_id=store.id,
-                status__in=[OrderStatus.CANCELLED, OrderStatus.FAILED]
+            orders_qs = Order.objects.filter(
+                store=store,
+                status__in=[
+                    OrderStatus.CANCELLED,
+                    OrderStatus.FAILED
+                ]
+            ).select_related(
+                "user"
+            ).prefetch_related(
+                "items__product__media"
             ).order_by("-created_at")
 
-            # -------- Date Filters --------
+            # ---------- Date filters ----------
             if from_date:
-                queryset = queryset.filter(created_at__date__gte=from_date)
+                orders_qs = orders_qs.filter(created_at__date__gte=from_date)
 
             if to_date:
-                queryset = queryset.filter(created_at__date__lte=to_date)
+                orders_qs = orders_qs.filter(created_at__date__lte=to_date)
 
-            orders = list(
-                queryset[offset: offset + page_size].values(
-                    "order_id",
-                    "user_id",
-                    "amount",
-                    "status",
-                    "created_at",
-                )
-            )
+            total = orders_qs.count()
+            offset = (page - 1) * page_size
+            orders_qs = orders_qs[offset: offset + page_size]
 
-            if not orders:
-                return CustomResponse().successResponse(
-                    description="Cancelled and failed orders fetched successfully",
-                    data=[],
-                    total=0
-                )
+            data = []
 
-            # -------- Fetch Users --------
-            user_ids = {o["user_id"] for o in orders}
+            for order in orders_qs:
+                items = []
 
-            users = User.objects.filter(id__in=user_ids).values(
-                "id", "username", "mobile", "email"
-            )
+                for item in order.items.all():
+                    product = item.product
 
-            user_map = {
-                u["id"]: {
-                    "username": u["username"],
-                    "mobile": u["mobile"],
-                    "email": u["email"],
-                }
-                for u in users
-            }
+                    # ---- primary image ----
+                    image_url = None
+                    for m in product.media.all():
+                        if m.media_type == "image":
+                            image_url = m.url
+                            break
 
-            # -------- Fetch Order Products --------
-            order_ids = [o["order_id"] for o in orders]
+                    items.append({
+                        "product_id": str(product.id),
+                        "sku": item.sku,
+                        "name": product.name,
+                        "qty": item.qty,
+                        "image": image_url,
+                        "price": str(item.selling_price)
+                    })
 
-            order_products = OrderProducts.objects.filter(
-                store_id=store.id,
-                order_id__in=order_ids
-            ).values(
-                "order_id",
-                "product_id",
-                "sku",
-                "qty",
-                "mrp",
-                "selling_price",
-                "Apportioned_discount",
-                "Apportioned_wallet",
-                "Apportioned_online",
-                "Apportioned_gst",
-                "rating",
-                "review",
-            )
-
-            # -------- Fetch Product Names --------
-            product_ids = {op["product_id"] for op in order_products}
-
-            products = Product.objects.filter(
-                id__in=product_ids
-            ).values("id", "name")
-
-            product_map = {
-                p["id"]: p["name"]
-                for p in products
-            }
-
-            # -------- Group Products by Order --------
-            products_by_order = {}
-            for op in order_products:
-                product_amount = op["qty"] * op["selling_price"]
-
-                products_by_order.setdefault(op["order_id"], []).append({
-                    "product_id": op["product_id"],
-                    "product_name": product_map.get(op["product_id"]),
-                    "qty": op["qty"],
-                    "mrp": op["mrp"],
-                    "selling_price": op["selling_price"],
-                    "amount": product_amount,
-                    # "apportioned_discount": op["Apportioned_discount"],
-                    # "apportioned_wallet": op["Apportioned_wallet"],
-                    # "apportioned_online": op["Apportioned_online"],
-                    # "apportioned_gst": op["Apportioned_gst"],
-                    # "rating": op["rating"],
-                    # "review": op["review"],
+                data.append({
+                    "order_id": str(order.id),
+                    "order_number": order.order_number,
+                    "status": order.status,
+                    "amount": str(order.amount),
+                    "created_at": order.created_at,
+                    "user": {
+                        "id": str(order.user.id),
+                        "name": order.user.name,
+                        "mobile": order.user.mobile,
+                        "email": order.user.email
+                    },
+                    "items": items
                 })
 
-            # -------- Attach User + Products to Orders --------
-            for order in orders:
-                user_info = user_map.get(order["user_id"], {})
-
-                order["username"] = user_info.get("username")
-                order["mobile"] = user_info.get("mobile")
-                order["email"] = user_info.get("email")
-                order["products"] = products_by_order.get(order["order_id"], [])
-
-            return CustomResponse().successResponse(
-                description="Cancelled and failed orders fetched successfully",
-                data=orders,
-                total=len(orders)
+            return CustomResponse.successResponse(
+                data=data,
+                total=total,
+                page=page,
+                page_size=page_size,
+                description="Abandoned orders fetched successfully"
             )
 
         except Exception as e:
