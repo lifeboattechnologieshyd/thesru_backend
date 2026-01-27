@@ -505,30 +505,53 @@ class InitiateOrder(APIView):
         store = request.store
         user = request.user
         data = request.data
+        items = data.get("products", [])
+        address = data.get("address")
 
-        cart_items = Cart.objects.select_related("product").filter(
-            store=store,
-            user=user
-        )
-        if not cart_items.exists():
-            return CustomResponse.errorResponse("Cart is empty")
+        if not items:
+            return CustomResponse.errorResponse("products are required")
+
+        if not address:
+            return CustomResponse.errorResponse("address is required")
 
         subtotal = Decimal("0.00")
-        for item in cart_items:
-            if item.product.current_stock < item.quantity:
-                return CustomResponse.errorResponse(
-                    f"{item.product.name} is out of stock"
-                )
-            subtotal += item.product.selling_price * item.quantity
-        coupon_discount = Decimal("0.00")
-        # todo : validatae coupon if applied
-        total_amount = subtotal - coupon_discount
-
-
-        order_number = generate_order_number(store, "ORD")
+        product_map = {}
 
         try:
             with transaction.atomic():
+                for item in items:
+                    product_id = item.get("product_id")
+                    qty = int(item.get("qty", 0))
+                    if not product_id or qty <= 0:
+                        return CustomResponse.errorResponse(
+                            "Invalid product_id or qty"
+                        )
+                    try:
+                        product = Product.objects.select_for_update().get(
+                            id=product_id,
+                            store=store,
+                            is_active=True
+                        )
+                    except Product.DoesNotExist:
+                        return CustomResponse.errorResponse(
+                            f"Invalid product: {product_id}"
+                        )
+                    if product.current_stock < qty:
+                        return CustomResponse.errorResponse(
+                            f"{product.name} is out of stock"
+                        )
+
+                    line_total = product.selling_price * qty
+                    subtotal += line_total
+
+                    product_map[product] = qty
+                coupon_discount = Decimal("0.00")
+                total_amount = subtotal - coupon_discount
+
+                # todo : validatae coupon if applied
+
+
+                order_number = generate_order_number(store, "ORD")
                 order = Order.objects.create(
                     store=store,
                     user=user,
@@ -541,18 +564,19 @@ class InitiateOrder(APIView):
                     created_by=user.id
                 )
 
-                for item in cart_items:
+                # ---------- Create Order Products ----------
+                for product, qty in product_map.items():
                     OrderProducts.objects.create(
                         order=order,
-                        product=item.product,
-                        sku=item.product.sku,
-                        qty=item.quantity,
-                        mrp=item.product.mrp,
-                        selling_price=item.product.selling_price,
-                        apportioned_discount=Decimal("0.00"), # coupon discount if any
-                        apportioned_online=item.product.selling_price * item.quantity,
-                        apportioned_wallet=Decimal("0.00"), # wallet paid if any
-                        apportioned_gst=item.product.gst_amount
+                        product=product,
+                        sku=product.sku,
+                        qty=qty,
+                        mrp=product.mrp,
+                        selling_price=product.selling_price,
+                        apportioned_discount=Decimal("0.00"),
+                        apportioned_online=product.selling_price * qty,
+                        apportioned_wallet=Decimal("0.00"),
+                        apportioned_gst=product.gst_amount
                     )
 
                 #  Create Order Timeline
@@ -747,7 +771,7 @@ class PaymentStatusAPIView(APIView):
 
         if not order_number:
             return CustomResponse().errorResponse(
-                description="order_number and status are required"
+                description="order number  required"
             )
 
         order = Order.objects.filter(order_number=order_number).first()
