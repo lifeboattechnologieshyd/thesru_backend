@@ -867,76 +867,82 @@ class OrderView(APIView):
     def get(self, request):
         store = request.store
         user = request.user
-        status_filter = request.query_params.get("status")
+        status_filter = request.query_params.get("status", "ONGOING")
         orders_qs = Order.objects.filter(
             store=store,
             user=user
         ).order_by("-created_at")
-        # ---------- Status filter ----------
-        if status_filter:
-            status_filter = status_filter.upper()
-            if status_filter not in self.STATUS_FILTER_MAP:
-                return CustomResponse.errorResponse(
-                    description="Invalid status filter"
-                )
-
-            orders_qs = orders_qs.filter(
-                status__in=self.STATUS_FILTER_MAP[status_filter]
-            )
-            # ---------- Prefetch order items ----------
-            orders_qs = orders_qs.prefetch_related(
-                "items__product"
+        status_filter = status_filter.upper()
+        if status_filter not in self.STATUS_FILTER_MAP:
+            return CustomResponse.errorResponse(
+                description="Invalid status filter"
             )
 
-            data = []
+        orders_qs = orders_qs.filter(
+            status__in=self.STATUS_FILTER_MAP[status_filter]
+        )
+        # ---------- Prefetch order items ----------
+        orders_qs = orders_qs.prefetch_related(
+            "items__product__media"
+        )
 
-            for order in orders_qs:
-                items = []
+        data = []
 
-                for item in order.items.all():
-                    product = item.product
+        for order in orders_qs:
+            items = []
 
-                    items.append({
-                        "order_product_id": str(item.id),
-                        "product_id": str(product.id),
-                        "sku": item.sku,
+            for item in order.items.all():
+                product = item.product
+                image_url = None
+                for m in product.media.all():
+                    if m.media_type.lower() == "image":
+                        image_url = m.url
+                        break
 
-                        "name": product.name,
-                        "colour": product.colour,
-                        "size": product.size,
+                items.append({
+                    "order_product_id": str(item.id),
+                    "product_id": str(product.id),
+                    "sku": item.sku,
+                    "image": image_url,
 
-                        "qty": item.qty,
-                        "selling_price": str(item.selling_price),
-                        "mrp": str(item.mrp),
-                        "total_price": str(item.selling_price * item.qty),
+                    "name": product.name,
+                    "colour": product.colour,
+                    "size": product.size,
 
-                        "rating": float(item.rating),
-                        "reviewed": item.review
-                    })
+                    "qty": item.qty,
+                    "selling_price": str(item.selling_price),
+                    "mrp": str(item.mrp),
+                    "total_price": str(item.selling_price * item.qty),
 
-                data.append({
-                    "order": {
-                        "order_id": str(order.id),
-                        "order_number": order.order_number,
-                        "status": order.status,
-
-                        "coupon_discount": str(order.coupon_discount),
-                        "amount": str(order.amount),
-
-                        "wallet_paid": str(order.wallet_paid),
-                        "paid_online": str(order.paid_online),
-                        "cash_on_delivery": str(order.cash_on_delivery),
-
-                        "created_at": order.created_at,
-                        "address": order.address
-                    },
-                    "items": items
+                    "rating": float(item.rating),
+                    "reviewed": item.review
                 })
 
-            return CustomResponse.successResponse(
-                data=data,
-                description="Orders fetched successfully"
-            )
+            data.append({
+                "order": {
+                    "order_id": str(order.id),
+                    "order_number": order.order_number,
+                    "status": order.status,
+
+                    "coupon_discount": str(order.coupon_discount),
+                    "amount": str(order.amount),
+
+                    "wallet_paid": str(order.wallet_paid),
+                    "paid_online": str(order.paid_online),
+                    "cash_on_delivery": str(order.cash_on_delivery),
+
+                    "created_at": order.created_at,
+                    "address": order.address
+                },
+                "items": items
+            })
+
+        return CustomResponse.successResponse(
+            data=data,
+            description="Orders fetched successfully"
+        )
+
+
 
 
 
