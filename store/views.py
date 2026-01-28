@@ -821,12 +821,12 @@ class Webhook(APIView):
 
                 if event_type == "PAYMENT_SUCCESS_WEBHOOK":
                     payment.status = PaymentStatus.COMPLETED
-                    payment.updated_by = SYSTEM_UPDATED_BY
+                    payment.updated_by = event_type
                     payment.save(update_fields=["status", "updated_by"])
 
                     order.status = OrderStatus.PLACED
                     order.paid_online = order_amount
-                    order.updated_by = SYSTEM_UPDATED_BY
+                    order.updated_by = event_type
                     order.save(update_fields=["status", "paid_online", "updated_by"])
                     CouponUsage.objects.create(
                         coupon=order.coupon,
@@ -836,20 +836,20 @@ class Webhook(APIView):
                     remove_cart_items(order.user, order.store)
                 elif event_type == "PAYMENT_FAILED_WEBHOOK":
                     payment.status = PaymentStatus.FAILED
-                    order.updated_by = SYSTEM_UPDATED_BY
+                    order.updated_by = event_type
                     order.save(update_fields=["status", "paid_online", "updated_by"])
 
                     order.status = OrderStatus.FAILED
-                    order.updated_by = SYSTEM_UPDATED_BY
+                    order.updated_by = event_type
                     order.save(update_fields=["status", "updated_by"])
 
                 elif event_type == "PAYMENT_USER_DROPPED_WEBHOOK":
                     payment.status = PaymentStatus.CANCELLED
-                    payment.updated_by = SYSTEM_UPDATED_BY
+                    payment.updated_by = event_type
                     payment.save(update_fields=["status", "updated_by"])
 
                     order.status = OrderStatus.CANCELLED
-                    order.updated_by = SYSTEM_UPDATED_BY
+                    order.updated_by = event_type
                     order.save(update_fields=["status", "updated_by"])
                 else:
                     print("Unhandled webhook type:", event_type)
@@ -857,15 +857,11 @@ class Webhook(APIView):
             return CustomResponse().successResponse(data={},
                 description="Webhook processed"
             )
-
         except Exception as e:
-            # IMPORTANT: Always return 200
             print("Webhook exception:", str(e))
             return CustomResponse().successResponse(data={},
                 description="Webhook received"
             )
-
-
 #
 class PaymentStatusAPIView(APIView):
     permission_classes = [AllowAny]
@@ -910,6 +906,7 @@ class PaymentStatusAPIView(APIView):
             if verified_status == PaymentStatus.COMPLETED:
                 order.status = OrderStatus.PLACED
                 order.paid_online = payment.amount
+                order.updated_by = "PAYMENT STATUS BY FE"
                 order.save(update_fields=["status", "paid_online"])
                 CouponUsage.objects.create(
                     coupon=order.coupon,
@@ -918,15 +915,17 @@ class PaymentStatusAPIView(APIView):
                 )
                 remove_cart_items(order.user, order.store)
 
-
             elif verified_status == PaymentStatus.FAILED:
                 order.status = OrderStatus.FAILED
-                order.save(update_fields=["status", "paid_online"])
+                order.updated_by = "PAYMENT STATUS BY FE"
+                order.save(update_fields=["status", "updated_by"])
 
 
             elif verified_status == PaymentStatus.CANCELLED:
                 order.status = OrderStatus.CANCELLED
-                order.save(update_fields=["status", "paid_online"])
+                order.updated_by = "PAYMENT STATUS BY FE"
+                order.save(update_fields=["status", "updated_by"])
+
 
         return CustomResponse().successResponse(
             data={
