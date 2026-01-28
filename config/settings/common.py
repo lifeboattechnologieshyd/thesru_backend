@@ -267,3 +267,14 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 SMS_AUTH_KEY = "G5OsafzTnblgPcNLiU69BtXdpZCrKEmuYAIFvhoxb79M2jJwkWLDTxFjvrotcO8mKwfSB2WYXRdUbzka"
 SMS_SENDER_ID = "THESRU"
 SMS_DLT_TEMPLATE_ID = "8764"
+
+
+
+CRONJOBS = [
+    (f"0 */1 * * * cd {BASE_DIR} && ",
+     "store.tasks.cron_run",
+     f">> {BASE_DIR}/cron_run.log 2>&1 "
+     )
+
+
+]
