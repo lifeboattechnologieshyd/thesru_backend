@@ -20,6 +20,8 @@ urlpatterns = [
     path("category/<str:id>",CategoriesAPIView.as_view()),
 
     path("tag",TagsAPIView.as_view()),
+    path("tag/<str:id>",TagsAPIView.as_view()),
+
 
     path("banner",BannerAPIView.as_view()),
     path("banner/<str:id>",BannerAPIView.as_view()),
