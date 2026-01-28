@@ -11,14 +11,38 @@ from db.models import Order, StoreSequence, OrderSequence
 #         if not Order.objects.filter(order_id=order_id).exists():
 #             return order_id
 
-def generate_order_id():
-    while True:
-        timestamp = str(int(time.time()))[-6:]  # last 6 digits
-        random_part = random.randint(1000, 9999)
-        order_id = f"{timestamp}{random_part}"
+from django.utils import timezone
 
-        if not Order.objects.filter(order_id=order_id).exists():
-            return order_id
+def time_ago(dt):
+    if not dt:
+        return None
+
+    now = timezone.now()
+    diff = now - dt
+
+    seconds = diff.total_seconds()
+
+    if seconds < 60:
+        return "just now"
+    elif seconds < 3600:
+        minutes = int(seconds // 60)
+        return f"{minutes} minute{'s' if minutes > 1 else ''} ago"
+    elif seconds < 86400:
+        hours = int(seconds // 3600)
+        return f"{hours} hour{'s' if hours > 1 else ''} ago"
+    elif seconds < 604800:
+        days = int(seconds // 86400)
+        return f"{days} day{'s' if days > 1 else ''} ago"
+    elif seconds < 2592000:
+        weeks = int(seconds // 604800)
+        return f"{weeks} week{'s' if weeks > 1 else ''} ago"
+    elif seconds < 31536000:
+        months = int(seconds // 2592000)
+        return f"{months} month{'s' if months > 1 else ''} ago"
+    else:
+        years = int(seconds // 31536000)
+        return f"{years} year{'s' if years > 1 else ''} ago"
+
 
 from django.db import transaction
 

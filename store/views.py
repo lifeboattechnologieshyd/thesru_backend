@@ -17,7 +17,7 @@ from db.models import AddressMaster, PinCode, Product, Order, OrderProducts, Pay
     Banner, Category, Cart, CouponUsage, Wishlist, CouponProduct, CouponCategory, CouponTag,WebBanner, FlashSaleBanner, ProductReviews, ContactMessage, Tag, Coupons
 from enums.store import OrderStatus, PaymentStatus
 from mixins.drf_views import CustomResponse
-from utils.store import generate_order_number
+from utils.store import generate_order_number, time_ago
 
 
 class CategoryListView(APIView):
@@ -1844,7 +1844,8 @@ class Reviews(APIView):
                     }
                     for media in review.media.all()
                 ],
-                "created_at": review.created_at
+                "created_at": review.created_at,
+                "time_ago": time_ago(review.created_at)
             })
 
         return CustomResponse.successResponse(
