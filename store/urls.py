@@ -4,7 +4,7 @@ from store.views import PinListView, AddressAPIView, ProductDetailAPIView, Produ
     BannerListView, CategoryListView, AddToCartAPIView, CartListAPIView, UpdateCartAPIView, RemoveFromCartAPIView, \
     AddToWishlistAPIView, WishlistListAPIView, RemoveFromWishlistAPIView, CartTotalAPIView, \
     FlashSaleBannerListView, WebBannerListView, Webhook, PaymentStatusAPIView, Reviews, ContactMessageAPIView, \
-    TagsListView
+    TagsListView, UserCouponListAPIView, ApplyCoupon
 
 urlpatterns = [
     path("category", CategoryListView.as_view()),
@@ -40,4 +40,7 @@ urlpatterns = [
     path("banner", BannerListView.as_view()),
     path("web/banner", WebBannerListView.as_view()),
     path("flash/sale/banner", FlashSaleBannerListView.as_view()),
+
+    path("coupons", UserCouponListAPIView.as_view()),
+    path("coupon/apply", ApplyCoupon.as_view()),
 ]

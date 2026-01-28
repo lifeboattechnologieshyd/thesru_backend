@@ -276,6 +276,103 @@ class PinCode(AuditModel):
     class Meta:
         db_table = "pincode"
 
+class Coupons(AuditModel):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    store = models.ForeignKey(
+        Store,
+        on_delete=models.CASCADE,
+        related_name="coupons"
+    )
+    code = models.CharField(
+        max_length=30,
+        help_text="Coupon code entered by user"
+    )
+    description = models.CharField(
+        max_length=255,
+        null=True,
+        blank=True
+    )
+
+    target_type = models.CharField(
+        max_length=20,
+        choices=(
+            ("ORDER", "Entire Order"),
+            ("SHIPPING", "Shipping"),
+            ("PRODUCT", "Product"),
+            ("CATEGORY", "Category"),
+            ("TAG", "Tag"),
+        )
+    )
+
+    # ---- Discount logic (HOW much) ----
+    discount_type = models.CharField(
+        max_length=20,
+        choices=(
+            ("FLAT", "Flat Amount"),
+            ("PERCENTAGE", "Percentage"),
+        )
+    )
+
+    discount_value = models.DecimalField(
+        max_digits=10,
+        decimal_places=2
+    )
+
+    max_discount_amount = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        help_text="Maximum discount cap"
+    )
+
+    # ---- Eligibility rules (WHEN allowed) ----
+    min_order_amount = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        default=0
+    )
+
+    min_product_amount = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        help_text="Minimum product price for eligibility"
+    )
+
+    first_order_only = models.BooleanField(
+        default=False,
+        help_text="Coupon valid only on first successful order"
+    )
+
+    start_date = models.DateTimeField()
+    end_date = models.DateTimeField()
+
+    usage_limit = models.PositiveIntegerField(
+        null=True,
+        blank=True,
+        help_text="Max usage across all users"
+    )
+
+    per_user_limit = models.PositiveIntegerField(
+        null=True,
+        blank=True,
+        help_text="Max usage per user"
+    )
+
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        db_table = "coupon"
+        unique_together = ("store", "code")
+        indexes = [
+            models.Index(fields=["store", "is_active"]),
+            models.Index(fields=["code"]),
+        ]
+
+    def __str__(self):
+        return self.code
 
 class Order(AuditModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -289,6 +386,13 @@ class Order(AuditModel):
         on_delete=models.CASCADE,
         related_name="orders"
     )
+    coupon = models.ForeignKey(
+        Coupons,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True
+    )
+    coupon_code = models.CharField(max_length=30, null=True, blank=True)
     order_number = models.CharField(unique=True, max_length=50, null=False)
     address = models.JSONField()
     mrp = models.DecimalField(decimal_places=2, max_digits=10, default=0)
@@ -345,7 +449,7 @@ class OrderTimeLines(AuditModel):
     class Meta:
         db_table = "order_timeline"
 
-
+# not being used so far...
 class OrderShippingDetails(AuditModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     order_id = models.CharField(max_length=50, null=False)
@@ -488,3 +592,85 @@ class OrderSequence(AuditModel):
     order_number = models.PositiveIntegerField(default=0)
 
 
+
+class CouponProduct(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    coupon = models.ForeignKey(
+        Coupons,
+        on_delete=models.CASCADE,
+        related_name="coupon_products"
+    )
+    product = models.ForeignKey(
+        Product,
+        on_delete=models.CASCADE
+    )
+    class Meta:
+        db_table = "coupon_product"
+        unique_together = ("coupon", "product")
+
+class CouponCategory(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+
+    coupon = models.ForeignKey(
+        Coupons,
+        on_delete=models.CASCADE,
+        related_name="coupon_categories"
+    )
+
+    category = models.ForeignKey(
+        Category,
+        on_delete=models.CASCADE
+    )
+
+    class Meta:
+        db_table = "coupon_category"
+        unique_together = ("coupon", "category")
+
+
+class CouponTag(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+
+    coupon = models.ForeignKey(
+        Coupons,
+        on_delete=models.CASCADE,
+        related_name="coupon_tags"
+    )
+
+    tag = models.ForeignKey(
+        Tag,
+        on_delete=models.CASCADE
+    )
+
+    class Meta:
+        db_table = "coupon_tag"
+        unique_together = ("coupon", "tag")
+
+class CouponUsage(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+
+    coupon = models.ForeignKey(
+        Coupons,
+        on_delete=models.CASCADE,
+        related_name="usages"
+    )
+
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE
+    )
+
+    order = models.ForeignKey(
+        Order,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True
+    )
+
+    used_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "coupon_usage"
+        indexes = [
+            models.Index(fields=["coupon", "user"]),
+            models.Index(fields=["user"]),
+        ]

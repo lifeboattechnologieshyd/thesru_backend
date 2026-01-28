@@ -8,12 +8,13 @@ from django.db import IntegrityError
 from django.db.models import Q
 from decimal import Decimal
 
+from django.utils.timezone import now
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated,AllowAny
 
 from django.conf import settings
 from db.models import AddressMaster, PinCode, Product, Order, OrderProducts, Payment, OrderTimeLines, \
-    Banner, Category, Cart, Wishlist, WebBanner, FlashSaleBanner, ProductReviews, ContactMessage, Tag
+    Banner, Category, Cart, CouponUsage, Wishlist, CouponProduct, CouponCategory, CouponTag,WebBanner, FlashSaleBanner, ProductReviews, ContactMessage, Tag, Coupons
 from enums.store import OrderStatus, PaymentStatus
 from mixins.drf_views import CustomResponse
 from utils.store import generate_order_number
@@ -496,7 +497,94 @@ class PinListView(APIView):
         return CustomResponse.successResponse(data=data,total=1)
 
 
+def calculate_coupon_and_apportion(
+    *,
+    store,
+    user,
+    coupon_code,
+    products_map,  # {product: qty}
+    subtotal
+):
+    coupon = Coupons.objects.filter(
+        store=store,
+        code=coupon_code,
+        is_active=True,
+        start_date__lte=now(),
+        end_date__gte=now()
+    ).first()
 
+    if not coupon:
+        raise ValueError("Invalid or expired coupon")
+
+    # ---------- First order check ----------
+    if coupon.first_order_only:
+        if Order.objects.filter(
+            store=store,
+            user=user,
+            status=OrderStatus.DELIVERED
+        ).exists():
+            raise ValueError("Coupon valid only on first order")
+
+    # ---------- Eligible products ----------
+    eligible_items = []
+
+    if coupon.target_type == "ORDER":
+        eligible_items = list(products_map.items())
+        eligible_total = subtotal
+
+        if eligible_total < coupon.min_order_amount:
+            raise ValueError("Order amount not eligible for coupon")
+
+    else:
+        eligible_total = Decimal("0.00")
+
+        for product, qty in products_map.items():
+            if coupon.target_type == "PRODUCT":
+                if not coupon.coupon_products.filter(product=product).exists():
+                    continue
+
+            elif coupon.target_type == "CATEGORY":
+                if not product.categories.filter(
+                    id__in=coupon.coupon_categories.values("category_id")
+                ).exists():
+                    continue
+
+            elif coupon.target_type == "TAG":
+                if not product.tags.filter(
+                    id__in=coupon.coupon_tags.values("tag_id")
+                ).exists():
+                    continue
+
+            if coupon.min_product_amount and product.selling_price < coupon.min_product_amount:
+                continue
+
+            line_total = product.selling_price * qty
+            eligible_items.append((product, qty))
+            eligible_total += line_total
+
+        if eligible_total == 0:
+            raise ValueError("Coupon not applicable to selected products")
+
+    # ---------- Calculate discount ----------
+    if coupon.discount_type == "PERCENTAGE":
+        total_discount = eligible_total * coupon.discount_value / 100
+    else:
+        total_discount = coupon.discount_value
+
+    if coupon.max_discount_amount:
+        total_discount = min(total_discount, coupon.max_discount_amount)
+
+    total_discount = total_discount.quantize(Decimal("0.00"))
+
+    # ---------- Apportion discount ----------
+    product_discount_map = {}
+
+    for product, qty in eligible_items:
+        line_total = product.selling_price * qty
+        share = (line_total / eligible_total) * total_discount
+        product_discount_map[product.id] = share.quantize(Decimal("0.00"))
+
+    return coupon, total_discount, product_discount_map
 
 class InitiateOrder(APIView):
     permission_classes = [IsAuthenticated]
@@ -505,54 +593,93 @@ class InitiateOrder(APIView):
         store = request.store
         user = request.user
         data = request.data
+        items = data.get("products", [])
+        address = data.get("address")
+        coupon_code = data.get("coupon_code")
 
-        cart_items = Cart.objects.select_related("product").filter(
-            store=store,
-            user=user
-        )
-        if not cart_items.exists():
-            return CustomResponse.errorResponse("Cart is empty")
+        if not items:
+            return CustomResponse.errorResponse("products are required")
+
+        if not address:
+            return CustomResponse.errorResponse("address is required")
 
         subtotal = Decimal("0.00")
-        for item in cart_items:
-            if item.product.current_stock < item.quantity:
-                return CustomResponse.errorResponse(
-                    f"{item.product.name} is out of stock"
-                )
-            subtotal += item.product.selling_price * item.quantity
-        coupon_discount = Decimal("0.00")
-        # todo : validatae coupon if applied
-        total_amount = subtotal - coupon_discount
-
-
-        order_number = generate_order_number(store, "ORD")
+        product_map = {}
 
         try:
             with transaction.atomic():
+                for item in items:
+                    product_id = item.get("product_id")
+                    qty = int(item.get("qty", 0))
+                    if not product_id or qty <= 0:
+                        return CustomResponse.errorResponse(
+                            "Invalid product_id or qty"
+                        )
+                    try:
+                        product = Product.objects.select_for_update().get(
+                            id=product_id,
+                            store=store,
+                            is_active=True
+                        )
+                    except Product.DoesNotExist:
+                        return CustomResponse.errorResponse(
+                            f"Invalid product: {product_id}"
+                        )
+                    if product.current_stock < qty:
+                        return CustomResponse.errorResponse(
+                            f"{product.name} is out of stock"
+                        )
+
+                    line_total = product.selling_price * qty
+                    subtotal += line_total
+                    product_map[product] = qty
+                # ---------- Coupon calculation ----------
+                coupon = None
+                coupon_discount = Decimal("0.00")
+                product_discount_map = {}
+                if coupon_code:
+                    (
+                        coupon,
+                        coupon_discount,
+                        product_discount_map
+                    ) = calculate_coupon_and_apportion(
+                        store=store,
+                        user=user,
+                        coupon_code=coupon_code,
+                        products_map=product_map,
+                        subtotal=subtotal
+                    )
+                total_amount = subtotal - coupon_discount
+                order_number = generate_order_number(store, "ORD")
                 order = Order.objects.create(
                     store=store,
                     user=user,
                     order_number=order_number,
                     address=data.get("address"),
                     coupon_discount=coupon_discount,
+                    coupon_code=coupon_code,
+                    coupon=coupon,
                     amount=total_amount,
                     wallet_paid=Decimal("0.00"),
                     status=OrderStatus.INITIATED,
                     created_by=user.id
                 )
-
-                for item in cart_items:
+                # ---------- Create Order Products ----------
+                for product, qty in product_map.items():
+                    p_discount = product_discount_map.get(
+                        product.id, Decimal("0.00")
+                    )
                     OrderProducts.objects.create(
                         order=order,
-                        product=item.product,
-                        sku=item.product.sku,
-                        qty=item.quantity,
-                        mrp=item.product.mrp,
-                        selling_price=item.product.selling_price,
-                        apportioned_discount=Decimal("0.00"), # coupon discount if any
-                        apportioned_online=item.product.selling_price * item.quantity,
-                        apportioned_wallet=Decimal("0.00"), # wallet paid if any
-                        apportioned_gst=item.product.gst_amount
+                        product=product,
+                        sku=product.sku,
+                        qty=qty,
+                        mrp=product.mrp,
+                        selling_price=product.selling_price,
+                        apportioned_discount=p_discount,
+                        apportioned_online=(product.selling_price * qty) - p_discount,
+                        apportioned_wallet=Decimal("0.00"),
+                        apportioned_gst=product.gst_amount or Decimal("0.00")
                     )
 
                 #  Create Order Timeline
@@ -572,7 +699,6 @@ class InitiateOrder(APIView):
                 )
                 payment_resp = initiateOrder(user, total_amount, order, request.store)
                 print("DEBUG cf_order_id:", payment_resp["cf_order_id"], len(payment_resp["cf_order_id"]))
-                print("DEBUG payment_session_id:", payment_resp["payment_session_id"], len(payment_resp["payment_session_id"]))
 
 
                 payment.session_id = payment_resp["payment_session_id"]
@@ -701,7 +827,11 @@ class Webhook(APIView):
                     order.paid_online = order_amount
                     order.updated_by = SYSTEM_UPDATED_BY
                     order.save(update_fields=["status", "paid_online", "updated_by"])
-
+                    CouponUsage.objects.create(
+                        coupon=order.coupon,
+                        user=order.user,
+                        order=order
+                    )
                     remove_cart_items(order.user, order.store)
                 elif event_type == "PAYMENT_FAILED_WEBHOOK":
                     payment.status = PaymentStatus.FAILED
@@ -747,7 +877,7 @@ class PaymentStatusAPIView(APIView):
 
         if not order_number:
             return CustomResponse().errorResponse(
-                description="order_number and status are required"
+                description="order number  required"
             )
 
         order = Order.objects.filter(order_number=order_number).first()
@@ -780,7 +910,11 @@ class PaymentStatusAPIView(APIView):
                 order.status = OrderStatus.PLACED
                 order.paid_online = payment.amount
                 order.save(update_fields=["status", "paid_online"])
-
+                CouponUsage.objects.create(
+                    coupon=order.coupon,
+                    user=order.user,
+                    order=order
+                )
                 remove_cart_items(order.user, order.store)
 
 
@@ -867,85 +1001,82 @@ class OrderView(APIView):
     def get(self, request):
         store = request.store
         user = request.user
-        status_filter = request.query_params.get("status")
+        status_filter = request.query_params.get("status", "ONGOING")
         orders_qs = Order.objects.filter(
             store=store,
             user=user
         ).order_by("-created_at")
-        # ---------- Status filter ----------
-        if status_filter:
-            status_filter = status_filter.upper()
-            if status_filter not in self.STATUS_FILTER_MAP:
-                return CustomResponse.errorResponse(
-                    description="Invalid status filter"
-                )
-
-            orders_qs = orders_qs.filter(
-                status__in=self.STATUS_FILTER_MAP[status_filter]
-            )
-            # ---------- Prefetch order items ----------
-            orders_qs = orders_qs.prefetch_related(
-                "items__product",
-                "timelines"
+        status_filter = status_filter.upper()
+        if status_filter not in self.STATUS_FILTER_MAP:
+            return CustomResponse.errorResponse(
+                description="Invalid status filter"
             )
 
-            data = []
+        orders_qs = orders_qs.filter(
+            status__in=self.STATUS_FILTER_MAP[status_filter]
+        )
+        # ---------- Prefetch order items ----------
+        orders_qs = orders_qs.prefetch_related(
+            "items__product__media"
+        )
 
-            for order in orders_qs:
-                items = []
+        data = []
 
-                for item in order.items.all():
-                    product = item.product
+        for order in orders_qs:
+            items = []
 
-                    items.append({
-                        "order_product_id": str(item.id),
-                        "product_id": str(product.id),
-                        "sku": item.sku,
+            for item in order.items.all():
+                product = item.product
+                image_url = None
+                for m in product.media.all():
+                    if m.media_type.lower() == "image":
+                        image_url = m.url
+                        break
 
-                        "name": product.name,
-                        "colour": product.colour,
-                        "size": product.size,
+                items.append({
+                    "order_product_id": str(item.id),
+                    "product_id": str(product.id),
+                    "sku": item.sku,
+                    "image": image_url,
 
-                        "qty": item.qty,
-                        "selling_price": str(item.selling_price),
-                        "mrp": str(item.mrp),
-                        "total_price": str(item.selling_price * item.qty),
+                    "name": product.name,
+                    "colour": product.colour,
+                    "size": product.size,
 
-                        "rating": float(item.rating),
-                        "reviewed": item.review
-                    })
+                    "qty": item.qty,
+                    "selling_price": str(item.selling_price),
+                    "mrp": str(item.mrp),
+                    "total_price": str(item.selling_price * item.qty),
 
-                timeline = []
-                for t in order.timelines.all().order_by("created_at"):
-                    timeline.append({
-                        "status": t.status,
-                        "remarks": t.remarks,
-                        "created_at": t.created_at
-                    })
-
-                data.append({
-                    "order": {
-                        "order_id": str(order.id),
-                        "order_number": order.order_number,
-                        "status": order.status,
-
-                        "coupon_discount": str(order.coupon_discount),
-                        "amount": str(order.amount),
-
-                        "wallet_paid": str(order.wallet_paid),
-                        "paid_online": str(order.paid_online),
-                        "cash_on_delivery": str(order.cash_on_delivery),
-
-                        "created_at": order.created_at,
-                        "address": order.address
-                    },
-                    "items": items
+                    "rating": float(item.rating),
+                    "reviewed": item.review
                 })
 
-            return CustomResponse.successResponse(
-                data=data,
-                description="Orders fetched successfully"
-            )
+            data.append({
+                "order": {
+                    "order_id": str(order.id),
+                    "order_number": order.order_number,
+                    "status": order.status,
+
+                    "coupon_discount": str(order.coupon_discount),
+                    "amount": str(order.amount),
+
+                    "wallet_paid": str(order.wallet_paid),
+                    "paid_online": str(order.paid_online),
+                    "cash_on_delivery": str(order.cash_on_delivery),
+
+                    "created_at": order.created_at,
+                    "address": order.address
+                },
+                "items": items
+            })
+
+        return CustomResponse.successResponse(
+            data=data,
+            description="Orders fetched successfully"
+        )
+
+
 
 
 
@@ -1407,4 +1538,231 @@ class ContactMessageAPIView(APIView):
             )
 
 
+class ApplyCoupon(APIView):
+    permission_classes = [IsAuthenticated]
 
+    def get(self, request):
+        user = request.user
+        store = user.store
+        data = request.data
+        coupon_code = data.get("coupon_code")
+        items = data.get("items", [])
+        # ---------- Fetch coupon ----------
+        try:
+            coupon = Coupons.objects.get(
+                store=store,
+                code=coupon_code,
+                is_active=True,
+                start_date__lte=now(),
+                end_date__gte=now()
+            )
+        except Coupons.DoesNotExist:
+            return CustomResponse.errorResponse("Invalid or expired coupon")
+
+        product_ids = [i.get("product_id") for i in items if i.get("product_id")]
+        products = Product.objects.filter(
+            id__in=product_ids,
+            store=store,
+            is_active=True
+        )
+        if not products.exists():
+            return CustomResponse.errorResponse("Invalid products")
+        return calculate_coupon_discount(store=store,coupon=coupon, user=user, products=products, items=items)
+
+
+from decimal import Decimal
+
+def calculate_coupon_discount(*, store, user,coupon, products, items):
+    order_amount = Decimal("0.00")
+    product_ids = [i.get("product_id") for i in items if i.get("product_id")]
+    qty_map = {i["product_id"]: int(i.get("qty", 0)) for i in items}
+
+    product_price_map = {}
+    for p in products:
+        qty = qty_map.get(str(p.id), 0)
+        line_total = p.selling_price * qty
+        order_amount += line_total
+        product_price_map[str(p.id)] = {
+            "price": p.selling_price,
+            "qty": qty,
+            "line_total": line_total
+        }
+    # ---------- First order check ----------
+    if coupon.first_order_only:
+        has_order = Order.objects.filter(
+            store=store,
+            user=user,
+            status__in=[
+                OrderStatus.CONFIRMED,
+                OrderStatus.DELIVERED
+            ]
+        ).exists()
+
+        if has_order:
+            return CustomResponse.errorResponse(
+                "Coupon valid only for first order"
+            )
+    # ---------- Usage limits ----------
+    if coupon.usage_limit is not None:
+        if CouponUsage.objects.filter(coupon=coupon).count() >= coupon.usage_limit:
+            return CustomResponse.errorResponse("Coupon usage limit exceeded")
+    if coupon.per_user_limit is not None:
+        if CouponUsage.objects.filter(
+                coupon=coupon,
+                user=user
+        ).count() >= coupon.per_user_limit:
+            return CustomResponse.errorResponse(
+                "You have already used this coupon"
+            )
+    # ---------- Minimum order ----------
+    if order_amount < coupon.min_order_amount:
+        return CustomResponse.errorResponse(
+            f"Minimum order value ₹{coupon.min_order_amount} required"
+        )
+    eligible_amount = order_amount
+    # ---------- Target based eligibility ----------
+    if coupon.target_type == "PRODUCT":
+        eligible_products = CouponProduct.objects.filter(
+            coupon=coupon,
+            product_id__in=product_ids
+        ).values_list("product_id", flat=True)
+
+        eligible_amount = sum(
+            product_price_map[str(pid)]["line_total"]
+            for pid in eligible_products
+            if str(pid) in product_price_map
+        )
+
+        if eligible_amount == 0:
+            return CustomResponse.errorResponse(
+                "Coupon not applicable to selected products"
+            )
+    elif coupon.target_type == "CATEGORY":
+        eligible_products = Product.objects.filter(
+            id__in=product_ids,
+            categories__in=CouponCategory.objects.filter(
+                coupon=coupon
+            ).values_list("category_id", flat=True)
+        ).distinct()
+
+        eligible_amount = sum(
+            product_price_map[str(p.id)]["line_total"]
+            for p in eligible_products
+        )
+
+        if eligible_amount == 0:
+            return CustomResponse.errorResponse(
+                "Coupon not applicable to product categories"
+            )
+
+    elif coupon.target_type == "TAG":
+        eligible_products = Product.objects.filter(
+            id__in=product_ids,
+            tags__in=CouponTag.objects.filter(
+                coupon=coupon
+            ).values_list("tag_id", flat=True)
+        ).distinct()
+
+        eligible_amount = sum(
+            product_price_map[str(p.id)]["line_total"]
+            for p in eligible_products
+        )
+
+        if eligible_amount == 0:
+            return CustomResponse.errorResponse(
+                "Coupon not applicable to product tags"
+            )
+    # ---------- Calculate discount ----------
+    if coupon.discount_type == "FLAT":
+        discount = coupon.discount_value
+    else:
+        discount = eligible_amount * coupon.discount_value / Decimal("100")
+    if coupon.max_discount_amount:
+        discount = min(discount, coupon.max_discount_amount)
+    discount = min(discount, order_amount)
+    payable_amount = order_amount - discount
+    return CustomResponse.successResponse(
+        data={
+            "coupon_code": coupon.code,
+            "order_amount": str(order_amount),
+            "discount_amount": str(discount.quantize(Decimal("0.01"))),
+            "payable_amount": str(payable_amount.quantize(Decimal("0.01"))),
+            "eligible_amount": str(eligible_amount),
+            "message": "Coupon applied successfully"
+        }
+    )
+
+
+
+
+class UserCouponListAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        store = request.store
+
+        # ---------- Pagination ----------
+        current_time = now()
+        queryset = Coupons.objects.filter(
+            store=store,
+            is_active=True,
+            start_date__lte=current_time,
+            end_date__gte=current_time
+        ).order_by("-created_at")
+        # ---------- First order check ----------
+        has_completed_order = Order.objects.filter(
+            store=store,
+            user=request.user,
+            status__in=[
+                OrderStatus.CONFIRMED,
+                OrderStatus.DELIVERED
+            ]
+        ).exists()
+
+        eligible_coupons = []
+
+
+        # ---------- Response ----------
+        data = []
+
+        for c in queryset:
+            # 1️⃣ First order validation
+            if c.first_order_only and has_completed_order:
+                continue
+            # 2️⃣ Global usage limit
+            if c.usage_limit is not None:
+                total_used = CouponUsage.objects.filter(
+                    coupon=c
+                ).count()
+                if total_used >= c.usage_limit:
+                    continue
+            # 3️⃣ Per-user usage limit
+            if c.per_user_limit is not None:
+                user_used = CouponUsage.objects.filter(
+                        coupon=c,
+                        user=request.user
+                    ).count()
+                if user_used >= c.per_user_limit:
+                    continue
+
+            data.append({
+                "id": str(c.id),
+                "code": c.code,
+                "description": c.description,
+                "target_type": c.target_type,
+                "discount_type": c.discount_type,
+                "discount_value": str(c.discount_value),
+                "max_discount_amount": (
+                    str(c.max_discount_amount)
+                    if c.max_discount_amount else None
+                ),
+                "min_order_amount": str(c.min_order_amount),
+                "first_order_only": c.first_order_only,
+                "start_date": c.start_date,
+                "end_date": c.end_date
+            })
+
+        return CustomResponse.successResponse(
+            data=data,
+            description="Active coupons fetched successfully"
+        )

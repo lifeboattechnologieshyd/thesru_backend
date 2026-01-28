@@ -1,4 +1,5 @@
 from datetime import timedelta
+from decimal import Decimal
 from tokenize import Double
 from unicodedata import category
 
@@ -9,6 +10,7 @@ from django.core.exceptions import ObjectDoesNotExist
 from django.db import transaction
 from django.db import IntegrityError
 from django.db.models.aggregates import Avg
+from django.utils.timezone import now
 from rest_framework.views import APIView
 from django.utils import timezone
 from django.db.models import Count, Sum
@@ -18,14 +20,14 @@ from rest_framework.permissions import IsAuthenticated, AllowAny
 from urllib3 import request
 
 from config.settings.common import DEBUG
-from db.models import Category, Product,  Banner, Inventory, PinCode, Coupon, Store, WebBanner, \
+from db.models import Category, Product, Banner, Inventory, PinCode, Store, WebBanner, \
     FlashSaleBanner, Order, User, Cart, OrderProducts, UserOTP, StoreClient, UserSession, ProductMedia, Tag, \
-    OrderTimeLines
+    OrderTimeLines, Coupons, CouponProduct, CouponCategory, CouponTag
 from enums.store import InventoryType, OrderStatus
 from mixins.drf_views import CustomResponse
 from rest_framework_simplejwt.tokens import RefreshToken
 
-from utils.store import generate_lsin
+from utils.store import generate_lsin, generate_order_number
 from utils.user import generate_otp, send_otp_to_mobile, get_storage_path_from_url
 
 
@@ -1419,8 +1421,6 @@ class PinCodeAPIView(APIView):
 
     def post(self,request):
         data = request.data
-
-
         required_fields = ["pin","state","area","city","country"]
         for field in required_fields:
             if not data.get(field):
@@ -1520,96 +1520,6 @@ class PinCodeAPIView(APIView):
 
 
 
-class CouponAPIView(APIView):
-    permission_classes = [IsAuthenticated]
-
-    def post(self,request):
-        data = request.data
-
-        required_fields = ["bonus_code","start_date","expiry_date","minimum_cart_value","bonus_percentage",
-                           "maximum_bonus",]
-        for field in required_fields:
-            if not data.get(field):
-                return CustomResponse.errorResponse(description=f"{field} is required")
-
-        Coupon.objects.create(
-            bonus_code = data.get("bonus_code"),
-            start_date = data.get("start_date"),
-            expiry_date = data.get("expiry_date"),
-            minimum_cart_value = data.get("minimum_cart_value"),
-            bonus_percentage = data.get("bonus_percentage"),
-            maximum_bonus = data.get("maximum_bonus"),
-            terms = data.get("terms"),
-            validity_count = data.get("validity_count"),
-            short_title = data.get("short_title"),
-            long_title = data.get("long_title"),
-
-
-        )
-        return CustomResponse.successResponse(data={},description="coupon created successfully")
-
-
-    def get(self,request,id = None):
-        if id:
-            coupon = Coupon.objects.filter(id=id).values().first()
-            if not coupon:
-                return CustomResponse.errorResponse(
-                    description="coupon id required"
-                )
-
-            return CustomResponse.successResponse(
-                data=[coupon],
-                total=1
-            )
-        page = int(request.query_params.get("page", 1))
-        page_size = int(request.query_params.get("page_size", 10))
-
-        if page < 1 or page_size < 1:
-            return CustomResponse.errorResponse(
-                description="page and page_size must be positive integers"
-            )
-
-        queryset = Coupon.objects.all().order_by("-created_at")
-
-        total = queryset.count()
-        offset = (page - 1) * page_size
-        queryset = queryset[offset: offset + page_size]
-
-        data = list(queryset.values())
-
-        return CustomResponse.successResponse(
-            data=data,
-            total=total
-        )
-    def put(self,request,id=None):
-        if not id:
-            return CustomResponse.errorResponse(description="coupon id required")
-
-        coupon = Coupon.objects.filter(id=id).first()
-
-        if not coupon:
-            return CustomResponse.errorResponse(description="coupon not found")
-
-
-        for field in [
-            "start_date","state","area","city","country",
-        ]:
-            if field in request.data:
-                setattr(coupon,field,request.data.get(field))
-
-        coupon.save()
-        return CustomResponse.successResponse(data={},description="coupon updated successfully")
-
-    def delete(self,request,id=None):
-        if not id:
-            return CustomResponse.errorResponse(description="coupon id required")
-
-        coupon = Coupon.objects.filter(id=id).filter()
-        if not coupon:
-            return CustomResponse.errorResponse(description="coupon not found")
-
-        coupon.delete()
-        return CustomResponse.successResponse(data={},description="coupon deleted successfully")
 
 
 
@@ -2010,132 +1920,78 @@ class AbandonedOrderListAPIView(APIView):
     def get(self, request):
         try:
             store = request.store
+
+            page = int(request.query_params.get("page", 1))
+            page_size = int(request.query_params.get("page_size", 20))
             from_date = request.query_params.get("from_date")
             to_date = request.query_params.get("to_date")
 
-            # -------- Pagination --------
-            page = int(request.query_params.get("page", 1))
-            page_size = int(request.query_params.get("page_size", 10))
-
-            if page < 1:
-                page = 1
-            if page_size < 1:
-                page_size = 10
-
-            offset = (page - 1) * page_size
-
-            # -------- Orders (Cancelled + Failed) --------
-            queryset = Order.objects.filter(
-                store_id=store.id,
-                status__in=[OrderStatus.CANCELLED, OrderStatus.FAILED]
+            orders_qs = Order.objects.filter(
+                store=store,
+                status__in=[
+                    OrderStatus.CANCELLED,
+                    OrderStatus.FAILED
+                ]
+            ).select_related(
+                "user"
+            ).prefetch_related(
+                "items__product__media"
             ).order_by("-created_at")
 
-            # -------- Date Filters --------
+            # ---------- Date filters ----------
             if from_date:
-                queryset = queryset.filter(created_at__date__gte=from_date)
+                orders_qs = orders_qs.filter(created_at__date__gte=from_date)
 
             if to_date:
-                queryset = queryset.filter(created_at__date__lte=to_date)
+                orders_qs = orders_qs.filter(created_at__date__lte=to_date)
 
-            orders = list(
-                queryset[offset: offset + page_size].values(
-                    "order_id",
-                    "user_id",
-                    "amount",
-                    "status",
-                    "created_at",
-                )
-            )
+            total = orders_qs.count()
+            offset = (page - 1) * page_size
+            orders_qs = orders_qs[offset: offset + page_size]
 
-            if not orders:
-                return CustomResponse().successResponse(
-                    description="Cancelled and failed orders fetched successfully",
-                    data=[],
-                    total=0
-                )
+            data = []
 
-            # -------- Fetch Users --------
-            user_ids = {o["user_id"] for o in orders}
+            for order in orders_qs:
+                items = []
 
-            users = User.objects.filter(id__in=user_ids).values(
-                "id", "username", "mobile", "email"
-            )
+                for item in order.items.all():
+                    product = item.product
 
-            user_map = {
-                u["id"]: {
-                    "username": u["username"],
-                    "mobile": u["mobile"],
-                    "email": u["email"],
-                }
-                for u in users
-            }
+                    # ---- primary image ----
+                    image_url = None
+                    for m in product.media.all():
+                        if m.media_type == "image":
+                            image_url = m.url
+                            break
 
-            # -------- Fetch Order Products --------
-            order_ids = [o["order_id"] for o in orders]
+                    items.append({
+                        "product_id": str(product.id),
+                        "sku": item.sku,
+                        "name": product.name,
+                        "qty": item.qty,
+                        "image": image_url,
+                        "price": str(item.selling_price)
+                    })
 
-            order_products = OrderProducts.objects.filter(
-                store_id=store.id,
-                order_id__in=order_ids
-            ).values(
-                "order_id",
-                "product_id",
-                "sku",
-                "qty",
-                "mrp",
-                "selling_price",
-                "Apportioned_discount",
-                "Apportioned_wallet",
-                "Apportioned_online",
-                "Apportioned_gst",
-                "rating",
-                "review",
-            )
-
-            # -------- Fetch Product Names --------
-            product_ids = {op["product_id"] for op in order_products}
-
-            products = Product.objects.filter(
-                id__in=product_ids
-            ).values("id", "name")
-
-            product_map = {
-                p["id"]: p["name"]
-                for p in products
-            }
-
-            # -------- Group Products by Order --------
-            products_by_order = {}
-            for op in order_products:
-                product_amount = op["qty"] * op["selling_price"]
-
-                products_by_order.setdefault(op["order_id"], []).append({
-                    "product_id": op["product_id"],
-                    "product_name": product_map.get(op["product_id"]),
-                    "qty": op["qty"],
-                    "mrp": op["mrp"],
-                    "selling_price": op["selling_price"],
-                    "amount": product_amount,
-                    # "apportioned_discount": op["Apportioned_discount"],
-                    # "apportioned_wallet": op["Apportioned_wallet"],
-                    # "apportioned_online": op["Apportioned_online"],
-                    # "apportioned_gst": op["Apportioned_gst"],
-                    # "rating": op["rating"],
-                    # "review": op["review"],
+                data.append({
+                    "order_id": str(order.id),
+                    "order_number": order.order_number,
+                    "status": order.status,
+                    "amount": str(order.amount),
+                    "created_at": order.created_at,
+                    "user": {
+                        "id": str(order.user.id),
+                        "name": order.user.name,
+                        "mobile": order.user.mobile,
+                        "email": order.user.email
+                    },
+                    "items": items
                 })
 
-            # -------- Attach User + Products to Orders --------
-            for order in orders:
-                user_info = user_map.get(order["user_id"], {})
-
-                order["username"] = user_info.get("username")
-                order["mobile"] = user_info.get("mobile")
-                order["email"] = user_info.get("email")
-                order["products"] = products_by_order.get(order["order_id"], [])
-
-            return CustomResponse().successResponse(
-                description="Cancelled and failed orders fetched successfully",
-                data=orders,
-                total=len(orders)
+            return CustomResponse.successResponse(
+                data=data,
+                total=total,
+                description="Abandoned orders fetched successfully"
             )
 
         except Exception as e:
@@ -2240,152 +2096,460 @@ class CartListView(APIView):
 class OrderListAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
+    STATUS_FILTER_MAP = {
+        "ONGOING": [
+            OrderStatus.INITIATED,
+            OrderStatus.PLACED,
+            OrderStatus.CONFIRMED,
+            OrderStatus.PACKED,
+            OrderStatus.SHIPPED,
+        ],
+        "DELIVERED": [OrderStatus.DELIVERED],
+        "CANCELLED": [
+            OrderStatus.CANCELLED,
+            OrderStatus.FAILED,
+            OrderStatus.UNFULFILLED,
+        ],
+    }
+
     def get(self, request):
-        try:
-            store = request.store
+        store = request.store
 
-            # -------- Pagination --------
-            page = int(request.query_params.get("page", 1))
-            page_size = int(request.query_params.get("page_size", 10))
+        page = int(request.query_params.get("page", 1))
+        page_size = int(request.query_params.get("page_size", 20))
+        status_filter = request.query_params.get("status")
+        search = request.query_params.get("search")
 
-            if page < 1:
-                page = 1
-            if page_size < 1:
-                page_size = 10
+        queryset = Order.objects.filter(
+            store=store
+        ).select_related("user").order_by("-created_at")
 
-            offset = (page - 1) * page_size
+        # ---- status filter ----
+        if status_filter:
+            status_filter = status_filter.upper()
+            if status_filter not in self.STATUS_FILTER_MAP:
+                return CustomResponse.errorResponse("Invalid status filter")
 
-            # -------- Orders --------
-            orders = list(
-                Order.objects.filter(store_id=store.id)
-                .order_by("-created_at")[offset: offset + page_size]
-                .values(
-                    "order_id",
-                    "user_id",
-                    "amount",
-                    "status",
-                    "created_at",
-                    "paid_online",
-                    "cash_on_delivery",
-                    "wallet_paid",
-                )
+            queryset = queryset.filter(
+                status__in=self.STATUS_FILTER_MAP[status_filter]
             )
 
-            if not orders:
-                return CustomResponse().successResponse(
-                    description="Orders fetched successfully",
-                    data=[]
-                )
-
-            # -------- Users --------
-            user_ids = [o["user_id"] for o in orders]
-
-            users = User.objects.filter(id__in=user_ids).values(
-                "id", "username"
+        # ---- search by order number ----
+        if search:
+            queryset = queryset.filter(
+                order_number__icontains=search
             )
 
-            user_map = {u["id"]: u["username"] for u in users}
+        total = queryset.count()
+        offset = (page - 1) * page_size
+        orders = queryset[offset: offset + page_size]
 
-            # -------- Items = number of products --------
-            order_ids = [o["order_id"] for o in orders]
+        data = []
+        for order in orders:
+            data.append({
+                "order_id": str(order.id),
+                "order_number": order.order_number,
+                "user_id": str(order.user.id),
+                "user_name": order.user.name,
+                "status": order.status,
+                "amount": str(order.amount),
+                "created_at": order.created_at,
+                "item_count": order.items.count()
+            })
 
-            items_count_map = {
-                row["order_id"]: row["product_count"]
-                for row in OrderProducts.objects.filter(
-                    store_id=store.id,
-                    order_id__in=order_ids
-                )
-                .values("order_id")
-                .annotate(product_count=Count("product_id", distinct=True))
-            }
-
-            # -------- Final Response --------
-            result = []
-            for order in orders:
-                payment_status = (
-                    "Paid"
-                    if (
-                        order["paid_online"] > 0
-                        or order["cash_on_delivery"] > 0
-                        or order["wallet_paid"] > 0
-                    )
-                    else "Unpaid"
-                )
-
-                result.append({
-                    "order_id": order["order_id"],
-                    "created_at": order["created_at"],
-                    "customer_name": user_map.get(order["user_id"]),
-                    "total": order["amount"],
-                    "payment_status": payment_status,
-                    "status": order["status"],
-                    "items": items_count_map.get(order["order_id"], 0),
-                })
-
-            return CustomResponse().successResponse(
-                description="Orders fetched successfully",
-                data=result,
-                total=len(result)
-            )
-
-        except Exception as e:
-            return CustomResponse().errorResponse(
-                description=str(e)
-            )
-
-
-
-class UpdateOrderStatusAPIView(APIView):
-    permission_classes = [IsAuthenticated]
-
-    @transaction.atomic
-    def post(self, request):
-        data = request.data
-        order_id = data.get("order_id")
-        new_status = data.get("status")
-        remarks = data.get("remarks")
-
-        if not order_id or not new_status:
-            return CustomResponse().errorResponse(
-                description="order_id and status are required",
-            )
-
-        # 🔍 Fetch order (store-safe)
-        try:
-            order = Order.objects.select_for_update().get(
-                id=order_id,
-                store=request.store
-            )
-        except Order.DoesNotExist:
-            return CustomResponse().errorResponse(
-                description="Order not found",
-            )
-
-        #  Prevent duplicate same-status entry
-        if order.status == new_status:
-            return CustomResponse().errorResponse(
-                description="Order is already in this status",
-            )
-
-        #  Update current order status
-        old_status = order.status
-        order.status = new_status
-        order.updated_by = request.user.mobile
-        order.save(update_fields=["status", "updated_by", "updated_at"])
-
-        #  Insert new timeline record
-        OrderTimeLines.objects.create(
-            order=order,
-            status=new_status,
-            remarks=remarks,
-            created_by=request.user.mobile
+        return CustomResponse.successResponse(
+            data=data,
+            total=total,
+            description="Orders fetched successfully"
         )
 
-        return CustomResponse().successResponse(
+    def post(self, request):
+        store = request.store
+        admin = request.user
+        data = request.data
+
+        user_id = data.get("user_id")
+        products = data.get("products", [])
+        address = data.get("address")
+
+        if not user_id:
+            return CustomResponse.errorResponse("user_id is required")
+
+        if not products:
+            return CustomResponse.errorResponse("products are required")
+
+        if not address:
+            return CustomResponse.errorResponse("address is required")
+
+        try:
+            user = User.objects.get(id=user_id)
+        except User.DoesNotExist:
+            return CustomResponse.errorResponse("Invalid user_id")
+
+        subtotal = Decimal("0.00")
+        order_items = []
+
+        with transaction.atomic():
+
+            # ---------- Validate products ----------
+            for item in products:
+                product_id = item.get("product_id")
+                qty = int(item.get("qty", 0))
+
+                if qty <= 0:
+                    return CustomResponse.errorResponse("Invalid quantity")
+
+                try:
+                    product = Product.objects.select_for_update().get(
+                        id=product_id,
+                        store=store,
+                        is_active=True
+                    )
+                except Product.DoesNotExist:
+                    return CustomResponse.errorResponse(
+                        f"Invalid product {product_id}"
+                    )
+
+                if product.current_stock < qty:
+                    return CustomResponse.errorResponse(
+                        f"{product.name} out of stock"
+                    )
+
+                line_total = product.selling_price * qty
+                subtotal += line_total
+
+                order_items.append((product, qty))
+
+            # ---------- Create Order ----------
+            order_number = generate_order_number(store, "SRU")  # sequence-based
+
+            order = Order.objects.create(
+                store=store,
+                user=user,
+                order_number=order_number,
+                address=address,
+                coupon_discount=Decimal("0.00"),
+                amount=subtotal,
+                wallet_paid=Decimal("0.00"),
+                paid_online=subtotal,
+                status=OrderStatus.CONFIRMED,
+                created_by=admin.id
+            )
+
+            # ---------- Create OrderProducts ----------
+            for product, qty in order_items:
+                OrderProducts.objects.create(
+                    order=order,
+                    product=product,
+                    sku=product.sku,
+                    qty=qty,
+                    mrp=product.mrp,
+                    selling_price=product.selling_price,
+                    apportioned_discount=Decimal("0.00"),
+                    apportioned_wallet=Decimal("0.00"),
+                    apportioned_online=Decimal("0.00"),
+                    apportioned_gst=Decimal("0.00")
+                )
+
+                # Reduce stock immediately (admin confirmed)
+                product.current_stock -= qty
+                product.save(update_fields=["current_stock"])
+            OrderTimeLines.objects.create(
+                order=order,
+                status=OrderStatus.INITIATED,
+                remarks=data.get("remarks", "Order initiated")
+            )
+
+        return CustomResponse.successResponse(
             data={
                 "order_id": str(order.id),
-                "old_status": old_status,
-                "new_status": new_status
+                "order_number": order.order_number,
+                "amount": str(order.amount),
+                "status": order.status
             },
-            description="Order status updated successfully",
+            description="Order created successfully"
+        )
+
+
+class AdminOrderDetailAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, order_id):
+        store = request.store
+        try:
+            order = Order.objects.select_related(
+                "user"
+            ).prefetch_related(
+                "items__product",
+                "payments",
+                "timelines"
+            ).get(
+                id=order_id,
+                store=store
+            )
+        except Order.DoesNotExist:
+            return CustomResponse.errorResponse("Order not found")
+
+        # ---- order products ----
+        items = []
+        for item in order.items.all():
+            product = item.product
+
+            items.append({
+                "order_product_id": str(item.id),
+                "product_id": str(product.id),
+                "sku": item.sku,
+                "name": product.name,
+                "colour": product.colour,
+                "size": product.size,
+                "qty": item.qty,
+                "selling_price": str(item.selling_price),
+                "mrp": str(item.mrp),
+                "total_price": str(item.selling_price * item.qty),
+                "rating": float(item.rating),
+                "reviewed": item.review
+            })
+
+        # ---- payments ----
+        payments = []
+        for p in order.payments.all():
+            payments.append({
+                "payment_id": str(p.id),
+                "gateway": p.gateway,
+                "amount": str(p.amount),
+                "status": p.status,
+                "cf_order_id": p.cf_order_id,
+                "created_at": p.created_at
+            })
+        # ---------- Timelines ----------
+        timelines = []
+        for t in order.timelines.all():
+            timelines.append({
+                "status": t.status,
+                "remarks": t.remarks,
+                "timestamp": t.created_at
+            })
+        return CustomResponse.successResponse(
+            data={
+                "order": {
+                    "order_id": str(order.id),
+                    "order_number": order.order_number,
+                    "status": order.status,
+                    "subtotal": str(order.subtotal),
+                    "coupon_discount": str(order.coupon_discount),
+                    "amount": str(order.amount),
+                    "wallet_paid": str(order.wallet_paid),
+                    "paid_online": str(order.paid_online),
+                    "cash_on_delivery": str(order.cash_on_delivery),
+                    "created_at": order.created_at,
+                    "address": order.address,
+                    "user": {
+                        "id": str(order.user.id),
+                        "name": order.user.name,
+                        "mobile": order.user.mobile,
+                        "email": order.user.email
+                    }
+                },
+                "items": items,
+                "payments": payments,
+                "timelines": timelines
+            },
+            description="Order details fetched successfully"
+        )
+
+
+class AdminCreateCouponAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        store = request.store
+        admin = request.user
+        data = request.data
+
+        code = data.get("code")
+        target_type = data.get("target_type")
+        discount_type = data.get("discount_type")
+        discount_value = data.get("discount_value")
+        start_date = data.get("start_date")
+        end_date = data.get("end_date")
+
+        # ---------- Basic validation ----------
+        if not code:
+            return CustomResponse.errorResponse("Coupon code is required")
+
+        if target_type not in ["ORDER", "SHIPPING", "PRODUCT", "CATEGORY", "TAG"]:
+            return CustomResponse.errorResponse("Invalid target_type")
+
+        if discount_type not in ["FLAT", "PERCENTAGE"]:
+            return CustomResponse.errorResponse("Invalid discount_type")
+
+        if discount_value is None or float(discount_value) <= 0:
+            return CustomResponse.errorResponse("Invalid discount_value")
+
+        if discount_type == "PERCENTAGE" and float(discount_value) > 100:
+            return CustomResponse.errorResponse(
+                "Percentage discount cannot exceed 100"
+            )
+
+        if not start_date or not end_date:
+            return CustomResponse.errorResponse(
+                "start_date and end_date are required"
+            )
+
+        # ---------- Uniqueness ----------
+        if Coupons.objects.filter(
+            store=store,
+            code__iexact=code
+        ).exists():
+            return CustomResponse.errorResponse(
+                "Coupon code already exists"
+            )
+
+        try:
+            with transaction.atomic():
+
+                coupon = Coupons.objects.create(
+                    store=store,
+                    code=code.upper(),
+                    description=data.get("description"),
+
+                    target_type=target_type,
+                    discount_type=discount_type,
+                    discount_value=discount_value,
+                    max_discount_amount=data.get("max_discount_amount"),
+
+                    min_order_amount=data.get("min_order_amount", 0),
+                    min_product_amount=data.get("min_product_amount"),
+                    first_order_only=data.get("first_order_only", False),
+
+                    start_date=start_date,
+                    end_date=end_date,
+
+                    usage_limit=data.get("usage_limit"),
+                    per_user_limit=data.get("per_user_limit"),
+
+                    is_active=True,
+                    created_by=admin.id
+                )
+
+                # ---------- Target mapping ----------
+                if target_type == "PRODUCT":
+                    product_ids = data.get("product_ids", [])
+                    if not product_ids:
+                        return CustomResponse.errorResponse(
+                            "product_ids are required for PRODUCT coupon"
+                        )
+                    for pid in product_ids:
+                        CouponProduct.objects.create(
+                            coupon=coupon,
+                            product_id=pid
+                        )
+
+                elif target_type == "CATEGORY":
+                    category_ids = data.get("category_ids", [])
+                    if not category_ids:
+                        return CustomResponse.errorResponse(
+                            "category_ids are required for CATEGORY coupon"
+                        )
+                    for cid in category_ids:
+                        CouponCategory.objects.create(
+                            coupon=coupon,
+                            category_id=cid
+                        )
+
+                elif target_type == "TAG":
+                    tag_ids = data.get("tag_ids", [])
+                    if not tag_ids:
+                        return CustomResponse.errorResponse(
+                            "tag_ids are required for TAG coupon"
+                        )
+                    for tid in tag_ids:
+                        CouponTag.objects.create(
+                            coupon=coupon,
+                            tag_id=tid
+                        )
+
+        except Exception as e:
+            return CustomResponse.errorResponse(
+                description=str(e) or "Failed to create coupon"
+            )
+
+        return CustomResponse.successResponse(
+            data={
+                "coupon_id": str(coupon.id),
+                "code": coupon.code,
+                "target_type": coupon.target_type
+            },
+            description="Coupon created successfully"
+        )
+
+    def get(self, request):
+        store = request.store
+
+        # ---------- Query params ----------
+        page = int(request.query_params.get("page", 1))
+        page_size = int(request.query_params.get("page_size", 10))
+
+        is_active = request.query_params.get("is_active")
+        target_type = request.query_params.get("target_type")
+        search = request.query_params.get("search")
+
+        # ---------- Base queryset ----------
+        queryset = Coupons.objects.filter(store=store)
+        # ---------- Filters ----------
+        if is_active is not None:
+            queryset = queryset.filter(is_active=is_active.lower() == "true")
+
+        if target_type:
+            queryset = queryset.filter(target_type__iexact=target_type)
+
+        if search:
+            queryset = queryset.filter(
+                Q(code__icontains=search) |
+                Q(description__icontains=search)
+            )
+
+        queryset = queryset.order_by("-created_at")
+
+        # ---------- Pagination ----------
+        total = queryset.count()
+        offset = (page - 1) * page_size
+        coupons = queryset[offset: offset + page_size]
+
+        # ---------- Response ----------
+        data = []
+        current_time = now()
+
+        for c in coupons:
+            data.append({
+                "id": str(c.id),
+                "code": c.code,
+                "description": c.description,
+
+                "target_type": c.target_type,
+                "discount_type": c.discount_type,
+                "discount_value": str(c.discount_value),
+                "max_discount_amount": str(c.max_discount_amount) if c.max_discount_amount else None,
+
+                "min_order_amount": str(c.min_order_amount),
+                "min_product_amount": str(c.min_product_amount) if c.min_product_amount else None,
+
+                "first_order_only": c.first_order_only,
+
+                "start_date": c.start_date,
+                "end_date": c.end_date,
+
+                "usage_limit": c.usage_limit,
+                "per_user_limit": c.per_user_limit,
+
+                "is_active": c.is_active,
+                "is_expired": c.end_date < current_time,
+
+                "created_at": c.created_at
+            })
+
+        return CustomResponse.successResponse(
+            data=data,
+            total=total,
+            description="Coupons fetched successfully"
         )
