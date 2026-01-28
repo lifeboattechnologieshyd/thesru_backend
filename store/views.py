@@ -595,7 +595,7 @@ class InitiateOrder(APIView):
         data = request.data
         items = data.get("products", [])
         address = data.get("address")
-        coupon_code = data.get("coupon_code")
+        coupon_code = data.get("coupon_code", "")
 
         if not items:
             return CustomResponse.errorResponse("products are required")
@@ -694,6 +694,7 @@ class InitiateOrder(APIView):
                     store=store,
                     order=order,
                     gateway='CASHFREE',
+                    status=PaymentStatus.INITIATED,
                     amount=total_amount,
                     user=user,
                 )
@@ -703,7 +704,7 @@ class InitiateOrder(APIView):
 
                 payment.session_id = payment_resp["payment_session_id"]
                 payment.cf_order_id = payment_resp["cf_order_id"]
-                payment.save(update_fields=["session_id", "order_id"])
+                payment.save(update_fields=["session_id", "cf_order_id"])
 
             return CustomResponse().successResponse(
                 data=payment_resp,
