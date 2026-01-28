@@ -1362,7 +1362,10 @@ class OrderView(APIView):
                     "cash_on_delivery": str(order.cash_on_delivery),
 
                     "created_at": order.created_at,
-                    "address": order.address
+                    "address": order.address,
+
+                    "display_date": order.created_at.strftime("%d %b %Y"),
+
                 },
                 "items": items
             })
