@@ -13,8 +13,11 @@ from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated,AllowAny
 
 from django.conf import settings
+
+from db import models
 from db.models import AddressMaster, PinCode, Product, Order, OrderProducts, Payment, OrderTimeLines, \
-    Banner, Category, Cart, CouponUsage, Wishlist, CouponProduct, CouponCategory, CouponTag,WebBanner, FlashSaleBanner, ProductReviews, ContactMessage, Tag, Coupons
+    Banner, Category, Cart, CouponUsage, Wishlist, CouponProduct, CouponCategory, CouponTag, WebBanner, FlashSaleBanner, \
+    ProductReviews, ContactMessage, Tag, Coupons, ProductReviewMedia
 from enums.store import OrderStatus, PaymentStatus
 from mixins.drf_views import CustomResponse
 from utils.store import generate_order_number, time_ago
@@ -1741,10 +1744,16 @@ class Reviews(APIView):
         store = request.store
 
         product_id = payload.get("product_id")
+        rating = int(payload.get("rating", 0))
+        review_text = payload.get("review", "")
+        media_list = payload.get("media", [])
+
         if not product_id:
             return CustomResponse().errorResponse(
                 description="product_id is required"
             )
+        if rating < 1 or rating > 5:
+            return CustomResponse.errorResponse("rating must be between 1 and 5")
 
         product = Product.objects.filter(id=product_id).first()
         if not product:
@@ -1754,7 +1763,8 @@ class Reviews(APIView):
 
         has_purchased = OrderProducts.objects.filter(
             product=product,
-            order__in=Order.objects.filter(user=user, status='DELIVERED')
+            order__user=user,
+            order__status=OrderStatus.DELIVERED
         ).exists()
 
         if not has_purchased:
@@ -1762,23 +1772,45 @@ class Reviews(APIView):
                 description="You can review this product only after purchasing it."
             )
 
-        product_review = ProductReviews.objects.filter(user=user, product=product).first()
-        if product_review:
+        if ProductReviews.objects.filter(user=user, product=product).exists():
             return CustomResponse().errorResponse(data={}, description="You have already submitted a review for this product.")
-        rating = ProductReviews()
-        rating.product = product
-        rating.rating = payload.get("rating",5)
-        rating.user = user
-        rating.store = request.store
-        rating.review = payload.get("review","")
-        rating.save()
-        product.number_of_reviews += 1
-        totalrating = Decimal(product.rating) + Decimal(rating.rating)
-        product.total_rating = totalrating
-        avg_rating = totalrating/product.number_of_reviews
-        product.rating = f"{avg_rating}"
-        product.save()
-        return CustomResponse().successResponse(data={})
+        try:
+            with transaction.atomic():
+                review = ProductReviews.objects.create(
+                    store=store,
+                    product=product,
+                    user=user,
+                    rating=rating,
+                    review=review_text,
+                    created_by=user.id
+                )
+
+                # ---- Save media ----
+                for media in media_list:
+                    ProductReviewMedia.objects.create(
+                        review=review,
+                        url=media.get("url"),
+                        media_type=media.get("media_type")
+                    )
+
+                # ---- Update product rating ----
+                agg = ProductReviews.objects.filter(
+                    product=product
+                ).aggregate(
+                    avg=Avg("rating"),
+                    count=Count("id")
+                )
+
+                product.rating = round(agg["avg"] or 0, 2)
+                product.number_of_reviews = agg["count"]
+                product.save(update_fields=["rating", "number_of_reviews"])
+            return CustomResponse.successResponse(
+                description="Review added successfully",data={}
+            )
+        except Exception as e:
+            return CustomResponse.errorResponse(
+                description=str(e)
+            )
 
 
     def get(self, request):
