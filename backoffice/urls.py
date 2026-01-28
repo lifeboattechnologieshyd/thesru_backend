@@ -2,7 +2,7 @@ from django.urls import path
 
 from backoffice.store import ProductAPIView, CategoriesAPIView, BannerAPIView, InventoryAPIView, \
     PinCodeAPIView, StoreAPIView, WebBannerAPIView, FlashSaleBannerAPIView, OrderStatsAPIView, \
-    CartListView, OrderListAPIView, AbandonedOrderListAPIView, Login, SendOTP, TagsAPIView, AdminOrderDetailAPIView
+    CartListView, OrderListAPIView, AbandonedOrderListAPIView, Login, SendOTP, TagsAPIView, UpdateOrderStatusAPIView
 
 urlpatterns = [
 
@@ -41,6 +41,6 @@ urlpatterns = [
     path("abandoned/stats",AbandonedOrderListAPIView.as_view()),
     path("cart/total",CartListView.as_view()),
     path("orders",OrderListAPIView.as_view()),
-    path("orders/<str:id>",AdminOrderDetailAPIView.as_view()),
+    path("order/update",UpdateOrderStatusAPIView.as_view()),
 
 ]

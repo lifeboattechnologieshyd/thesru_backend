@@ -505,53 +505,30 @@ class InitiateOrder(APIView):
         store = request.store
         user = request.user
         data = request.data
-        items = data.get("products", [])
-        address = data.get("address")
 
-        if not items:
-            return CustomResponse.errorResponse("products are required")
-
-        if not address:
-            return CustomResponse.errorResponse("address is required")
+        cart_items = Cart.objects.select_related("product").filter(
+            store=store,
+            user=user
+        )
+        if not cart_items.exists():
+            return CustomResponse.errorResponse("Cart is empty")
 
         subtotal = Decimal("0.00")
-        product_map = {}
+        for item in cart_items:
+            if item.product.current_stock < item.quantity:
+                return CustomResponse.errorResponse(
+                    f"{item.product.name} is out of stock"
+                )
+            subtotal += item.product.selling_price * item.quantity
+        coupon_discount = Decimal("0.00")
+        # todo : validatae coupon if applied
+        total_amount = subtotal - coupon_discount
+
+
+        order_number = generate_order_number(store, "ORD")
 
         try:
             with transaction.atomic():
-                for item in items:
-                    product_id = item.get("product_id")
-                    qty = int(item.get("qty", 0))
-                    if not product_id or qty <= 0:
-                        return CustomResponse.errorResponse(
-                            "Invalid product_id or qty"
-                        )
-                    try:
-                        product = Product.objects.select_for_update().get(
-                            id=product_id,
-                            store=store,
-                            is_active=True
-                        )
-                    except Product.DoesNotExist:
-                        return CustomResponse.errorResponse(
-                            f"Invalid product: {product_id}"
-                        )
-                    if product.current_stock < qty:
-                        return CustomResponse.errorResponse(
-                            f"{product.name} is out of stock"
-                        )
-
-                    line_total = product.selling_price * qty
-                    subtotal += line_total
-
-                    product_map[product] = qty
-                coupon_discount = Decimal("0.00")
-                total_amount = subtotal - coupon_discount
-
-                # todo : validatae coupon if applied
-
-
-                order_number = generate_order_number(store, "ORD")
                 order = Order.objects.create(
                     store=store,
                     user=user,
@@ -564,19 +541,18 @@ class InitiateOrder(APIView):
                     created_by=user.id
                 )
 
-                # ---------- Create Order Products ----------
-                for product, qty in product_map.items():
+                for item in cart_items:
                     OrderProducts.objects.create(
                         order=order,
-                        product=product,
-                        sku=product.sku,
-                        qty=qty,
-                        mrp=product.mrp,
-                        selling_price=product.selling_price,
-                        apportioned_discount=Decimal("0.00"),
-                        apportioned_online=product.selling_price * qty,
-                        apportioned_wallet=Decimal("0.00"),
-                        apportioned_gst=product.gst_amount
+                        product=item.product,
+                        sku=item.product.sku,
+                        qty=item.quantity,
+                        mrp=item.product.mrp,
+                        selling_price=item.product.selling_price,
+                        apportioned_discount=Decimal("0.00"), # coupon discount if any
+                        apportioned_online=item.product.selling_price * item.quantity,
+                        apportioned_wallet=Decimal("0.00"), # wallet paid if any
+                        apportioned_gst=item.product.gst_amount
                     )
 
                 #  Create Order Timeline
@@ -771,7 +747,7 @@ class PaymentStatusAPIView(APIView):
 
         if not order_number:
             return CustomResponse().errorResponse(
-                description="order number  required"
+                description="order_number and status are required"
             )
 
         order = Order.objects.filter(order_number=order_number).first()
@@ -891,82 +867,85 @@ class OrderView(APIView):
     def get(self, request):
         store = request.store
         user = request.user
-        status_filter = request.query_params.get("status", "ONGOING")
+        status_filter = request.query_params.get("status")
         orders_qs = Order.objects.filter(
             store=store,
             user=user
         ).order_by("-created_at")
-        status_filter = status_filter.upper()
-        if status_filter not in self.STATUS_FILTER_MAP:
-            return CustomResponse.errorResponse(
-                description="Invalid status filter"
+        # ---------- Status filter ----------
+        if status_filter:
+            status_filter = status_filter.upper()
+            if status_filter not in self.STATUS_FILTER_MAP:
+                return CustomResponse.errorResponse(
+                    description="Invalid status filter"
+                )
+
+            orders_qs = orders_qs.filter(
+                status__in=self.STATUS_FILTER_MAP[status_filter]
+            )
+            # ---------- Prefetch order items ----------
+            orders_qs = orders_qs.prefetch_related(
+                "items__product",
+                "timelines"
             )
 
-        orders_qs = orders_qs.filter(
-            status__in=self.STATUS_FILTER_MAP[status_filter]
-        )
-        # ---------- Prefetch order items ----------
-        orders_qs = orders_qs.prefetch_related(
-            "items__product__media"
-        )
+            data = []
 
-        data = []
+            for order in orders_qs:
+                items = []
 
-        for order in orders_qs:
-            items = []
+                for item in order.items.all():
+                    product = item.product
 
-            for item in order.items.all():
-                product = item.product
-                image_url = None
-                for m in product.media.all():
-                    if m.media_type.lower() == "image":
-                        image_url = m.url
-                        break
+                    items.append({
+                        "order_product_id": str(item.id),
+                        "product_id": str(product.id),
+                        "sku": item.sku,
 
-                items.append({
-                    "order_product_id": str(item.id),
-                    "product_id": str(product.id),
-                    "sku": item.sku,
-                    "image": image_url,
+                        "name": product.name,
+                        "colour": product.colour,
+                        "size": product.size,
 
-                    "name": product.name,
-                    "colour": product.colour,
-                    "size": product.size,
+                        "qty": item.qty,
+                        "selling_price": str(item.selling_price),
+                        "mrp": str(item.mrp),
+                        "total_price": str(item.selling_price * item.qty),
 
-                    "qty": item.qty,
-                    "selling_price": str(item.selling_price),
-                    "mrp": str(item.mrp),
-                    "total_price": str(item.selling_price * item.qty),
+                        "rating": float(item.rating),
+                        "reviewed": item.review
+                    })
 
-                    "rating": float(item.rating),
-                    "reviewed": item.review
+                timeline = []
+                for t in order.timelines.all().order_by("created_at"):
+                    timeline.append({
+                        "status": t.status,
+                        "remarks": t.remarks,
+                        "created_at": t.created_at
+                    })
+
+                data.append({
+                    "order": {
+                        "order_id": str(order.id),
+                        "order_number": order.order_number,
+                        "status": order.status,
+
+                        "coupon_discount": str(order.coupon_discount),
+                        "amount": str(order.amount),
+
+                        "wallet_paid": str(order.wallet_paid),
+                        "paid_online": str(order.paid_online),
+                        "cash_on_delivery": str(order.cash_on_delivery),
+
+                        "created_at": order.created_at,
+                        "address": order.address
+                    },
+                    "items": items
                 })
 
-            data.append({
-                "order": {
-                    "order_id": str(order.id),
-                    "order_number": order.order_number,
-                    "status": order.status,
-
-                    "coupon_discount": str(order.coupon_discount),
-                    "amount": str(order.amount),
-
-                    "wallet_paid": str(order.wallet_paid),
-                    "paid_online": str(order.paid_online),
-                    "cash_on_delivery": str(order.cash_on_delivery),
-
-                    "created_at": order.created_at,
-                    "address": order.address
-                },
-                "items": items
-            })
-
-        return CustomResponse.successResponse(
-            data=data,
-            description="Orders fetched successfully"
-        )
-
-
+            return CustomResponse.successResponse(
+                data=data,
+                description="Orders fetched successfully"
+            )
 
 
 
