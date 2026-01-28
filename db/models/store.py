@@ -577,19 +577,44 @@ class ProductReviews(AuditModel):
         db_table = "productreviews"
         indexes = [
             models.Index(fields=["user_id"]),
-            # models.Index(fields=["product_id"]),
+            models.Index(fields=["product_id"]),
         ]
+
+class ProductReviewMedia(AuditModel):
+    IMAGE = "IMAGE"
+    VIDEO = "VIDEO"
+
+    MEDIA_TYPE_CHOICES = (
+        (IMAGE, "Image"),
+        (VIDEO, "Video"),
+    )
+
+    review = models.ForeignKey(
+        ProductReviews,
+        on_delete=models.CASCADE,
+        related_name="media"
+    )
+
+    media_type = models.CharField(max_length=10, choices=MEDIA_TYPE_CHOICES)
+    url = models.CharField(max_length=500)
+
+    class Meta:
+        db_table = "reviewmedia"
 
 
 
 class StoreSequence(AuditModel):
     store = models.OneToOneField(Store, on_delete=models.CASCADE)
     last_lsin_number = models.PositiveIntegerField(default=0)
-
+    class Meta:
+        db_table = "store_sequence"
 
 class OrderSequence(AuditModel):
     store = models.OneToOneField(Store, on_delete=models.CASCADE)
     order_number = models.PositiveIntegerField(default=0)
+    class Meta:
+        db_table = "order_sequence"
+
 
 
 

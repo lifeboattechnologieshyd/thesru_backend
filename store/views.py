@@ -5,7 +5,7 @@ import requests
 from django.contrib.admin.templatetags.admin_list import results
 from django.db import transaction
 from django.db import IntegrityError
-from django.db.models import Q
+from django.db.models import Q, Count, Avg
 from decimal import Decimal
 
 from django.utils.timezone import now
@@ -1782,18 +1782,81 @@ class Reviews(APIView):
 
 
     def get(self, request):
-        product_id = request.GET.get("product_id")
+        store = request.store
+        product_id = request.query_params.get("product_id")
 
         if not product_id:
-            return CustomResponse().errorResponse(
-                description="product_id is required"
+            return CustomResponse.errorResponse("product_id is required")
+
+        reviews = ProductReviews.objects.filter(
+            store=store,
+            product_id=product_id
+        ).select_related("user").prefetch_related("media")
+
+        if not reviews.exists():
+            return CustomResponse.successResponse(
+                data={
+                    "reviews": [],
+                    "rating_summary": {
+                        "average_rating": 0,
+                        "total_ratings": 0,
+                        "rating_breakup": {
+                            "1": 0, "2": 0, "3": 0, "4": 0, "5": 0
+                        }
+                    }
+                }
             )
 
-        product_review = ProductReviews.objects.filter(
-            product_id=product_id
-        ).values()
+        # ---------------- Rating Aggregates ----------------
+        rating_counts = (
+            reviews
+            .values("rating")
+            .annotate(count=Count("rating"))
+        )
 
-        return CustomResponse().successResponse(data=list(product_review))
+        rating_breakup = {"1": 0, "2": 0, "3": 0, "4": 0, "5": 0}
+        total_ratings = 0
+
+        for r in rating_counts:
+            rating_breakup[str(r["rating"])] = r["count"]
+            total_ratings += r["count"]
+
+        avg_rating = reviews.aggregate(
+            avg=Avg("rating")
+        )["avg"] or 0
+
+        # ---------------- Review List ----------------
+        review_list = []
+        for review in reviews.order_by("-created_at"):
+            review_list.append({
+                "review_id": review.id,
+                "user": {
+                    "id": review.user.id,
+                    "name": review.user.username,
+                    "profile_image": review.user.profile_image
+                },
+                "rating": review.rating,
+                "review": review.review,
+                "media": [
+                    {
+                        "type": media.media_type,
+                        "url": media.url
+                    }
+                    for media in review.media.all()
+                ],
+                "created_at": review.created_at
+            })
+
+        return CustomResponse.successResponse(
+            data={
+                "rating_summary": {
+                    "average_rating": round(avg_rating, 1),
+                    "total_ratings": total_ratings,
+                    "rating_breakup": rating_breakup
+                },
+                "reviews": review_list
+            }
+        )
 
 
 class ContactMessageAPIView(APIView):
