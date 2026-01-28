@@ -201,43 +201,100 @@ class ProductAPIView(APIView):
     def get(self, request):
         store = request.store
 
+        # ---------- Query params ----------
+        search = request.query_params.get("search")
+        category_id = request.query_params.get("category")
+        tags = request.query_params.get("tags")  # comma-separated
+        lsin = request.query_params.get("lsin")
+
         page = int(request.query_params.get("page", 1))
-        page_size = min(int(request.query_params.get("page_size", 20)), 100)
-        offset = (page - 1) * page_size
+        page_size = int(request.query_params.get("page_size", 10))
 
-        queryset = (
-            Product.objects
-            .filter(store_id=store.id, is_active=True)
-            .annotate(
-                avg_rating=Avg("reviews__rating"),
-                review_count=Count("reviews")
+        # ---------- Base queryset ----------
+        queryset = Product.objects.filter(
+            store=store
+        ).prefetch_related(
+            "categories",
+            "tags",
+            "media"
+        ).order_by("-created_at")
+
+        # ---------- LSIN filter ----------
+        if lsin:
+            queryset = queryset.filter(lsin__iexact=lsin)
+
+        # ---------- Search ----------
+        if search:
+            queryset = queryset.filter(
+                Q(name__icontains=search) |
+                Q(sku__icontains=search) |
+                Q(lsin__icontains=search) |
+                Q(search_tags__icontains=search)
             )
-            .order_by("-created_at")
-        )
 
-        total_count = queryset.count()
-        products = queryset[offset: offset + page_size]
+        # ---------- Category filter ----------
+        if category_id:
+            queryset = queryset.filter(
+                categories__id=category_id
+            )
 
+        # ---------- Tags filter ----------
+        if tags:
+            tag_ids = [t.strip() for t in tags.split(",") if t.strip()]
+            queryset = queryset.filter(
+                tags__id__in=tag_ids
+            )
+
+        queryset = queryset.distinct()
+
+        # ---------- Pagination ----------
+        total = queryset.count()
+        offset = (page - 1) * page_size
+        queryset = queryset[offset: offset + page_size]
+
+        # ---------- Response ----------
         data = []
-        for p in products:
-            data.append({
-                "id": str(p.id),
-                "sku": p.sku,
-                "name": p.name,
-                "size": p.size,
-                "colour": p.colour,
-                "mrp": p.mrp,
-                "selling_price": p.selling_price,
-                "stock": p.current_stock,
-                "created_at": p.created_at,
 
-                # "rating": round(p.avg_rating or 0, 1),
-                # "number_of_reviews": p.review_count,
+        for product in queryset:
+            data.append({
+                "id": str(product.id),
+                "lsin": product.lsin,
+                "group_code": product.group_code,
+                "sku": product.sku,
+
+                "name": product.name,
+                "colour": product.colour,
+                "size": product.size,
+
+                "mrp": str(product.mrp),
+                "selling_price": str(product.selling_price),
+                "current_stock": product.current_stock,
+
+                "categories": [
+                    {"id": str(c.id), "name": c.name}
+                    for c in product.categories.all()
+                ],
+
+                "tags": [
+                    {"id": str(t.id), "name": t.name}
+                    for t in product.tags.all()
+                ],
+                "media": [
+                    {
+                        "id": str(m.id),
+                        "url": m.url,
+                        "type": m.media_type,
+                        "position": m.position
+                    } for m in product.media.all()
+                ],
+                "search_tags": product.search_tags,
+                "is_active": product.is_active,
+                "created_at": product.created_at
             })
 
         return CustomResponse.successResponse(
             data=data,
-            total=total_count,
+            total=total,
             description="Products fetched successfully"
         )
 
