@@ -1784,7 +1784,6 @@ class Reviews(APIView):
                     review=review_text,
                     created_by=user.id
                 )
-
                 # ---- Save media ----
                 for media in media_list:
                     ProductReviewMedia.objects.create(
@@ -1792,7 +1791,6 @@ class Reviews(APIView):
                         url=media.get("url"),
                         media_type=media.get("media_type")
                     )
-
                 # ---- Update product rating ----
                 agg = ProductReviews.objects.filter(
                     product=product
@@ -1800,7 +1798,6 @@ class Reviews(APIView):
                     avg=Avg("rating"),
                     count=Count("id")
                 )
-
                 product.rating = round(agg["avg"] or 0, 2)
                 product.number_of_reviews = agg["count"]
                 product.save(update_fields=["rating", "number_of_reviews"])
