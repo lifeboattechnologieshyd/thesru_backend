@@ -498,6 +498,7 @@ class PinListView(APIView):
         }
 
         return CustomResponse.successResponse(data=data,total=1)
+
 class CheckoutPreview(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -526,11 +527,15 @@ class CheckoutPreview(APIView):
             if not product_id or qty <= 0:
                 return CustomResponse.errorResponse("Invalid product or qty")
 
-            product = Product.objects.get(
+            product = Product.objects.filter(
                 id=product_id,
                 store=store,
                 is_active=True
-            )
+            ).first()
+            if not product:
+                return CustomResponse.errorResponse(
+                    "Product not found or inactive"
+                )
 
             if product.current_stock < qty:
                 return CustomResponse.errorResponse(
