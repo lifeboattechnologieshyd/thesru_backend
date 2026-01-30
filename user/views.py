@@ -328,6 +328,33 @@ class MobileVerifyOTPView(APIView):
             status=status.HTTP_200_OK
         )
 
+class ProfileUpdate(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        user = request.user
+        data = request.data
+        if "name" in data:
+            user.name = data["name"]
+        if "email" in data:
+            user.email = data["email"]
+        if "profile_pic" in data:
+            user.profile_image = data["profile_pic"]
+        if "dob" in data:
+            user.dob = data["dob"]
+        if "gender" in data:
+            user.dob = data["gender"]
+        user.save()
+        return CustomResponse().successResponse(data={
+            "name":user.name,
+            "gender":user.gender,
+            "dob":user.dob,
+            "referral_code":user.referral_code,
+            "wallet_balance":user.wallet_balance,
+            "email":user.email,
+        })
+
+
 class FileUploadView(APIView):
     permission_classes = [AllowAny]
     parser_classes = [MultiPartParser, FormParser]
