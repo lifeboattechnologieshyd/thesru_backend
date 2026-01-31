@@ -275,6 +275,10 @@ class PinCode(AuditModel):
 
     class Meta:
         db_table = "pincode"
+        indexes = [
+
+            models.Index(fields=["pin"]),
+        ]
 
 class Coupons(AuditModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
