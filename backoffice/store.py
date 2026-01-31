@@ -143,7 +143,7 @@ class ProductAPIView(APIView):
             "name",
             "mrp",
             "selling_price",
-            "current_stock"
+            "stock"
         ]
 
         for field in required_fields:
@@ -151,15 +151,23 @@ class ProductAPIView(APIView):
                 return CustomResponse.errorResponse(
                     description=f"{field} is required"
                 )
+        if Decimal(data["selling_price"]) > Decimal(data["mrp"]):
+            return CustomResponse.errorResponse(
+                "Selling price cannot be greater than MRP"
+            )
 
         sku = data["sku"].strip()
-        if Product.objects.filter(sku=sku).exists():
+        if Product.objects.filter(store=store, sku=sku).exists():
             return CustomResponse.errorResponse(
                 description="SKU already exists"
             )
-        gst_percentage = data.get("gst_percentage")
-        product_cost = ((data["selling_price"]) / (100 + gst_percentage) ) * 100
-        gst_amount = data["selling_price"] - product_cost
+        selling_price = Decimal(data["selling_price"])
+        gst_percentage = Decimal(data.get("gst_percentage", 0))
+        if gst_percentage > 0:
+            product_cost = (selling_price * 100) / (100 + gst_percentage)
+            gst_amount = selling_price - product_cost
+        else:
+            gst_amount = Decimal("0.00")
         product=Product.objects.create(
             store=store,
             sku=sku,
@@ -175,6 +183,25 @@ class ProductAPIView(APIView):
             is_active=data.get("is_active", True),
             created_by=request.user.mobile
         )
+        # ---------- Categories ----------
+        category_ids = data.get("categories", [])
+        if category_ids:
+            categories = Category.objects.filter(
+                id__in=category_ids,
+                store=store,
+                is_active=True
+            )
+            product.categories.set(categories)
+
+        # ---------- Tags ----------
+        tag_ids = data.get("tags", [])
+        if tag_ids:
+            tags = Tag.objects.filter(
+                id__in=tag_ids,
+                store=store,
+                is_active=True
+            )
+            product.tags.set(tags)
 
         media_list = data.get("media", [])
 
