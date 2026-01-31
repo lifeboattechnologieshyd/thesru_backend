@@ -153,7 +153,6 @@ class ProductAPIView(APIView):
                 )
 
         sku = data["sku"].strip()
-        # SKU uniqueness
         if Product.objects.filter(sku=sku).exists():
             return CustomResponse.errorResponse(
                 description="SKU already exists"
@@ -172,7 +171,7 @@ class ProductAPIView(APIView):
             selling_price=data["selling_price"],
             gst_percentage=gst_percentage,
             gst_amount=gst_amount,
-            current_stock=data["current_stock"],
+            current_stock=data["stock"],
             is_active=data.get("is_active", True),
             created_by=request.user.mobile
         )
