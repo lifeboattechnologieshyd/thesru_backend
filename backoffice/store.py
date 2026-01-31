@@ -153,13 +153,11 @@ class ProductAPIView(APIView):
                 )
 
         sku = data["sku"].strip()
-
         # SKU uniqueness
         if Product.objects.filter(sku=sku).exists():
             return CustomResponse.errorResponse(
                 description="SKU already exists"
             )
-        # GST calculation (optional)
         gst_percentage = data.get("gst_percentage")
         product_cost = ((data["selling_price"]) / (100 + gst_percentage) ) * 100
         gst_amount = data["selling_price"] - product_cost
@@ -178,13 +176,12 @@ class ProductAPIView(APIView):
             is_active=data.get("is_active", True),
             created_by=request.user.mobile
         )
-        #
-        # 2️⃣ Attach media (optional)
+
         media_list = data.get("media", [])
 
         for media in media_list:
             if not media.get("url") or not media.get("media_type"):
-                continue  # skip invalid entries
+                continue
 
             ProductMedia.objects.create(
                 product=product,

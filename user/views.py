@@ -343,7 +343,7 @@ class ProfileUpdate(APIView):
         if "dob" in data:
             user.dob = data["dob"]
         if "gender" in data:
-            user.dob = data["gender"]
+            user.gender = data["gender"]
         user.save()
         return CustomResponse().successResponse(data={
             "name":user.name,
