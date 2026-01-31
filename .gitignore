@@ -45,3 +45,6 @@ build/
 dist/
 *.egg-info/
 .eggs/
+
+# Project specific
+*.pem
