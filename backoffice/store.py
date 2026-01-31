@@ -143,7 +143,7 @@ class ProductAPIView(APIView):
             "name",
             "mrp",
             "selling_price",
-            "stock"
+            "current_stock"
         ]
 
         for field in required_fields:
@@ -179,7 +179,7 @@ class ProductAPIView(APIView):
             selling_price=data["selling_price"],
             gst_percentage=gst_percentage,
             gst_amount=gst_amount,
-            current_stock=data["stock"],
+            current_stock=data["current_stock"],
             is_active=data.get("is_active", True),
             created_by=request.user.mobile
         )
