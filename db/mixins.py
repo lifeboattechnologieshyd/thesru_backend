@@ -3,6 +3,7 @@ from crum import get_current_request
 from django.db import models
 
 
+
 class TimeAuditModel(models.Model):
     """To path when the record was created and last modified"""
 
@@ -45,3 +46,11 @@ class AuditModel(TimeAuditModel, UserAuditModel):
             self.updated_by = str(request.user.id)
 
         super().save(*args, **kwargs)
+
+
+
+
+
+
+
+

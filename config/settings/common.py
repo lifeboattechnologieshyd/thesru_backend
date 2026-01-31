@@ -9,9 +9,12 @@ https://docs.djangoproject.com/en/5.2/topics/settings/
 For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.2/ref/settings/
 """
+from corsheaders.defaults import default_headers
+
 import os
-from pathlib import Path
 from datetime import timedelta
+from pathlib import Path
+
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -24,7 +27,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-ybwx2=+7(tjhy((m&gqxav68h4jcr8_ts6x@usy_2!v(18+5+&'
+SECRET_KEY = "django-insecure-ybwx2=+7(tjhy((m&gqxav68h4jcr8_ts6x@usy_2!v(18+5+&"
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
@@ -35,15 +38,16 @@ ALLOWED_HOSTS = []
 # Application definition
 
 INSTALLED_APPS = [
-    'django.contrib.admin',
-    'django.contrib.auth',
-    'django.contrib.contenttypes',
-    'django.contrib.sessions',
-    'django.contrib.messages',
-    'django.contrib.staticfiles',
+    "django.contrib.admin",
+    "django.contrib.auth",
+    "django.contrib.contenttypes",
+    "django.contrib.sessions",
+    "django.contrib.messages",
+    "django.contrib.staticfiles",
     # installed apps
-    'db',
-    'store',
+    "db",
+    "store",
+    "core",
     # Third Party
     "rest_framework",
     "rest_framework.authtoken",
@@ -62,35 +66,35 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
-     "corsheaders.middleware.CorsMiddleware",  # CORS
-    'django.middleware.security.SecurityMiddleware',
-    'django.contrib.sessions.middleware.SessionMiddleware',
-    'django.middleware.common.CommonMiddleware',
-    'django.middleware.csrf.CsrfViewMiddleware',
-    'django.contrib.auth.middleware.AuthenticationMiddleware',
-    'django.contrib.messages.middleware.MessageMiddleware',
-    'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    "corsheaders.middleware.CorsMiddleware",  # CORS
+    "django.middleware.security.SecurityMiddleware",
+    "django.contrib.sessions.middleware.SessionMiddleware",
+    "django.middleware.common.CommonMiddleware",
+    "django.middleware.csrf.CsrfViewMiddleware",
+    "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "utils.middleware.store_middleware.StoreMiddleware",
+    "django.contrib.messages.middleware.MessageMiddleware",
+    "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
 
-ROOT_URLCONF = 'config.urls'
+ROOT_URLCONF = "config.urls"
 WSGI_APPLICATION = "config.wsgi.application"
 
 
 TEMPLATES = [
     {
-        'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
-        'APP_DIRS': True,
-        'OPTIONS': {
-            'context_processors': [
-                'django.template.context_processors.request',
-                'django.contrib.auth.context_processors.auth',
-                'django.contrib.messages.context_processors.messages',
+        "BACKEND": "django.template.backends.django.DjangoTemplates",
+        "DIRS": [],
+        "APP_DIRS": True,
+        "OPTIONS": {
+            "context_processors": [
+                "django.template.context_processors.request",
+                "django.contrib.auth.context_processors.auth",
+                "django.contrib.messages.context_processors.messages",
             ],
         },
     },
 ]
-
 
 
 # Database
@@ -120,13 +124,83 @@ DATABASES = {
 #################################
 AUTH_USER_MODEL = "db.User"
 
+
+#############################
+#       AWS CREDS         #
+#############################
+AWS_ACCESS_KEY_ID = os.environ.get("AWS_ACCESS_KEY_ID")
+AWS_SECRET_ACCESS_KEY = os.environ.get("AWS_SECRET_ACCESS_KEY")
+AWS_S3_REGION_NAME = os.environ.get("AWS_S3_REGION_NAME")
+AWS_S3_BUCKET = os.environ.get("AWS_S3_BUCKET")
+AWS_S3_ENDPOINT_URL = os.environ.get("AWS_S3_ENDPOINT_URL", None)  # Optional: set for MinIO
+AWS_S3_USE_SSL = os.environ.get("AWS_S3_USE_SSL", "True") == "True"  # Optional: set for MinIO
+
+
+
+#############################
+#       STORAGE ENGINE      #
+#############################
+STORAGES = {
+    "default": {
+        "BACKEND": "storages.backends.s3.S3Storage",
+        "OPTIONS": {
+            "access_key": AWS_ACCESS_KEY_ID,
+            "secret_key": AWS_SECRET_ACCESS_KEY,
+            "region_name": AWS_S3_REGION_NAME,
+            "bucket_name": AWS_S3_BUCKET,
+            "endpoint_url": AWS_S3_ENDPOINT_URL if AWS_S3_ENDPOINT_URL else None,
+            "use_ssl": AWS_S3_USE_SSL,
+        },
+    },
+    "staticfiles": {  # Static files
+        "BACKEND": "storages.backends.s3.S3Storage",
+        "OPTIONS": {
+            "access_key": AWS_ACCESS_KEY_ID,
+            "secret_key": AWS_SECRET_ACCESS_KEY,
+            "region_name": AWS_S3_REGION_NAME,
+            "bucket_name": AWS_S3_BUCKET,
+            "endpoint_url": AWS_S3_ENDPOINT_URL if AWS_S3_ENDPOINT_URL else None,
+            "use_ssl": AWS_S3_USE_SSL,
+            "location": "static",
+        },
+    },
+}
+
+DATA_UPLOAD_MAX_MEMORY_SIZE = 4294967296  # 4GB
+FILE_UPLOAD_MAX_MEMORY_SIZE = 4294967296  # 4GB
+#############################
+#       STATIC FILES        #
+#############################
+STATIC_URL = f"https://{AWS_S3_BUCKET}.s3.{AWS_S3_REGION_NAME}.amazonaws.com/static/"
+
+
+#############################
+#       MEDIA FILES         #
+#############################
+MEDIA_URL = f"https://{AWS_S3_BUCKET}.s3.{AWS_S3_REGION_NAME}.amazonaws.com/"
+
+
+# CASHFREE_URL = "https://sandbox.cashfree.com/pg/orders"
+CASHFREE_API_VERSION = "2025-01-01"
+# CASHFREE_CLIENT_ID = os.getenv("CASHFREE_CLIENT_ID")
+# CASHFREE_CLIENT_SECRET = os.getenv("CASHFREE_CLIENT_SECRET")
+# CASHFREE_WEBHOOK = "https://dev-api.sru.ai/payment/paymentWebhook"
+
 SIMPLE_JWT = {
     "BLACKLIST_DB_ALIAS": "default",
     "ACCESS_TOKEN_LIFETIME": timedelta(
-        days=float(os.getenv("ACCESS_TOKEN_LIFETIME_IN_MINUTES", 1))
+        days=float(os.getenv("ACCESS_TOKEN_LIFETIME_IN_DAYS", 7))
     ),
     "REFRESH_TOKEN_LIFETIME": timedelta(
         days=float(os.getenv("REFRESH_TOKEN_LIFETIME_IN_DAYS", 7))
+    ),
+}
+REST_FRAMEWORK = {
+    "DEFAULT_AUTHENTICATION_CLASSES": (
+        "core.auth.authentication.SessionJWTAuthentication",
+    ),
+    "DEFAULT_PERMISSION_CLASSES": (
+        "rest_framework.permissions.IsAuthenticated",
     ),
 }
 
@@ -135,26 +209,42 @@ SIMPLE_JWT = {
 
 AUTH_PASSWORD_VALIDATORS = [
     {
-        'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
+        "NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator",
     },
     {
-        'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
+        "NAME": "django.contrib.auth.password_validation.MinimumLengthValidator",
     },
     {
-        'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',
+        "NAME": "django.contrib.auth.password_validation.CommonPasswordValidator",
     },
     {
-        'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
+        "NAME": "django.contrib.auth.password_validation.NumericPasswordValidator",
     },
 ]
 
+#############################
+#       CORS SETTINGS       #
+#############################
+ALLOWED_HOSTS = ["*"]
+CORS_ALLOW_ALL_ORIGINS = True
+CORS_ALLOW_CREDENTIALS = True
+CORS_ALLOW_HEADERS = [
+    *default_headers,
+    "x-request-id",
+    "x-store-id",
+    "X-Client-Type",
+    "X-Client-Identifier",
+]
+CORS_EXPOSE_HEADERS = [
+    "x-request-id",
+]
 
 # Internationalization
 # https://docs.djangoproject.com/en/5.2/topics/i18n/
 
-LANGUAGE_CODE = 'en-us'
+LANGUAGE_CODE = "en-us"
 
-TIME_ZONE = 'UTC'
+TIME_ZONE = "UTC"
 
 USE_I18N = True
 
@@ -164,9 +254,27 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
-STATIC_URL = 'static/'
+STATIC_URL = "static/"
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
-DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+
+
+
+SMS_AUTH_KEY = "G5OsafzTnblgPcNLiU69BtXdpZCrKEmuYAIFvhoxb79M2jJwkWLDTxFjvrotcO8mKwfSB2WYXRdUbzka"
+SMS_SENDER_ID = "THESRU"
+SMS_DLT_TEMPLATE_ID = "8764"
+
+
+
+CRONJOBS = [
+    (f"0 */1 * * * cd {BASE_DIR} && ",
+     "store.tasks.cron_run",
+     f">> {BASE_DIR}/cron_run.log 2>&1 "
+     )
+
+
+]
