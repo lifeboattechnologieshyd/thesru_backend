@@ -8,6 +8,7 @@ from django.db import IntegrityError
 from django.db.models import Q, Count, Avg
 from decimal import Decimal
 
+from django.utils.timesince import timesince
 from django.utils.timezone import now
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated,AllowAny
@@ -1324,8 +1325,10 @@ class OrderView(APIView):
         )
         # ---------- Prefetch order items ----------
         orders_qs = orders_qs.prefetch_related(
-            "items__product__media"
+            "items__product__media",
+            "timelines"
         )
+
 
         data = []
 
@@ -1358,6 +1361,14 @@ class OrderView(APIView):
                     "rating": float(item.rating),
                     "reviewed": item.review
                 })
+            timelines = []
+            for t in order.timelines.all().order_by("created_at"):
+                timelines.append({
+                    "status": t.status,
+                    "remarks": t.remarks,
+                    "date": t.created_at.strftime("%d %b %Y"),
+                    "time_ago": f"{timesince(t.created_at)} ago"
+                })
 
             data.append({
                 "order": {
@@ -1378,6 +1389,7 @@ class OrderView(APIView):
                     "display_date": order.created_at.strftime("%d %b %Y"),
 
                 },
+                "timelines": timelines,   # 👈 ADDED
                 "items": items
             })
 
