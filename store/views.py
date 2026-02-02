@@ -1456,15 +1456,6 @@ class WebBannerListView(APIView):
             store_id=store.id,
             is_active=True
         )
-
-        # ---------- Action filter ----------
-        if action is not None:
-            action = action.lower()
-            if action == "true":
-                queryset = queryset.filter(action=True)
-            elif action == "false":
-                queryset = queryset.filter(action=False)
-
         # ---------- Priority-based ordering ----------
         queryset = queryset.order_by(
             "priority",
