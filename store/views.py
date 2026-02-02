@@ -1448,92 +1448,36 @@ class BannerListView(APIView):
 class WebBannerListView(APIView):
     permission_classes = [AllowAny]
 
-    def get(self, request, id=None):
-        store = request.store
-        action = request.query_params.get("action")
-        queryset = WebBanner.objects.filter(is_active=True,store_id=store.id)
 
-        #  ACTION FILTER
-        if action is not None:
-            if action.lower() == "true":
-                queryset = queryset.filter(action=True)
-            elif action.lower() == "false":
-                queryset = queryset.filter(action=False)
-
-        #  LIST BANNERS
-        data = []
-        for banner in queryset.order_by("-created_at"):
-            data.append({
-                "id": str(banner.id),
-                "screen": banner.screen,
-                "image": banner.image,
-                "is_active": banner.is_active,
-                "priority": banner.priority,
-                "action": banner.action,
-                "destination": banner.destination,
-            })
-
-        return CustomResponse.successResponse(
-            data=data,
-            total=len(data)
-        )
 
 class FlashSaleBannerListView(APIView):
     permission_classes = [AllowAny]
 
     def get(self, request):
         store = request.store
-        action = request.query_params.get("action")
-
-        queryset = FlashSaleBanner.objects.filter(
-            is_active=True,
-            store_id=store.id
+        queryset = WebBanner.objects.filter(
+            store_id=store.id,
+            is_active=True
+        ).order_by(
+            "priority",
+            "-created_at"
         )
-
-        # ACTION FILTER
-        if action is not None:
-            queryset = queryset.filter(action=action.lower() == "true")
-
-        # ---------- LIST BANNERS ----------
-        banners = list(queryset.order_by("-created_at"))
-
-        # Collect ALL product IDs from all banners
-        all_product_ids = set()
-        for banner in banners:
-            if banner.product_id:
-                all_product_ids.update(banner.product_id)
-
-        # Fetch products in ONE query
-        products = Product.objects.filter(id__in=all_product_ids)
-        product_map = {str(p.id): p.name for p in products}
-
-        data = []
-        for banner in banners:
-            product_names = []
-            if banner.product_id:
-                product_names = [
-                    product_map.get(str(pid))
-                    for pid in banner.product_id
-                    if str(pid) in product_map
-                ]
-
-            data.append({
+        data = [
+            {
                 "id": str(banner.id),
                 "screen": banner.screen,
-                "name":banner.name,
-                "title":banner.title,
-                "description":banner.description,
+                "title": banner.title,
+                "description": banner.description,
                 "image": banner.image,
-                "is_active": banner.is_active,
                 "priority": banner.priority,
                 "action": banner.action,
                 "destination": banner.destination,
-                "start_date": banner.start_date,
-                "end_date": banner.end_date,
-                "product_id": banner.product_id,
-                "product_names": product_names,
-                "discount": banner.discount
-            })
+                "is_active": banner.is_active,
+                "created_at": banner.created_at,
+                "updated_at": banner.updated_at,
+            }
+            for banner in queryset
+        ]
 
         return CustomResponse.successResponse(
             data=data,
