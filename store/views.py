@@ -1286,6 +1286,25 @@ class OrderedProducts(APIView):
 class OrderView(APIView):
     permission_classes = [IsAuthenticated]
 
+    TIMELINE_STATUS_MAP = {
+        "PAYMENT": [
+            OrderStatus.INITIATED,
+            OrderStatus.PLACED,
+            OrderStatus.CONFIRMED,
+            OrderStatus.FAILED,
+        ],
+        "PACKED": [
+            OrderStatus.PACKED,
+        ],
+        "SHIPPED": [
+            OrderStatus.SHIPPED,
+            OrderStatus.OUT_FOR_DELIVERY,
+        ],
+        "DELIVERED": [
+            OrderStatus.DELIVERED,
+        ],
+    }
+
     STATUS_FILTER_MAP = {
         "ONGOING": [
             OrderStatus.INITIATED,
@@ -1305,6 +1324,35 @@ class OrderView(APIView):
         ],
     }
 
+    def build_fe_timelines(self, order):
+        timeline_map = {
+            "PAYMENT": None,
+            "PACKED": None,
+            "SHIPPED": None,
+            "DELIVERED": None,
+        }
+
+        for t in order.timelines.all():
+            for fe_status, mapped_statuses in self.TIMELINE_STATUS_MAP.items():
+                if t.status in mapped_statuses:
+                    # pick the FIRST occurrence only
+                    if timeline_map[fe_status] is None:
+                        timeline_map[fe_status] = t
+
+        # ---------- Final FE timeline ----------
+        timelines = []
+
+        for fe_status in ["PAYMENT", "PACKED", "SHIPPED", "DELIVERED"]:
+            t = timeline_map[fe_status]
+
+            timelines.append({
+                "status": fe_status,
+                "completed": t is not None,
+                "date": t.created_at.strftime("%d %b %Y") if t else None,
+                "time_ago": f"{timesince(t.created_at)} ago" if t else None
+            })
+
+        return timelines
 
     def get(self, request):
         store = request.store
@@ -1361,14 +1409,9 @@ class OrderView(APIView):
                     "rating": float(item.rating),
                     "reviewed": item.review
                 })
-            timelines = []
-            for t in order.timelines.all().order_by("created_at"):
-                timelines.append({
-                    "status": t.status,
-                    "remarks": t.remarks,
-                    "date": t.created_at.strftime("%d %b %Y"),
-                    "time_ago": f"{timesince(t.created_at)} ago"
-                })
+            timelines = self.build_fe_timelines(order)
+
+
 
             data.append({
                 "order": {
