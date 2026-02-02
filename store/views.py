@@ -1129,11 +1129,13 @@ class Webhook(APIView):
                     order.paid_online = order_amount
                     order.updated_by = event_type
                     order.save(update_fields=["status", "paid_online", "updated_by"])
-                    CouponUsage.objects.create(
-                        coupon=order.coupon,
-                        user=order.user,
-                        order=order
-                    )
+                    if order.coupon is not None:
+                        CouponUsage.objects.create(
+                            coupon=order.coupon,
+                            user=order.user,
+                            order=order
+                        )
+
                     remove_cart_items(order.user, order.store)
                 elif event_type == "PAYMENT_FAILED_WEBHOOK":
                     payment.status = PaymentStatus.FAILED
@@ -1209,11 +1211,13 @@ class PaymentStatusAPIView(APIView):
                 order.paid_online = payment.amount
                 order.updated_by = "PAYMENT STATUS BY FE"
                 order.save(update_fields=["status", "paid_online"])
-                CouponUsage.objects.create(
-                    coupon=order.coupon,
-                    user=order.user,
-                    order=order
-                )
+                if order.coupon is not None:
+                    CouponUsage.objects.create(
+                        coupon=order.coupon,
+                        user=order.user,
+                        order=order
+                    )
+
                 remove_cart_items(order.user, order.store)
 
             elif verified_status == PaymentStatus.FAILED:
