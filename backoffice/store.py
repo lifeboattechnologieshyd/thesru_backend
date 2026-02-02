@@ -4,7 +4,7 @@ from tokenize import Double
 from unicodedata import category
 
 from django.core.files.storage import default_storage
-from django.db.models import Q
+from django.db.models import Q, F
 
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import transaction
@@ -1771,6 +1771,14 @@ class WebBannerAPIView(APIView):
             )
 
         screen = data["screen"]
+        # ---------- Handle priority conflicts ----------
+        WebBanner.objects.filter(
+            store_id=store.id,
+            screen=screen,
+            priority__gte=priority
+        ).update(
+            priority=F("priority") + 1
+        )
 
         # ---------- Create banner ----------
         banner = WebBanner.objects.create(
@@ -1807,36 +1815,110 @@ class WebBannerAPIView(APIView):
             total=total
         )
 
-
-    def put(self,request,id=None):
+    @transaction.atomic
+    def put(self, request, id=None):
         if not id:
-            return CustomResponse.errorResponse(description="web banner id required")
+            return CustomResponse.errorResponse(
+                description="web banner id required"
+            )
 
-        banner = WebBanner.objects.filter(id=id).first()
+        store = request.store
+        data = request.data
+
+        banner = WebBanner.objects.filter(
+            id=id,
+            store_id=store.id
+        ).first()
 
         if not banner:
-            return CustomResponse.errorResponse(description="web banner not found")
+            return CustomResponse.errorResponse(
+                description="web banner not found"
+            )
 
+        old_priority = banner.priority
+        old_screen = banner.screen
 
-        for field in [
-            "screen","image","priority","is_active","action","destination"
-        ]:
-            if field in request.data:
-                setattr(banner,field,request.data.get(field))
+        new_screen = data.get("screen", old_screen)
+        new_priority = data.get("priority", old_priority)
+
+        # ---------- Validate priority ----------
+        try:
+            new_priority = int(new_priority)
+        except (TypeError, ValueError):
+            return CustomResponse.errorResponse(
+                description="priority must be an integer"
+            )
+
+        # ---------- Handle priority shift ----------
+        if new_priority != old_priority or new_screen != old_screen:
+            WebBanner.objects.filter(
+                store_id=store.id,
+                screen=new_screen,
+                priority__gte=new_priority
+            ).exclude(
+                id=banner.id
+            ).update(
+                priority=F("priority") + 1
+            )
+
+            banner.priority = new_priority
+            banner.screen = new_screen
+
+        # ---------- Update other fields safely ----------
+        updatable_fields = [
+            "image",
+            "is_active",
+            "action",
+            "destination",
+            "title",
+            "description",
+        ]
+
+        for field in updatable_fields:
+            if field in data:
+                setattr(banner, field, data[field])
 
         banner.save()
-        return CustomResponse.successResponse(data={},description="web banner updated successfully")
 
-    def delete(self,request,id=None):
+        return CustomResponse.successResponse(
+            data={"banner_id": str(banner.id)},
+            description="web banner updated successfully"
+        )
+
+    @transaction.atomic
+    def delete(self, request, id=None):
         if not id:
-            return CustomResponse.errorResponse(description="web banner id required")
+            return CustomResponse.errorResponse(
+                description="web banner id required"
+            )
 
-        banner = WebBanner.objects.filter(id=id).filter()
+        store = request.store
+
+        banner = WebBanner.objects.filter(
+            id=id,
+            store_id=store.id
+        ).first()
+
         if not banner:
-            return CustomResponse.errorResponse(description="web banner not found")
-
+            return CustomResponse.errorResponse(
+                description="web banner not found"
+            )
+        screen = banner.screen
+        deleted_priority = banner.priority
+        # ---------- Delete banner ----------
         banner.delete()
-        return CustomResponse.successResponse(data={},description="web banner deleted successfully")
+        # ---------- Rebalance priorities ----------
+        WebBanner.objects.filter(
+            store_id=store.id,
+            screen=screen,
+            priority__gt=deleted_priority
+        ).update(
+            priority=F("priority") - 1
+        )
+        return CustomResponse.successResponse(
+            description="web banner deleted successfully",
+            data={}
+        )
 
 
 class FlashSaleBannerAPIView(APIView):
