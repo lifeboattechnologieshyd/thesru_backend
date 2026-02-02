@@ -1448,6 +1448,50 @@ class BannerListView(APIView):
 class WebBannerListView(APIView):
     permission_classes = [AllowAny]
 
+    def get(self, request, id=None):
+        store = request.store
+        action = request.query_params.get("action")
+
+        queryset = WebBanner.objects.filter(
+            store_id=store.id,
+            is_active=True
+        )
+
+        # ---------- Action filter ----------
+        if action is not None:
+            action = action.lower()
+            if action == "true":
+                queryset = queryset.filter(action=True)
+            elif action == "false":
+                queryset = queryset.filter(action=False)
+
+        # ---------- Priority-based ordering ----------
+        queryset = queryset.order_by(
+            "priority",
+            "-created_at"
+        )
+
+        data = [
+            {
+                "id": str(banner.id),
+                "screen": banner.screen,
+                "title": banner.title,
+                "description": banner.description,
+                "image": banner.image,
+                "priority": banner.priority,
+                "action": banner.action,
+                "destination": banner.destination,
+                "is_active": banner.is_active,
+                "created_at": banner.created_at,
+                "updated_at": banner.updated_at,
+            }
+            for banner in queryset
+        ]
+
+        return CustomResponse.successResponse(
+            data=data,
+            total=len(data)
+        )
 
 
 class FlashSaleBannerListView(APIView):
