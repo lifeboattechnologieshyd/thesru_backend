@@ -1742,60 +1742,66 @@ class StoreAPIView(APIView):
 class WebBannerAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
-    def post(self,request):
+    @transaction.atomic
+    def post(self, request):
         data = request.data
         store = request.store
 
-        required_fields = ["screen","image","is_active","priority","action","destination"]
+        required_fields = [
+            "screen",
+            "title",
+            "description",
+            "image",
+            "priority",
+            "action",
+            "destination"
+        ]
+
         for field in required_fields:
-            if not data.get(field):
-                return CustomResponse.errorResponse(description=f"{field} is required")
-
-        WebBanner.objects.create(
-            store_id=store.id,
-            screen = data.get("screen"),
-            title = data.get("title"),
-            description = data.get("description"),
-            image = data.get("image"),
-            is_active = data.get("is_active"),
-            priority = data.get("priority"),
-            action = data.get("action"),
-            destination = data.get("destination"),
-
-        )
-        return CustomResponse.successResponse(data={},description="web banner created successfully")
-
-    def get(self, request, id=None):
-        # ---------- SINGLE BANNER ----------
-        if id:
-            banner = WebBanner.objects.filter(id=id).values().first()
-            if not banner:
+            if field not in data or data[field] in [None, ""]:
                 return CustomResponse.errorResponse(
-                    description="web banner id required"
+                    description=f"{field} is required"
                 )
 
-            return CustomResponse.successResponse(
-                data=[banner],
-                total=1
+        try:
+            priority = int(data["priority"])
+        except ValueError:
+            return CustomResponse.errorResponse(
+                description="priority must be an integer"
             )
 
-        # ---------- PAGINATION ----------
+        screen = data["screen"]
+
+        # ---------- Create banner ----------
+        banner = WebBanner.objects.create(
+            store_id=store.id,
+            screen=screen,
+            title=data["title"],
+            description=data["description"],
+            image=data["image"],
+            is_active=data.get("is_active", True),
+            priority=priority,
+            action=data["action"],
+            destination=data["destination"],
+            created_by=request.user.mobile
+        )
+
+        return CustomResponse.successResponse(
+            data={"banner_id": str(banner.id)},
+            description="Web banner created successfully"
+        )
+    def get(self, request):
         page = int(request.query_params.get("page", 1))
         page_size = int(request.query_params.get("page_size", 10))
-
         if page < 1 or page_size < 1:
             return CustomResponse.errorResponse(
                 description="page and page_size must be positive integers"
             )
-
         queryset = WebBanner.objects.all().order_by("-created_at")
-
         total = queryset.count()
         offset = (page - 1) * page_size
         queryset = queryset[offset: offset + page_size]
-
         data = list(queryset.values())
-
         return CustomResponse.successResponse(
             data=data,
             total=total
