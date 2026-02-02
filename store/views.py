@@ -1191,9 +1191,14 @@ class PaymentStatusAPIView(APIView):
                 description="Payment not found"
             )
         if payment.status == PaymentStatus.COMPLETED:
-            return CustomResponse().successResponse(data={},
-                description="Payment already completed (webhook confirmed)"
+            return CustomResponse().successResponse(
+                data={
+                    "order_number": order_number,
+                    "final_payment_status": order.status,
+                },
+                description="Payment status verified with Cashfree and updated"
             )
+
 
         # 🔥 FETCH CASHFREE STATUS
         cf_response = fetch_cashfree_payment_status(order_number, request.store)
@@ -1231,13 +1236,10 @@ class PaymentStatusAPIView(APIView):
                 order.updated_by = "PAYMENT STATUS BY FE"
                 order.save(update_fields=["status", "updated_by"])
 
-
         return CustomResponse().successResponse(
             data={
                 "order_number": order_number,
-                "cashfree_status": cf_order_status,
-                "final_payment_status": payment.status,
-                "order_status": order.status,
+                "final_payment_status": order.status,
             },
             description="Payment status verified with Cashfree and updated"
         )
