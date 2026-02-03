@@ -331,6 +331,18 @@ class MobileVerifyOTPView(APIView):
 class ProfileUpdate(APIView):
     permission_classes = [IsAuthenticated]
 
+    def get(self, request):
+        user = request.user
+        return CustomResponse().successResponse(data={
+            "name": user.name,
+            "gender": user.gender,
+            "dob": user.dob,
+            "referral_code": user.referral_code,
+            "wallet_balance": user.wallet_balance,
+            "email": user.email,
+            "profile_image": user.profile_image,
+        })
+
     def post(self, request):
         user = request.user
         data = request.data
@@ -352,6 +364,7 @@ class ProfileUpdate(APIView):
             "referral_code":user.referral_code,
             "wallet_balance":user.wallet_balance,
             "email":user.email,
+            "profile_image":user.profile_image,
         })
 
 
