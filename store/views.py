@@ -494,7 +494,7 @@ class PinListView(APIView):
             "pin":pin.pin,
             "state":pin.state,
             "city":pin.city,
-            "area":pin.area,
+            "district":pin.district,
             "country":pin.country
         }
 

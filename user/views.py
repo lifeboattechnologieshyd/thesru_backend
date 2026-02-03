@@ -355,6 +355,7 @@ class ProfileUpdate(APIView):
         })
 
 
+
 class FileUploadView(APIView):
     permission_classes = [AllowAny]
     parser_classes = [MultiPartParser, FormParser]
