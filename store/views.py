@@ -1024,8 +1024,8 @@ def initiateOrder(user, amount, order, store):
     """
     print("DEBUG CASHFREE CLIENT ID:", store.client_id)
     print("DEBUG CASHFREE CLIENT SECRET:", store.client_secret)
-    print("DEBUG CASHFREE URL:", store.url)
-    print("DEBUG CASHFREE WEBHOOK:", store.webhook)
+    print("DEBUG CASHFREE URL:", settings.CASHFREE_URL)
+    print("DEBUG CASHFREE WEBHOOK:", settings.CASHFREE_WEBHOOK)
 
     # --- Prepare payload ---
     payload = {
@@ -1038,7 +1038,7 @@ def initiateOrder(user, amount, order, store):
             "customer_name": str(user.username),
         },
         "order_meta": {
-            "notify_url": store.webhook,
+            "notify_url": settings.CASHFREE_WEBHOOK,
         },
     }
 
@@ -1055,7 +1055,7 @@ def initiateOrder(user, amount, order, store):
 
     try:
         # --- Send request to CashFree ---
-        response = requests.post(store.url, json=payload, headers=headers, timeout=15)
+        response = requests.post(settings.CASHFREE_URL, json=payload, headers=headers, timeout=15)
 
 
         # --- Validate response ---

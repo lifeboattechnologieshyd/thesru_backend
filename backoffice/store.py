@@ -1510,11 +1510,11 @@ class PinCodeAPIView(APIView):
 
         try:
             PinCode.objects.create(
-            pin = data.get("pin"),
-            state = data.get("state"),
-            area = data.get("area"),
-            city = data.get("city"),
-            country = data.get("country")
+                pin = data.get("pin"),
+                state = data.get("state"),
+                district = data.get("district"),
+                city = data.get("city"),
+                country = data.get("country")
             )
             return CustomResponse.successResponse(data={},description="pincode created successfully")
 

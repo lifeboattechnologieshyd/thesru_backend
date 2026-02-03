@@ -267,10 +267,9 @@ class PinCode(AuditModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     pin = models.PositiveIntegerField()
     state = models.CharField(max_length=50)
-    area = models.CharField(max_length=100)
-    city = models.CharField(max_length=100)
+    district = models.CharField(max_length=100)
+    city = models.CharField(max_length=100, null=True)
     country = models.CharField(max_length=100)
-
 
 
     class Meta:

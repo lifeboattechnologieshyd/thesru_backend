@@ -180,11 +180,11 @@ STATIC_URL = f"https://{AWS_S3_BUCKET}.s3.{AWS_S3_REGION_NAME}.amazonaws.com/sta
 MEDIA_URL = f"https://{AWS_S3_BUCKET}.s3.{AWS_S3_REGION_NAME}.amazonaws.com/"
 
 
-# CASHFREE_URL = "https://sandbox.cashfree.com/pg/orders"
+CASHFREE_URL = "https://sandbox.cashfree.com/pg/orders"
 CASHFREE_API_VERSION = "2025-01-01"
 # CASHFREE_CLIENT_ID = os.getenv("CASHFREE_CLIENT_ID")
 # CASHFREE_CLIENT_SECRET = os.getenv("CASHFREE_CLIENT_SECRET")
-# CASHFREE_WEBHOOK = "https://dev-api.sru.ai/payment/paymentWebhook"
+CASHFREE_WEBHOOK = "https://dev-api.sru.ai/store/paymentWebhook"
 
 SIMPLE_JWT = {
     "BLACKLIST_DB_ALIAS": "default",
@@ -278,3 +278,4 @@ CRONJOBS = [
 
 
 ]
+
