@@ -43,7 +43,7 @@ urlpatterns = [
     path("cart/total",CartListView.as_view()),
 
     path("orders",OrderListAPIView.as_view()),
-    path("orders/<str:id>",AdminOrderDetailAPIView.as_view()),
+    path("order/details",AdminOrderDetailAPIView.as_view()),
 
 
     path("coupon",AdminCreateCouponAPIView.as_view()),

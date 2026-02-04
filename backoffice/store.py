@@ -2443,7 +2443,8 @@ class OrderListAPIView(APIView):
 class AdminOrderDetailAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
-    def get(self, request, order_id):
+    def get(self, request):
+        order_id = request.GET.get("id", "")
         store = request.store
         try:
             order = Order.objects.select_related(
