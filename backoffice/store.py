@@ -147,9 +147,8 @@ class CreateAppVersionConfigAPI(APIView):
         os = request.data.get("os")
         min_version = request.data.get("min_supported_version")
         latest_version = request.data.get("latest_version")
-        store_url = request.data.get("store_url")
 
-        if not all([os, min_version, latest_version, store_url]):
+        if not all([os, min_version, latest_version]):
             return CustomResponse().successResponse(
                 data={}, description="Missing required fields"
             )
@@ -163,7 +162,6 @@ class CreateAppVersionConfigAPI(APIView):
             os=os,
             min_supported_version=min_version,
             latest_version=latest_version,
-            store_url=store_url,
             force_update=request.data.get("force_update", False),
             update_title=request.data.get("update_title"),
             update_message=request.data.get("update_message"),
@@ -186,7 +184,6 @@ class CreateAppVersionConfigAPI(APIView):
             "force_update",
             "update_title",
             "update_message",
-            "store_url"
         ]:
             if field in request.data:
                 setattr(config, field, request.data[field])
