@@ -22,7 +22,7 @@ from urllib3 import request
 from config.settings.common import DEBUG
 from db.models import Category, Product, Banner, Inventory, PinCode, Store, WebBanner, \
     FlashSaleBanner, Order, User, Cart, OrderProducts, UserOTP, StoreClient, UserSession, ProductMedia, Tag, \
-    OrderTimeLines, Coupons, CouponProduct, CouponCategory, CouponTag
+    OrderTimeLines, Coupons, CouponProduct, CouponCategory, CouponTag, AddressMaster
 from enums.store import InventoryType, OrderStatus
 from mixins.drf_views import CustomResponse
 from rest_framework_simplejwt.tokens import RefreshToken
@@ -128,6 +128,44 @@ class Login(APIView):
             )
         else:
             return CustomResponse().errorResponse(data={}, description="Invalid Mobile Number")
+
+class UserAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        mobile = request.query_params.get("mobile")
+        store = request.store
+        if not mobile or len(mobile) < 3:
+            return CustomResponse().errorResponse(data={}, description="Enter at least 3 digits of mobile number")
+        users_qs = (
+            User.objects
+            .filter(
+                is_active=True,
+                store=store,
+                mobile_number__startswith=mobile
+            )
+            .order_by("-created_at")
+            .values()[:20]
+        )
+        return CustomResponse().successResponse(data={
+            "users": list(users_qs)
+        })
+
+
+class UserAddress(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        mobile = request.query_params.get("mobile")
+        store = request.store
+        address = AddressMaster.objects.filter(store_id=store.id, mobile=mobile, is_default=True).values()
+        if address:
+            return CustomResponse().successResponse(data=address.first())
+        else:
+            return CustomResponse().errorResponse(data={}, description="No Address found for this user")
+
+
+
 
 
 class ProductAPIView(APIView):
