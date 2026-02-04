@@ -2505,7 +2505,7 @@ class AdminOrderDetailAPIView(APIView):
                     "order_id": str(order.id),
                     "order_number": order.order_number,
                     "status": order.status,
-                    "subtotal": str(order.subtotal),
+                    "subtotal": str(order.amount),
                     "coupon_discount": str(order.coupon_discount),
                     "amount": str(order.amount),
                     "wallet_paid": str(order.wallet_paid),
