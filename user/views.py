@@ -15,13 +15,14 @@ import random
 
 from config.settings.common import DEBUG
 from db.models import User, UserOTP, TempUser, Store, UserSession
+from db.models.user import AppVersionConfig
 from mixins.drf_views import CustomResponse
 from serializers.user import UserMasterSerializer
 
 from rest_framework import status
 
 from utils.storage import add_unique_suffix_to_filename, sanitize_filename
-from utils.user import generate_username, generate_referral_code, send_otp_to_mobile, generate_otp
+from utils.user import generate_username, generate_referral_code, send_otp_to_mobile, generate_otp, version_to_tuple
 
 
 # class MobileSendOTPView(APIView):
@@ -401,3 +402,58 @@ class FileUploadView(APIView):
             return CustomResponse().errorResponse(
                 {"error": str(e)}, description="File upload failed", status=status.HTTP_400_BAD_REQUEST
             )
+
+from rest_framework.views import APIView
+from rest_framework.response import Response
+
+
+class AppVersionCheckAPI(APIView):
+    authentication_classes = []  # public
+    permission_classes = []
+
+    def post(self, request):
+        os = request.header.get("os")
+        version = request.data.get("version")
+
+        if not os or not version:
+            return CustomResponse().errorResponse(data={}, description="os and version are required")
+
+        config = (
+            AppVersionConfig.objects
+            .filter(os=os, is_active=True)
+            .order_by("-updated_at")
+            .first()
+        )
+
+        if not config:
+            return Response({"update_required": False})
+
+        app_version = version_to_tuple(version)
+        min_version = version_to_tuple(config.min_supported_version)
+        latest_version = version_to_tuple(config.latest_version)
+
+        # 🚨 Force update condition
+        if app_version < min_version or config.force_update:
+            return CustomResponse().successResponse(data={
+                "update_required": True,
+                "force_update": True,
+                "latest_version": config.latest_version,
+                "title": config.update_title,
+                "message": config.update_message,
+                "store_url": config.store_url
+            })
+
+        # 🔔 Normal update
+        if app_version < latest_version:
+            return CustomResponse().successResponse(data={
+                "update_required": True,
+                "force_update": False,
+                "latest_version": config.latest_version,
+                "title": config.update_title,
+                "message": config.update_message,
+                "store_url": config.store_url
+            })
+
+        return CustomResponse().successResponse(data={
+            "update_required": False,
+        })

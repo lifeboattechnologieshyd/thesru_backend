@@ -23,6 +23,7 @@ from config.settings.common import DEBUG
 from db.models import Category, Product, Banner, Inventory, PinCode, Store, WebBanner, \
     FlashSaleBanner, Order, User, Cart, OrderProducts, UserOTP, StoreClient, UserSession, ProductMedia, Tag, \
     OrderTimeLines, Coupons, CouponProduct, CouponCategory, CouponTag, AddressMaster
+from db.models.user import AppVersionConfig
 from enums.store import InventoryType, OrderStatus
 from mixins.drf_views import CustomResponse
 from rest_framework_simplejwt.tokens import RefreshToken
@@ -128,6 +129,71 @@ class Login(APIView):
             )
         else:
             return CustomResponse().errorResponse(data={}, description="Invalid Mobile Number")
+class UsersAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+    def get(self, request):
+        store = request.store
+        users_qs = User.objects.filter(
+                store=store
+            ).values()[:20]
+        return CustomResponse().successResponse(data=users_qs)
+
+
+class CreateAppVersionConfigAPI(APIView):
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        os = request.data.get("os")
+        min_version = request.data.get("min_supported_version")
+        latest_version = request.data.get("latest_version")
+        store_url = request.data.get("store_url")
+
+        if not all([os, min_version, latest_version, store_url]):
+            return CustomResponse().successResponse(
+                data={}, description="Missing required fields"
+            )
+        # Check if active record already exists
+        if AppVersionConfig.objects.filter(os=os, is_active=True).exists():
+            return CustomResponse().successResponse(
+                data={}, description=f"Active config already exists for {os}"
+            )
+
+        config = AppVersionConfig.objects.create(
+            os=os,
+            min_supported_version=min_version,
+            latest_version=latest_version,
+            store_url=store_url,
+            force_update=request.data.get("force_update", False),
+            update_title=request.data.get("update_title"),
+            update_message=request.data.get("update_message"),
+            is_active=True
+        )
+        return CustomResponse().successResponse(data={}, description="App version config created")
+
+    def put(self, request, config_id):
+        try:
+            config = AppVersionConfig.objects.get(id=config_id, is_active=True)
+        except AppVersionConfig.DoesNotExist:
+            return CustomResponse().successResponse(
+                data={}, description="Active config not found"
+            )
+
+        # Update allowed fields
+        for field in [
+            "min_supported_version",
+            "latest_version",
+            "force_update",
+            "update_title",
+            "update_message",
+            "store_url"
+        ]:
+            if field in request.data:
+                setattr(config, field, request.data[field])
+
+        config.save()
+        return CustomResponse().successResponse(data={}, description="App version config updated")
+
 
 class UserAPIView(APIView):
     permission_classes = [IsAuthenticated]
@@ -143,7 +209,7 @@ class UserAPIView(APIView):
             ).first()
         address = AddressMaster.objects.filter(store_id=store.id,
                                                mobile=users_qs.mobile,
-                                               is_default=True).values()
+                                               is_default=True).values().first()
 
 
 

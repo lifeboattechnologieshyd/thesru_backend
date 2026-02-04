@@ -3,7 +3,7 @@ from django.urls import path
 from backoffice.store import ProductAPIView, CategoriesAPIView, BannerAPIView, InventoryAPIView, \
     PinCodeAPIView, StoreAPIView, WebBannerAPIView, FlashSaleBannerAPIView, OrderStatsAPIView, \
     CartListView, OrderListAPIView, AbandonedOrderListAPIView, Login, SendOTP, TagsAPIView, AdminOrderDetailAPIView, \
-    AdminCreateCouponAPIView, UserAddress, UserAPIView
+    AdminCreateCouponAPIView, UserAddress, UserAPIView, CreateAppVersionConfigAPI
 from db.models import AddressMaster
 
 urlpatterns = [
@@ -11,7 +11,7 @@ urlpatterns = [
     path("send-otp",SendOTP.as_view()),
     path("verify-otp",Login.as_view()),
 
-    path("users",UserAPIView.as_view()),
+    path("user/search",UserAPIView.as_view()),
     path("user/address",UserAddress.as_view()),
 
     path("store", StoreAPIView.as_view()),
@@ -25,6 +25,10 @@ urlpatterns = [
     path("category/<str:id>",CategoriesAPIView.as_view()),
 
     path("tag",TagsAPIView.as_view()),
+
+    path("appversion",CreateAppVersionConfigAPI.as_view()),
+    path("appversion/<str:id>",CreateAppVersionConfigAPI.as_view()),
+
 
     path("banner",BannerAPIView.as_view()),
     path("banner/<str:id>",BannerAPIView.as_view()),

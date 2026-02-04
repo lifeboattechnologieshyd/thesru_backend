@@ -214,3 +214,30 @@ class UserSession(AuditModel):
 
     def __str__(self):
         return f"{self.user_id} | {self.device_type}"
+
+
+# core/models.py
+
+class AppVersionConfig(AuditModel):
+    OS_CHOICES = (
+        ("android", "Android"),
+        ("ios", "iOS"),
+    )
+    os = models.CharField(max_length=10, choices=OS_CHOICES)
+    min_supported_version = models.CharField(max_length=20)
+    latest_version = models.CharField(max_length=20)
+    force_update = models.BooleanField(default=False)
+    update_title = models.CharField(max_length=100, blank=True, null=True)
+    update_message = models.TextField(blank=True, null=True)
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        db_table = "version_configuration"
+        indexes = [
+            models.Index(fields=["os", "latest_version", "is_active"]),
+        ]
+
+    def __str__(self):
+        return f"{self.os} | {self.latest_version}"
+
+
