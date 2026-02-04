@@ -73,8 +73,10 @@ class User(AbstractBaseUser):
     email = models.EmailField(max_length=100, null=True)
     referral_code = models.CharField(max_length=20, null=True)
     wallet_balance = models.DecimalField(max_digits=12,decimal_places=2,default=0.00)
-    mobile = models.BigIntegerField(
-        validators=[MinValueValidator(1000000000), MaxValueValidator(9999999999)], null=True
+    mobile = models.CharField(
+    max_length=15,
+    db_index=True,
+        null=True
     )
     device_id = models.CharField(max_length=100, null=True)
     country = models.CharField(max_length=30,null=True)

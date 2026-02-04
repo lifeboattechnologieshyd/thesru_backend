@@ -141,7 +141,7 @@ class UserAPIView(APIView):
             User.objects
             .filter(
                 store=store,
-                mobile_number__startswith=mobile
+                mobile__startswith=mobile
             )
             .order_by("-created_at")
             .values()[:20]
