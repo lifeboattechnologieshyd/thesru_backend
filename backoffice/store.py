@@ -140,7 +140,6 @@ class UserAPIView(APIView):
         users_qs = (
             User.objects
             .filter(
-                is_active=True,
                 store=store,
                 mobile_number__startswith=mobile
             )
