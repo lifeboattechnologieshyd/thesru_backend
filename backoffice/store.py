@@ -2493,12 +2493,20 @@ class AdminOrderDetailAPIView(APIView):
             })
         # ---------- Timelines ----------
         timelines = []
+        coupon_details = {}
         for t in order.timelines.all():
             timelines.append({
                 "status": t.status,
                 "remarks": t.remarks,
                 "timestamp": t.created_at
             })
+        if order.coupon:
+            coupon_details = {
+                        "code": order.coupon.code,
+                        "target_type": order.coupon.target_type,
+                        "discount_type": order.coupon.discount_type,
+                        "discount_value": order.coupon.discount_value,
+                    }
         return CustomResponse.successResponse(
             data={
                 "order": {
@@ -2513,6 +2521,7 @@ class AdminOrderDetailAPIView(APIView):
                     "cash_on_delivery": str(order.cash_on_delivery),
                     "created_at": order.created_at,
                     "address": order.address,
+                    "coupon": coupon_details,
                     "user": {
                         "id": str(order.user.id),
                         "name": order.user.name,

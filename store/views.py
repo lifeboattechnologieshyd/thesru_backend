@@ -1130,6 +1130,11 @@ class Webhook(APIView):
                     order.paid_online = order_amount
                     order.updated_by = event_type
                     order.save(update_fields=["status", "paid_online", "updated_by"])
+                    OrderTimeLines.objects.create(
+                        order=order,
+                        status=OrderStatus.PLACED,
+                        remarks="Order Placed"
+                    )
                     if order.coupon is not None:
                         CouponUsage.objects.create(
                             coupon=order.coupon,
@@ -1147,6 +1152,12 @@ class Webhook(APIView):
                     order.updated_by = event_type
                     order.save(update_fields=["status", "updated_by"])
 
+                    OrderTimeLines.objects.create(
+                        order=order,
+                        status=OrderStatus.FAILED,
+                        remarks="Order Failed"
+                    )
+
                 elif event_type == "PAYMENT_USER_DROPPED_WEBHOOK":
                     payment.status = PaymentStatus.CANCELLED
                     payment.updated_by = event_type
@@ -1155,6 +1166,11 @@ class Webhook(APIView):
                     order.status = OrderStatus.CANCELLED
                     order.updated_by = event_type
                     order.save(update_fields=["status", "updated_by"])
+                    OrderTimeLines.objects.create(
+                        order=order,
+                        status=OrderStatus.CANCELLED,
+                        remarks="Order Cancelled"
+                    )
                 else:
                     print("Unhandled webhook type:", event_type)
 
@@ -1217,6 +1233,11 @@ class PaymentStatusAPIView(APIView):
                 order.paid_online = payment.amount
                 order.updated_by = "PAYMENT STATUS BY FE"
                 order.save(update_fields=["status", "paid_online"])
+                OrderTimeLines.objects.create(
+                    order=order,
+                    status=OrderStatus.PLACED,
+                    remarks="Order Placed"
+                )
                 if order.coupon is not None:
                     CouponUsage.objects.create(
                         coupon=order.coupon,
@@ -1230,12 +1251,22 @@ class PaymentStatusAPIView(APIView):
                 order.status = OrderStatus.FAILED
                 order.updated_by = "PAYMENT STATUS BY FE"
                 order.save(update_fields=["status", "updated_by"])
+                OrderTimeLines.objects.create(
+                    order=order,
+                    status=OrderStatus.FAILED,
+                    remarks="Order failed"
+                )
 
 
             elif verified_status == PaymentStatus.CANCELLED:
                 order.status = OrderStatus.CANCELLED
                 order.updated_by = "PAYMENT STATUS BY FE"
                 order.save(update_fields=["status", "updated_by"])
+                OrderTimeLines.objects.create(
+                    order=order,
+                    status=OrderStatus.CANCELLED,
+                    remarks="Order Cancelled"
+                )
 
         return CustomResponse().successResponse(
             data={
