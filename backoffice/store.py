@@ -137,17 +137,23 @@ class UserAPIView(APIView):
         store = request.store
         if not mobile or len(mobile) < 3:
             return CustomResponse().errorResponse(data={}, description="Enter at least 3 digits of mobile number")
-        users_qs = (
-            User.objects
-            .filter(
+        users_qs = User.objects.filter(
                 store=store,
                 mobile__startswith=mobile
-            )
-            .order_by("-created_at")
-            .values()[:20]
-        )
+            ).first()
+        address = AddressMaster.objects.filter(store_id=store.id,
+                                               mobile=users_qs.mobile,
+                                               is_default=True).values()
+
+
+
+
         return CustomResponse().successResponse(data={
-            "users": list(users_qs)
+            "username": users_qs.username,
+            "name": users_qs.name,
+            "mobile": users_qs.mobile,
+            "email": users_qs.email,
+            "address": address,
         })
 
 
