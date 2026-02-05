@@ -109,11 +109,19 @@ def generate_shipping_invoice(order):
     # -------------------------
     # SAVE FILE
     # -------------------------
-    file_path = f"shipping/{order.order_number}.pdf"
+
+    filename = f"{order.order_number}.pdf"
+    file_path = f"shipping/{filename}"
 
     saved_path = default_storage.save(
         file_path,
         ContentFile(buffer.read())
     )
 
-    return saved_path
+    file_url = settings.MEDIA_URL + saved_path
+
+    # Save to order
+    order.shipping_slip = saved_path
+    order.save(update_fields=["shipping_slip"])
+
+    return file_url
