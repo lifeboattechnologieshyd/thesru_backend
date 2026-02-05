@@ -143,13 +143,29 @@ def draw_box(c, x, y, w, h):
     c.rect(x, y, w, h)
 
 
-def generate_shipping_invoice(order):
+
+
+
+def generate_shipping_invoice():
     buffer = BytesIO()
 
     c = canvas.Canvas(buffer, pagesize=A4)
     width, height = A4
     margin = 15
     y = height - margin
+
+    # -------------------------
+    # STATIC DATA
+    # -------------------------
+    customer_name = "Nusrath Syed"
+    address_line1 = "20-4-510-1 kota mitta, meclines road"
+    address_line2 = "Near rehmatia masjid"
+    city_state = "Nellore, Andhra Pradesh"
+    pincode = "524001"
+    phone = "9666215779"
+
+    order_total = "398"
+    awb = "7D124748548"
 
     # -------------------------
     # SHIP TO SECTION
@@ -163,19 +179,18 @@ def generate_shipping_invoice(order):
     c.setFont("Helvetica", 10)
 
     ship_lines = [
-        order.customer_name,
-        order.address_line1,
-        order.address_line2,
-        f"{order.city}, {order.state}",
-        order.pincode,
-        order.phone,
+        customer_name,
+        address_line1,
+        address_line2,
+        city_state,
+        pincode,
+        phone,
     ]
 
     ty = y - 35
     for line in ship_lines:
-        if line:
-            c.drawString(20, ty, str(line))
-            ty -= 14
+        c.drawString(20, ty, line)
+        ty -= 14
 
     y -= box_height + 10
 
@@ -188,7 +203,7 @@ def generate_shipping_invoice(order):
     left_lines = [
         "Dimensions: 21x31x2",
         "Payment: PREPAID",
-        f"Order Total: ₹{order.total}",
+        f"Order Total: ₹{order_total}",
         "Weight: 0.5 kg",
         "EWaybill No:",
         "Routing code: NA",
@@ -201,9 +216,9 @@ def generate_shipping_invoice(order):
         ty -= 14
 
     c.drawRightString(width - 25, y - 20, "DTDC Surface")
-    c.drawRightString(width - 25, y - 35, f"AWB: {order.awb}")
+    c.drawRightString(width - 25, y - 35, f"AWB: {awb}")
 
-    barcode = code128.Code128(order.awb, barHeight=40)
+    barcode = code128.Code128(awb, barHeight=40)
     barcode.drawOn(c, width - 220, y - 90)
 
     y -= box_height + 10
@@ -229,12 +244,14 @@ def generate_shipping_invoice(order):
 
     c.save()
 
+
     buffer.seek(0)
 
     # -------------------------
     # SAVE FILE
     # -------------------------
-    filename = f"{order.order_number}.pdf"
+
+    filename = "shipping_invoice_test.pdf"
     file_path = f"shipping/{filename}"
 
     saved_path = default_storage.save(
@@ -244,7 +261,20 @@ def generate_shipping_invoice(order):
 
     file_url = settings.MEDIA_URL + saved_path
 
-    order.shipping_slip = saved_path
-    order.save(update_fields=["shipping_slip"])
-
+    print("Uploaded to:", file_url)
     return file_url
+
+    # filename = f"{order.order_number}.pdf"
+    # file_path = f"shipping/{filename}"
+    #
+    # saved_path = default_storage.save(
+    #     file_path,
+    #     ContentFile(buffer.read())
+    # )
+    #
+    # file_url = settings.MEDIA_URL + saved_path
+    #
+    # order.shipping_slip = saved_path
+    # order.save(update_fields=["shipping_slip"])
+    #
+    # return file_url
