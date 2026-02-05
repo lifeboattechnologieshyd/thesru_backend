@@ -28,7 +28,7 @@ from enums.store import InventoryType, OrderStatus
 from mixins.drf_views import CustomResponse
 from rest_framework_simplejwt.tokens import RefreshToken
 
-from utils.store import generate_lsin, generate_order_number
+from utils.store import generate_lsin, generate_order_number, BO_STATUS_FLOW
 from utils.user import generate_otp, send_otp_to_mobile, get_storage_path_from_url
 
 
@@ -2507,7 +2507,7 @@ class OrderListAPIView(APIView):
                 amount=subtotal,
                 wallet_paid=Decimal("0.00"),
                 paid_online=subtotal,
-                status=OrderStatus.CONFIRMED,
+                status=OrderStatus.PLACED,
                 created_by=admin.id
             )
 
@@ -2544,6 +2544,45 @@ class OrderListAPIView(APIView):
             },
             description="Order created successfully"
         )
+
+    def put(self, request, id):
+        order = Order.objects.filter(
+            id=id
+        ).first()
+        if not order:
+            return CustomResponse().errorResponse(data={}, description="No order found with provided Id")
+        new_status = request.data.get("status")
+        remarks = request.data.get("remarks")
+
+        if not new_status:
+            return CustomResponse().errorResponse(data={}, description="status is required")
+
+        current_status = order.status
+        allowed_next = BO_STATUS_FLOW.get(current_status, [])
+        if new_status not in allowed_next:
+            return CustomResponse().errorResponse( data=
+                {
+                    "message": "Invalid status transition",
+                    "current_status": current_status,
+                    "allowed_next": allowed_next
+                },
+                description="Invalid status transition",
+            )
+        order.status = new_status
+        order.save()
+        if order.status == OrderStatus.PACKED:
+            #todo: generate shipping slip
+            pass
+        OrderTimeLines.objects.create(
+            order=order,
+            status=new_status,
+            remarks=remarks
+        )
+        return CustomResponse.successResponse(
+            data={},
+            description="Order Updated successfully"
+        )
+
 
 
 class AdminOrderDetailAPIView(APIView):

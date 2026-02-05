@@ -13,6 +13,9 @@ from db.models import Order, StoreSequence, OrderSequence
 
 from django.utils import timezone
 
+from enums.store import OrderStatus
+
+
 def time_ago(dt):
     if not dt:
         return None
@@ -65,3 +68,12 @@ def generate_order_number(store, prefix):
         seq.save(update_fields=["order_number"])
 
         return f"{prefix}-{store.id.hex[:4].upper()}-{seq.order_number:08d}"
+
+
+BO_STATUS_FLOW = {
+    OrderStatus.PLACED: [OrderStatus.PACKED],
+    OrderStatus.CONFIRMED: [OrderStatus.PACKED],
+
+    OrderStatus.PACKED: [OrderStatus.SHIPPED],
+    OrderStatus.SHIPPED: [OrderStatus.DELIVERED],
+}
