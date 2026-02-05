@@ -28,6 +28,7 @@ from enums.store import InventoryType, OrderStatus
 from mixins.drf_views import CustomResponse
 from rest_framework_simplejwt.tokens import RefreshToken
 
+from utils.invoice_generator import generate_shipping_invoice
 from utils.store import generate_lsin, generate_order_number, BO_STATUS_FLOW
 from utils.user import generate_otp, send_otp_to_mobile, get_storage_path_from_url
 
@@ -2571,8 +2572,12 @@ class OrderListAPIView(APIView):
         order.status = new_status
         order.save()
         if order.status == OrderStatus.PACKED:
+            file_path = generate_shipping_invoice(order)
+
+            order.shipping_slip = file_path
+            order.save(update_fields=["shipping_slip"])
             #todo: generate shipping slip
-            pass
+            # pass
         OrderTimeLines.objects.create(
             order=order,
             status=new_status,
