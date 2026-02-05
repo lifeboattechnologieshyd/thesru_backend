@@ -146,7 +146,7 @@ def draw_box(c, x, y, w, h):
 
 
 
-def generate_shipping_invoice():
+def generate_shipping_invoice(order=None):
     buffer = BytesIO()
 
     c = canvas.Canvas(buffer, pagesize=A4)
