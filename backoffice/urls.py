@@ -29,7 +29,6 @@ urlpatterns = [
     path("appversion",CreateAppVersionConfigAPI.as_view()),
     path("appversion/<str:id>",CreateAppVersionConfigAPI.as_view()),
 
-
     path("banner",BannerAPIView.as_view()),
     path("banner/<str:id>",BannerAPIView.as_view()),
 
@@ -38,8 +37,6 @@ urlpatterns = [
 
     path("pin",PinCodeAPIView.as_view()),
     path("pin/<str:id>",PinCodeAPIView.as_view()),
-
-
 
     path("webbanner",WebBannerAPIView.as_view()),
     path("webbanner/<str:id>",WebBannerAPIView.as_view()),
@@ -54,8 +51,5 @@ urlpatterns = [
     path("orders/<str:id>",OrderListAPIView.as_view()),
     path("order/details",AdminOrderDetailAPIView.as_view()),
 
-
     path("coupon",AdminCreateCouponAPIView.as_view()),
-
-
-    ]
+]
