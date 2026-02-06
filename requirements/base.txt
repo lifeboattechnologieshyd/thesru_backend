@@ -43,8 +43,7 @@ gTTS==2.5.*
 # generate invoice
 reportlab==4.2.0
 # pdf generation
-weasyprint==61.2
-pydyf==0.8.0
+
 
 
 # OpenTelemetry core packages
