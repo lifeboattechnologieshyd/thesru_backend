@@ -5,26 +5,31 @@ FROM python:3.13-slim-bookworm AS base
 # ---- Python Build Stage ----
 FROM base AS python-build-stage
 
-
 # Install system dependencies required for building
 RUN apt-get update && apt-get install -y --no-install-recommends \
     # dependencies for building Python packages
     build-essential \
     gcc \
     libpq-dev \
-    python3-dev
+    python3-dev \
+    \
     # runtime libs for WeasyPrint (cairo/pango/gdk-pixbuf and friends)
     libcairo2 \
     libpango-1.0-0 \
     libpangocairo-1.0-0 \
     libpangoft2-1.0-0 \
     libgdk-pixbuf2.0-0 \
+    libglib2.0-0 \
+    libgobject-2.0-0 \
     libffi8 \
     libxml2 \
     libxslt1.1 \
     libjpeg62-turbo \
     zlib1g \
     libfreetype6 \
+    fonts-dejavu-core \
+    shared-mime-info \
+    && rm -rf /var/lib/apt/lists/*
 
 
 # Copy dependency files
