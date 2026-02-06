@@ -1427,8 +1427,6 @@ class InventoryAPIView(APIView):
             return CustomResponse().errorResponse(
                 description="Invalid inventory type"
             )
-
-
         #  Price calculations
         purchase_price = data.get("purchase_price")
         sale_price = data.get("sale_price")
@@ -1461,9 +1459,6 @@ class InventoryAPIView(APIView):
         sale_price = sale_price or 0
         purchase_rate = purchase_rate or 0
         sale_rate = sale_rate or 0
-
-
-
 
         # 4️⃣ Save inventory atomically
         with transaction.atomic():
@@ -1757,9 +1752,9 @@ class StoreAPIView(APIView):
                 description="store created successfully"
             )
 
-        except IntegrityError:
+        except IntegrityError as error:
             return CustomResponse.errorResponse(
-                description="Database integrity error"
+                description=f"Database integrity error {error}"
             )
 
     # ---------------- GET STORE / LIST ----------------
