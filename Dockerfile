@@ -60,13 +60,36 @@ RUN chmod +x /project/scripts/*
 # Install system dependencies required for running
 RUN apt-get update && apt-get install --no-install-recommends -y \
     cron \
+    \
     # Postgres client Runtime Dependencies
     libpq5 \
+    \
     # system monitoring
     procps \
-    # cleaning up unused files
+    \
+    # Chromium runtime deps (REQUIRED)
+    wget \
+    ca-certificates \
+    fonts-liberation \
+    libasound2 \
+    libatk-bridge2.0-0 \
+    libatk1.0-0 \
+    libcups2 \
+    libdbus-1-3 \
+    libdrm2 \
+    libgbm1 \
+    libnspr4 \
+    libnss3 \
+    libx11-xcb1 \
+    libxcomposite1 \
+    libxdamage1 \
+    libxfixes3 \
+    libxrandr2 \
+    xdg-utils \
+    \
     && apt-get purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false \
     && rm -rf /var/lib/apt/lists/*
+
 
 
 # All absolute dir copies ignore workdir instruction. All relative dir copies are wrt to the workdir instruction
@@ -76,6 +99,8 @@ COPY --from=python-build-stage /usr/src/app/wheels  /wheels/
 # use wheels to install python dependencies
 RUN pip install --no-cache-dir --no-index --find-links=/wheels/ /wheels/* \
     && rm -rf /wheels/
+
+RUN playwright install chromium
 
 # Copy Grafana Alloy binary from alloy-download-stage
 COPY --from=alloy-download-stage /tmp/alloy /usr/local/bin/alloy

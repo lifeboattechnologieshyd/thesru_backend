@@ -43,6 +43,7 @@ gTTS==2.5.*
 # generate invoice
 reportlab==4.2.0
 # pdf generation
+playwright==1.49.0
 
 
 
