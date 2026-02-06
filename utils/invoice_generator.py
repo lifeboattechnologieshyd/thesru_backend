@@ -17,7 +17,7 @@ def generate_shipping_invoice(order):
 
     # 1️⃣ Render HTML from Django template
     html_content = render_to_string(
-        "shipping_invoice.html",
+        "store/shipping_invoice.html",
         {"order": order},
     )
 
