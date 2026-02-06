@@ -60,14 +60,10 @@ RUN chmod +x /project/scripts/*
 # Install system dependencies required for running
 RUN apt-get update && apt-get install --no-install-recommends -y \
     cron \
-    \
-    # Postgres client Runtime Dependencies
     libpq5 \
-    \
-    # system monitoring
     procps \
     \
-    # Chromium runtime deps (REQUIRED)
+    # Chromium / Playwright runtime deps
     wget \
     ca-certificates \
     fonts-liberation \
@@ -85,10 +81,11 @@ RUN apt-get update && apt-get install --no-install-recommends -y \
     libxdamage1 \
     libxfixes3 \
     libxrandr2 \
+    libxkbcommon0 \
     xdg-utils \
     \
-    && apt-get purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false \
     && rm -rf /var/lib/apt/lists/*
+
 
 
 
