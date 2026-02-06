@@ -2572,10 +2572,11 @@ class OrderListAPIView(APIView):
         order.status = new_status
         order.save()
         if order.status == OrderStatus.PACKED:
-            file_path = generate_shipping_invoice()
+            shipping_slip_url = generate_shipping_invoice()
 
-            order.shipping_slip = file_path
+            order.shipping_slip = shipping_slip_url
             order.save(update_fields=["shipping_slip"])
+
             #todo: generate shipping slip
             # pass
         OrderTimeLines.objects.create(

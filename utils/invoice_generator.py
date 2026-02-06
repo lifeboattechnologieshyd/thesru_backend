@@ -143,33 +143,17 @@ def draw_box(c, x, y, w, h):
     c.rect(x, y, w, h)
 
 
-
-
-
-def generate_shipping_invoice(order=None):
+def generate_shipping_invoice():
     buffer = BytesIO()
-
     c = canvas.Canvas(buffer, pagesize=A4)
+
     width, height = A4
     margin = 15
     y = height - margin
 
-    # -------------------------
-    # STATIC DATA
-    # -------------------------
-    customer_name = "Nusrath Syed"
-    address_line1 = "20-4-510-1 kota mitta, meclines road"
-    address_line2 = "Near rehmatia masjid"
-    city_state = "Nellore, Andhra Pradesh"
-    pincode = "524001"
-    phone = "9666215779"
-
-    order_total = "398"
-    awb = "7D124748548"
-
-    # -------------------------
-    # SHIP TO SECTION
-    # -------------------------
+    # =========================================================
+    # SHIP TO
+    # =========================================================
     box_height = 95
     draw_box(c, margin, y - box_height, width - 2 * margin, box_height)
 
@@ -177,81 +161,159 @@ def generate_shipping_invoice(order=None):
     c.drawString(20, y - 20, "Ship To")
 
     c.setFont("Helvetica", 10)
-
     ship_lines = [
-        customer_name,
-        address_line1,
-        address_line2,
-        city_state,
-        pincode,
-        phone,
+        "Nusrath Syed",
+        "20-4-510-1 kota mitta, meclines road, near rehmatia masjid",
+        "Nellore, Andhra Pradesh, India",
+        "524001",
+        "9666215779",
     ]
 
-    ty = y - 35
+    ty = y - 38
     for line in ship_lines:
         c.drawString(20, ty, line)
         ty -= 14
 
-    y -= box_height + 10
+    y -= box_height + 8
 
-    # -------------------------
-    # ORDER DETAILS
-    # -------------------------
-    box_height = 110
+    # =========================================================
+    # ORDER DETAILS + BARCODE
+    # =========================================================
+    box_height = 120
     draw_box(c, margin, y - box_height, width - 2 * margin, box_height)
 
     left_lines = [
         "Dimensions: 21x31x2",
         "Payment: PREPAID",
-        f"Order Total: ₹{order_total}",
+        "Order Total: ₹398",
         "Weight: 0.5 kg",
         "EWaybill No:",
         "Routing code: NA",
         "RTO Routing code: NA",
     ]
 
-    ty = y - 20
+    ty = y - 22
     for line in left_lines:
         c.drawString(20, ty, line)
         ty -= 14
 
-    c.drawRightString(width - 25, y - 20, "DTDC Surface")
-    c.drawRightString(width - 25, y - 35, f"AWB: {awb}")
+    c.drawRightString(width - 25, y - 22, "DTDC Surface")
+    c.drawRightString(width - 25, y - 38, "AWB: 7D124748548")
 
-    barcode = code128.Code128(awb, barHeight=40)
-    barcode.drawOn(c, width - 220, y - 90)
+    awb_barcode = code128.Code128(
+        "7D124748548",
+        barHeight=45,
+        barWidth=1.2
+    )
+    awb_barcode.drawOn(c, width - 240, y - 100)
 
-    y -= box_height + 10
+    y -= box_height + 8
 
-    # -------------------------
+    # =========================================================
+    # SHIPPED BY
+    # =========================================================
+    box_height = 160
+    draw_box(c, margin, y - box_height, width - 2 * margin, box_height)
+
+    c.setFont("Helvetica-Bold", 11)
+    c.drawString(20, y - 22, "Shipped By (if undelivered, return to)")
+
+    c.setFont("Helvetica", 10)
+    shipped_lines = [
+        "Ishu’s Store",
+        "Ishu's Store 3rd floor, GMR & GS Complex",
+        "Kishanpura, Opp: Police Head Quarters",
+        "Hanamkonda",
+        "Warangal, Telangana",
+        "506001",
+        "9182348571",
+        "Customer Care: 1800-123-4567",
+        "Customer Email: shiprocket@.com",
+    ]
+
+    ty = y - 42
+    for line in shipped_lines:
+        c.drawString(20, ty, line)
+        ty -= 14
+
+    c.drawRightString(width - 25, y - 22, "Order#: IS1128")
+
+    order_barcode = code128.Code128(
+        "IS1128",
+        barHeight=45,
+        barWidth=1.2
+    )
+    order_barcode.drawOn(c, width - 240, y - 105)
+
+    c.drawRightString(width - 25, y - 120, "Invoice No: ISV00067")
+    c.drawRightString(width - 25, y - 136, "Invoice Date: 28/01/2026")
+    c.drawRightString(width - 25, y - 152, "Order Date: 24/01/2026")
+    c.drawRightString(width - 25, y - 168, "GSTIN:")
+
+    y -= box_height + 8
+
+    # =========================================================
+    # ITEM TABLE
+    # =========================================================
+    box_height = 85
+    draw_box(c, margin, y - box_height, width - 2 * margin, box_height)
+
+    headers = ["Item", "SKU", "Qty", "Price", "HSN", "Taxable Value", "Total"]
+    x_positions = [20, 135, 265, 305, 360, 430, 525]
+
+    c.setFont("Helvetica-Bold", 10)
+    for i, h in enumerate(headers):
+        c.drawString(x_positions[i], y - 22, h)
+
+    c.setFont("Helvetica", 10)
+    values = [
+        "ZOYA NIQAB...",
+        "4540979216...",
+        "1",
+        "₹299.00",
+        "",
+        "₹299.00",
+        "₹299.00",
+    ]
+
+    for i, v in enumerate(values):
+        c.drawString(x_positions[i], y - 42, v)
+
+    c.drawString(20, y - 62, "Platform Fee: ₹0")
+    c.drawString(20, y - 76, "Shipping Charges: ₹99")
+
+    c.drawRightString(width - 25, y - 62, "Discount: ₹0")
+    c.drawRightString(width - 25, y - 76, "Collectable Amount: ₹0")
+
+    y -= box_height + 8
+
+    # =========================================================
     # FOOTER
-    # -------------------------
-    draw_box(c, margin, y - 50, width - 2 * margin, 50)
+    # =========================================================
+    box_height = 55
+    draw_box(c, margin, y - box_height, width - 2 * margin, box_height)
 
     c.setFont("Helvetica-Bold", 9)
     c.drawString(
         20,
-        y - 20,
-        "All disputes are subject to Haryana Jurisdiction only.",
+        y - 22,
+        "All disputes are subject to Haryana Jurisdiction only. Goods once sold will only be taken back or exchanged as per store's exchange and return policy",
     )
 
     c.setFont("Helvetica", 9)
     c.drawString(
         20,
-        y - 35,
+        y - 40,
         "This is an auto generated label and does not require any signature.",
     )
 
+    # =========================================================
+    # SAVE & UPLOAD TO S3
+    # =========================================================
     c.save()
-
-
     buffer.seek(0)
 
-    # -------------------------
-    # SAVE FILE
-    # -------------------------
-
-    filename = "shipping_invoice_test.pdf"
+    filename = "shipping_invoice_static.pdf"
     file_path = f"shipping/{filename}"
 
     saved_path = default_storage.save(
@@ -260,10 +322,7 @@ def generate_shipping_invoice(order=None):
     )
 
     file_url = settings.MEDIA_URL + saved_path
-
-    print("Uploaded to:", file_url)
     return file_url
-
     # filename = f"{order.order_number}.pdf"
     # file_path = f"shipping/{filename}"
     #
