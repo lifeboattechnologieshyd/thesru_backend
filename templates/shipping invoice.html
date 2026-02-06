@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Invoice</title>
+    <style>
+        body {
+            background: #f2f2f2;
+            font-family: Arial, Helvetica, sans-serif;
+        }
+
+        .invoice {
+            width: 800px;
+            margin: 20px auto;
+            background: #fff;
+            border: 2px solid #000;
+            padding: 0;
+        }
+
+        .section {
+            border-bottom: 2px solid #000;
+            padding: 10px;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .left, .right {
+            width: 50%;
+            font-size: 14px;
+            line-height: 1.4;
+        }
+
+        .right {
+            text-align: right;
+        }
+
+        .bold {
+            font-weight: bold;
+        }
+
+        .barcode {
+            margin-top: 10px;
+        }
+
+        .barcode img {
+            width: 280px;
+            height: 70px;
+        }
+
+        .middle {
+            border-bottom: 2px solid #000;
+            padding: 10px;
+            display: flex;
+        }
+
+        .middle .left {
+            width: 60%;
+        }
+
+        .middle .right {
+            width: 40%;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 14px;
+        }
+
+        th, td {
+            border: 2px solid #000;
+            padding: 6px;
+            text-align: center;
+        }
+
+        th {
+            font-weight: bold;
+        }
+
+        .summary {
+            display: flex;
+            padding: 10px;
+            border-bottom: 2px solid #000;
+        }
+
+        .summary .left, .summary .right {
+            width: 50%;
+            font-size: 14px;
+        }
+
+        .footer {
+            padding: 10px;
+            font-size: 13px;
+        }
+
+        .footer-note {
+            border-top: 2px solid #000;
+            padding: 10px;
+            font-size: 13px;
+        }
+
+        @media print {
+            body {
+                background: none;
+            }
+            .invoice {
+                margin: 0;
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<div class="invoice">
+
+    <!-- SHIP TO -->
+    <div class="section">
+        <div class="left">
+            <div class="bold">Ship To</div>
+            Nusrath Syed<br>
+            20-4-510-1 kota mitta, meclines road, near rehmatjya masjid Near rehmatjya masjid<br>
+            Nellore,Andhra Pradesh, India<br>
+            524001<br>
+            9666215779
+        </div>
+
+        <div class="right">
+            <img src="logo.png" width="60" alt="">
+        </div>
+    </div>
+
+    <!-- ORDER DETAILS -->
+    <div class="middle">
+        <div class="left">
+            Dimensions: 21x31x2<br>
+            Payment: PREPAID<br>
+            Order Total: ₹398<br>
+            Weight: 0.5 kg<br>
+            EWaybill No:<br>
+            Routing code: NA<br>
+            RTO Routing code: NA
+        </div>
+
+        <div class="right">
+            <div class="bold">DTDC Surface</div>
+            AWB: 7D124748548
+            <div class="barcode">
+                <img src="barcode1.png" alt="barcode">
+            </div>
+        </div>
+    </div>
+
+    <!-- SHIPPED BY -->
+    <div class="middle">
+        <div class="left">
+            <span class="bold">Shipped By</span> <i>(if undelivered, return to)</i><br>
+            Ishu’s Store<br><br>
+            Ishu's Store 3rd floor, GMR & GS<br>
+            Complex,Kishanpura,Opp:Police Head<br>
+            Quarters, Hanamkonda<br>
+            Warangal, Telangana<br>
+            506001<br>
+            9182348571<br><br>
+            Customer Care: 1800-123-4567<br>
+            Customer Email: shiprocket@.com
+        </div>
+
+        <div class="right">
+            Order#: IS1128
+            <div class="barcode">
+                <img src="barcode2.png" alt="barcode">
+            </div>
+            Invoice No. ISV00067<br>
+            Invoice Date: 28/01/2026<br>
+            Order Date: 24/01/2026<br>
+            GSTIN:
+        </div>
+    </div>
+
+    <!-- ITEM TABLE -->
+    <table>
+        <tr>
+            <th>Item</th>
+            <th>SKU</th>
+            <th>Qty</th>
+            <th>Price</th>
+            <th>HSN</th>
+            <th>Taxable Value</th>
+            <th>Total</th>
+        </tr>
+        <tr>
+            <td>ZOYA NIQAB...</td>
+            <td>4540979216...</td>
+            <td>1</td>
+            <td>₹299.00</td>
+            <td></td>
+            <td>₹299.00</td>
+            <td>₹299.00</td>
+        </tr>
+    </table>
+
+    <!-- SUMMARY -->
+    <div class="summary">
+        <div class="left">
+            Platform Fee: ₹0<br>
+            Shipping Charges: ₹99
+        </div>
+
+        <div class="right">
+            Discount: ₹0<br>
+            Collectable Amount: ₹0
+        </div>
+    </div>
+
+    <!-- FOOTER -->
+    <div class="footer">
+        <b>All disputes are subject to Haryana Jurisdiction only.</b>
+        Goods once sold will only be taken back or exchanged as per store's exchange and return policy
+    </div>
+
+    <div class="footer-note">
+        This is an auto generated label and does not require any signature.
+    </div>
+
+</div>
+
+</body>
+</html>
