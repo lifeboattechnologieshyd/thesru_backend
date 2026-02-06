@@ -1,229 +1,196 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <title>Invoice</title>
-    <style>
-        body {
-            background: #f2f2f2;
-            font-family: Arial, Helvetica, sans-serif;
-        }
+  <meta charset="utf-8" />
+  <title>Shipping Invoice</title>
 
-        .invoice {
-            width: 800px;
-            margin: 20px auto;
-            background: #fff;
-            border: 2px solid #000;
-            padding: 0;
-        }
+  <!-- Barcode font (Code128) -->
+  <link href="https://fonts.googleapis.com/css2?family=Libre+Barcode+128&display=swap" rel="stylesheet">
 
-        .section {
-            border-bottom: 2px solid #000;
-            padding: 10px;
-            display: flex;
-            justify-content: space-between;
-        }
+  <style>
+    @page {
+      size: A4;
+      margin: 10mm;
+    }
 
-        .left, .right {
-            width: 50%;
-            font-size: 14px;
-            line-height: 1.4;
-        }
+    body {
+      font-family: Arial, sans-serif;
+      font-size: 12px;
+      margin: 0;
+    }
 
-        .right {
-            text-align: right;
-        }
+    .page {
+      border: 2px solid #000;
+      padding: 8px;
+      height: 100%;
+    }
 
-        .bold {
-            font-weight: bold;
-        }
+    .box {
+      border: 1px solid #000;
+      padding: 8px;
+      margin-bottom: 6px;
+    }
 
-        .barcode {
-            margin-top: 10px;
-        }
+    .row {
+      display: flex;
+      justify-content: space-between;
+    }
 
-        .barcode img {
-            width: 280px;
-            height: 70px;
-        }
+    .left {
+      width: 60%;
+    }
 
-        .middle {
-            border-bottom: 2px solid #000;
-            padding: 10px;
-            display: flex;
-        }
+    .right {
+      width: 38%;
+      text-align: right;
+    }
 
-        .middle .left {
-            width: 60%;
-        }
+    .title {
+      font-weight: bold;
+      margin-bottom: 4px;
+    }
 
-        .middle .right {
-            width: 40%;
-        }
+    .barcode {
+      font-family: 'Libre Barcode 128', cursive;
+      font-size: 48px;
+      line-height: 1;
+      margin-top: 6px;
+    }
 
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            font-size: 14px;
-        }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 6px;
+    }
 
-        th, td {
-            border: 2px solid #000;
-            padding: 6px;
-            text-align: center;
-        }
+    th, td {
+      border-bottom: 1px solid #000;
+      padding: 6px;
+      text-align: left;
+    }
 
-        th {
-            font-weight: bold;
-        }
+    th {
+      font-weight: bold;
+    }
 
-        .summary {
-            display: flex;
-            padding: 10px;
-            border-bottom: 2px solid #000;
-        }
+    .footer-bold {
+      font-weight: bold;
+      border: 1px solid #000;
+      padding: 6px;
+      margin-top: 6px;
+    }
 
-        .summary .left, .summary .right {
-            width: 50%;
-            font-size: 14px;
-        }
-
-        .footer {
-            padding: 10px;
-            font-size: 13px;
-        }
-
-        .footer-note {
-            border-top: 2px solid #000;
-            padding: 10px;
-            font-size: 13px;
-        }
-
-        @media print {
-            body {
-                background: none;
-            }
-            .invoice {
-                margin: 0;
-                width: 100%;
-            }
-        }
-    </style>
+    .footer {
+      border: 1px solid #000;
+      padding: 6px;
+      margin-top: 6px;
+    }
+  </style>
 </head>
+
 <body>
+<div class="page">
 
-<div class="invoice">
+  <!-- SHIP TO -->
+  <div class="box">
+    <div class="title">Ship To</div>
+    Nusrath Syed<br>
+    20-4-510-1 kota mitta, meclines road, near rehmatia masjid<br>
+    Nellore, Andhra Pradesh, India<br>
+    524001<br>
+    9666215779
+  </div>
 
-    <!-- SHIP TO -->
-    <div class="section">
-        <div class="left">
-            <div class="bold">Ship To</div>
-            Nusrath Syed<br>
-            20-4-510-1 kota mitta, meclines road, near rehmatjya masjid Near rehmatjya masjid<br>
-            Nellore,Andhra Pradesh, India<br>
-            524001<br>
-            9666215779
-        </div>
-
-        <div class="right">
-            <img src="logo.png" width="60" alt="">
-        </div>
+  <!-- ORDER DETAILS -->
+  <div class="box row">
+    <div class="left">
+      Dimensions: 21x31x2<br>
+      Payment: PREPAID<br>
+      Order Total: ₹398<br>
+      Weight: 0.5 kg<br>
+      EWaybill No:<br>
+      Routing code: NA<br>
+      RTO Routing code: NA
     </div>
 
-    <!-- ORDER DETAILS -->
-    <div class="middle">
-        <div class="left">
-            Dimensions: 21x31x2<br>
-            Payment: PREPAID<br>
-            Order Total: ₹398<br>
-            Weight: 0.5 kg<br>
-            EWaybill No:<br>
-            Routing code: NA<br>
-            RTO Routing code: NA
-        </div>
+    <div class="right">
+      <strong>DTDC Surface</strong><br>
+      <strong>AWB: 7D124748548</strong>
+      <div class="barcode">7D124748548</div>
+    </div>
+  </div>
 
-        <div class="right">
-            <div class="bold">DTDC Surface</div>
-            AWB: 7D124748548
-            <div class="barcode">
-                <img src="barcode1.png" alt="barcode">
-            </div>
-        </div>
+  <!-- SHIPPED BY -->
+  <div class="box row">
+    <div class="left">
+      <div class="title">Shipped By <i>(if undelivered, return to)</i></div>
+      Ishu’s Store<br>
+      Ishu's Store 3rd floor, GMR & GS Complex<br>
+      Kishanpura, Opp: Police Head Quarters<br>
+      Hanamkonda<br>
+      Warangal, Telangana<br>
+      506001<br>
+      9182348571<br><br>
+      Customer Care: 1800-123-4567<br>
+      Customer Email: shiprocket@.com
     </div>
 
-    <!-- SHIPPED BY -->
-    <div class="middle">
-        <div class="left">
-            <span class="bold">Shipped By</span> <i>(if undelivered, return to)</i><br>
-            Ishu’s Store<br><br>
-            Ishu's Store 3rd floor, GMR & GS<br>
-            Complex,Kishanpura,Opp:Police Head<br>
-            Quarters, Hanamkonda<br>
-            Warangal, Telangana<br>
-            506001<br>
-            9182348571<br><br>
-            Customer Care: 1800-123-4567<br>
-            Customer Email: shiprocket@.com
-        </div>
-
-        <div class="right">
-            Order#: IS1128
-            <div class="barcode">
-                <img src="barcode2.png" alt="barcode">
-            </div>
-            Invoice No. ISV00067<br>
-            Invoice Date: 28/01/2026<br>
-            Order Date: 24/01/2026<br>
-            GSTIN:
-        </div>
+    <div class="right">
+      <strong>Order#: IS1128</strong>
+      <div class="barcode">IS1128</div>
+      Invoice No: ISV00067<br>
+      Invoice Date: 28/01/2026<br>
+      Order Date: 24/01/2026<br>
+      GSTIN:
     </div>
+  </div>
 
-    <!-- ITEM TABLE -->
+  <!-- ITEM TABLE -->
+  <div class="box">
     <table>
+      <thead>
         <tr>
-            <th>Item</th>
-            <th>SKU</th>
-            <th>Qty</th>
-            <th>Price</th>
-            <th>HSN</th>
-            <th>Taxable Value</th>
-            <th>Total</th>
+          <th>Item</th>
+          <th>SKU</th>
+          <th>Qty</th>
+          <th>Price</th>
+          <th>HSN</th>
+          <th>Taxable Value</th>
+          <th>Total</th>
         </tr>
+      </thead>
+      <tbody>
         <tr>
-            <td>ZOYA NIQAB...</td>
-            <td>4540979216...</td>
-            <td>1</td>
-            <td>₹299.00</td>
-            <td></td>
-            <td>₹299.00</td>
-            <td>₹299.00</td>
+          <td>ZOYA NIQAB...</td>
+          <td>4540979216...</td>
+          <td>1</td>
+          <td>₹299.00</td>
+          <td></td>
+          <td>₹299.00</td>
+          <td>₹299.00</td>
         </tr>
+      </tbody>
     </table>
 
-    <!-- SUMMARY -->
-    <div class="summary">
-        <div class="left">
-            Platform Fee: ₹0<br>
-            Shipping Charges: ₹99
-        </div>
+    <br>
+    Platform Fee: ₹0<br>
+    Shipping Charges: ₹99
 
-        <div class="right">
-            Discount: ₹0<br>
-            Collectable Amount: ₹0
-        </div>
+    <div style="float:right">
+      Discount: ₹0<br>
+      Collectable Amount: ₹0
     </div>
+  </div>
 
-    <!-- FOOTER -->
-    <div class="footer">
-        <b>All disputes are subject to Haryana Jurisdiction only.</b>
-        Goods once sold will only be taken back or exchanged as per store's exchange and return policy
-    </div>
+  <!-- FOOTER -->
+  <div class="footer-bold">
+    All disputes are subject to Haryana Jurisdiction only. Goods once sold will only be taken back or exchanged as per store's exchange and return policy
+  </div>
 
-    <div class="footer-note">
-        This is an auto generated label and does not require any signature.
-    </div>
+  <div class="footer">
+    This is an auto generated label and does not require any signature.
+  </div>
 
 </div>
-
 </body>
 </html>
