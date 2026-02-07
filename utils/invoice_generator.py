@@ -20,8 +20,15 @@ def generate_shipping_invoice(order):
     # 1️⃣ Render HTML
     html_content = render_to_string(
         "store/shipping_invoice.html",
-        {"order": order}
+        {
+            "order": order,
+            "address": order.address,
+            "store": order.store,
+            "items": order.items.select_related("product"),
+        }
     )
+
+
 
     # 2️⃣ Create temp files
     with tempfile.TemporaryDirectory() as tmpdir:

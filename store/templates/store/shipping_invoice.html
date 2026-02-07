@@ -1,208 +1,432 @@
+<!--<!DOCTYPE html>-->
+<!--<html>-->
+<!--<head>-->
+<!--  <meta charset="utf-8" />-->
+<!--  <title>Shipping Invoice</title>-->
+
+<!--  &lt;!&ndash; Barcode font (Code128) &ndash;&gt;-->
+<!--  <link href="https://fonts.googleapis.com/css2?family=Libre+Barcode+128&display=swap" rel="stylesheet">-->
+
+<!--  <style>-->
+<!--  @page {-->
+<!--    size: A4;-->
+<!--    margin: 10mm;-->
+<!--  }-->
+
+<!--  body {-->
+<!--    font-family: Arial, sans-serif;-->
+<!--    font-size: 12px;-->
+<!--    margin: 0;-->
+<!--  }-->
+
+<!--  .page {-->
+<!--    border: 2px solid #000;-->
+<!--    padding: 10px;-->
+<!--  }-->
+
+<!--  .section {-->
+<!--    padding: 6px 2px;-->
+<!--  }-->
+
+<!--  .divider {-->
+<!--  border-top: 1px solid #000;-->
+<!--  margin: 8px -10px;-->
+<!--  }-->
+
+
+<!--  .row {-->
+<!--    display: flex;-->
+<!--    justify-content: space-between;-->
+<!--    align-items: flex-start;-->
+<!--  }-->
+
+<!--  .left {-->
+<!--    width: 60%;-->
+<!--  }-->
+
+<!--  .right {-->
+<!--    width: 38%;-->
+<!--    text-align: right;-->
+<!--  }-->
+
+<!--  .title {-->
+<!--    font-weight: bold;-->
+<!--    margin-bottom: 4px;-->
+<!--  }-->
+
+<!--  .barcode {-->
+<!--    font-family: 'Libre Barcode 128', cursive;-->
+<!--    font-size: 48px;-->
+<!--    line-height: 1;-->
+<!--    margin-top: 6px;-->
+<!--  }-->
+
+<!--  table {-->
+<!--    width: 100%;-->
+<!--    border-collapse: collapse;-->
+<!--    margin-top: 6px;-->
+<!--  }-->
+
+<!--  th, td {-->
+<!--    border-bottom: 1px solid #000;-->
+<!--    padding: 6px;-->
+<!--    text-align: left;-->
+<!--  }-->
+
+<!--  th {-->
+<!--    font-weight: bold;-->
+<!--  }-->
+
+<!--  .summary {-->
+<!--    display: flex;-->
+<!--    justify-content: space-between;-->
+<!--    margin-top: 6px;-->
+<!--  }-->
+
+<!--  .footer-bold {-->
+<!--    font-weight: bold;-->
+<!--    border-top: 1px solid #000;-->
+<!--    padding-top: 6px;-->
+<!--    margin-top: 6px;-->
+<!--  }-->
+
+<!--  .footer {-->
+<!--    border-top: 1px solid #000;-->
+<!--    padding-top: 6px;-->
+<!--    margin-top: 6px;-->
+<!--  }-->
+<!--</style>-->
+
+<!--</head>-->
+
+<!--<body>-->
+<!--<div class="page">-->
+
+<!--  &lt;!&ndash; SHIP TO &ndash;&gt;-->
+<!--  <div class="section">-->
+<!--    <div class="title">Ship To</div>-->
+<!--    Nusrath Syed<br>-->
+<!--    20-4-510-1 kota mitta, meclines road, near rehmatia masjid<br>-->
+<!--    Nellore, Andhra Pradesh, India<br>-->
+<!--    524001<br>-->
+<!--    9666215779-->
+<!--  </div>-->
+
+<!--  <div class="divider"></div>-->
+
+<!--  &lt;!&ndash; ORDER DETAILS &ndash;&gt;-->
+<!--  <div class="section row">-->
+<!--    <div class="left">-->
+<!--      Dimensions: 21x31x2<br>-->
+<!--      Payment: PREPAID<br>-->
+<!--      Order Total: ₹398<br>-->
+<!--      Weight: 0.5 kg<br>-->
+<!--      EWaybill No:<br>-->
+<!--      Routing code: NA<br>-->
+<!--      RTO Routing code: NA-->
+<!--    </div>-->
+
+<!--    <div class="right">-->
+<!--      <strong>DTDC Surface</strong><br>-->
+<!--      <strong>AWB: 7D124748548</strong>-->
+<!--      <div class="barcode">7D124748548</div>-->
+<!--    </div>-->
+<!--  </div>-->
+
+<!--  <div class="divider"></div>-->
+
+<!--  &lt;!&ndash; SHIPPED BY &ndash;&gt;-->
+<!--  <div class="section row">-->
+<!--    <div class="left">-->
+<!--      <div class="title">Shipped By <i>(if undelivered, return to)</i></div>-->
+<!--      Ishu’s Store<br>-->
+<!--      Ishu's Store 3rd floor, GMR & GS Complex<br>-->
+<!--      Kishanpura, Opp: Police Head Quarters<br>-->
+<!--      Hanamkonda<br>-->
+<!--      Warangal, Telangana<br>-->
+<!--      506001<br>-->
+<!--      9182348571<br><br>-->
+<!--      Customer Care: 1800-123-4567<br>-->
+<!--      Customer Email: shiprocket@.com-->
+<!--    </div>-->
+
+<!--    <div class="right">-->
+<!--      <strong>Order#: IS1128</strong>-->
+<!--      <div class="barcode">IS1128</div>-->
+<!--      Invoice No: ISV00067<br>-->
+<!--      Invoice Date: 28/01/2026<br>-->
+<!--      Order Date: 24/01/2026<br>-->
+<!--      GSTIN:-->
+<!--    </div>-->
+<!--  </div>-->
+
+<!--  <div class="divider"></div>-->
+
+<!--  &lt;!&ndash; ITEM TABLE &ndash;&gt;-->
+<!--  <div class="section">-->
+<!--    <table>-->
+<!--      <thead>-->
+<!--        <tr>-->
+<!--          <th>Item</th>-->
+<!--          <th>SKU</th>-->
+<!--          <th>Qty</th>-->
+<!--          <th>Price</th>-->
+<!--          <th>HSN</th>-->
+<!--          <th>Taxable Value</th>-->
+<!--          <th>Total</th>-->
+<!--        </tr>-->
+<!--      </thead>-->
+<!--      <tbody>-->
+<!--        <tr>-->
+<!--          <td>ZOYA NIQAB...</td>-->
+<!--          <td>4540979216...</td>-->
+<!--          <td>1</td>-->
+<!--          <td>₹299.00</td>-->
+<!--          <td></td>-->
+<!--          <td>₹299.00</td>-->
+<!--          <td>₹299.00</td>-->
+<!--        </tr>-->
+<!--      </tbody>-->
+<!--    </table>-->
+
+<!--    <div class="summary">-->
+<!--      <div>-->
+<!--        Platform Fee: ₹0<br>-->
+<!--        Shipping Charges: ₹99-->
+<!--      </div>-->
+<!--      <div>-->
+<!--        Discount: ₹0<br>-->
+<!--        <strong>Collectable Amount: ₹0</strong>-->
+<!--      </div>-->
+<!--    </div>-->
+<!--  </div>-->
+
+<!--  <div class="footer-bold">-->
+<!--    All disputes are subject to Haryana Jurisdiction only. Goods once sold will only be taken back or exchanged as per store's exchange and return policy-->
+<!--  </div>-->
+
+<!--  <div class="footer">-->
+<!--    This is an auto generated label and does not require any signature.-->
+<!--  </div>-->
+
+<!--</div>-->
+<!--</body>-->
+
+<!--</html>-->
+
+
 <!DOCTYPE html>
 <html>
 <head>
-  <meta charset="utf-8" />
+  <meta charset="utf-8">
   <title>Shipping Invoice</title>
 
-  <!-- Barcode font (Code128) -->
+  <!-- Barcode font -->
   <link href="https://fonts.googleapis.com/css2?family=Libre+Barcode+128&display=swap" rel="stylesheet">
 
   <style>
-  @page {
-    size: A4;
-    margin: 10mm;
-  }
+    @page {
+      size: A4;
+      margin: 10mm;
+    }
 
-  body {
-    font-family: Arial, sans-serif;
-    font-size: 12px;
-    margin: 0;
-  }
+    body {
+      font-family: Arial, sans-serif;
+      font-size: 12px;
+      margin: 0;
+    }
 
-  .page {
-    border: 2px solid #000;
-    padding: 10px;
-  }
+    .page {
+      border: 2px solid #000;
+      padding: 10px;
+    }
 
-  .section {
-    padding: 6px 2px;
-  }
+    .divider {
+      border-top: 1px solid #000;
+      margin: 8px -10px; /* extend to outer border */
+    }
 
-  .divider {
-  border-top: 1px solid #000;
-  margin: 8px -10px;
-  }
+    .row {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+    }
 
+    .left {
+      width: 60%;
+    }
 
-  .row {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-  }
+    .right {
+      width: 38%;
+      text-align: right;
+    }
 
-  .left {
-    width: 60%;
-  }
+    .title {
+      font-weight: bold;
+      margin-bottom: 4px;
+    }
 
-  .right {
-    width: 38%;
-    text-align: right;
-  }
+    .barcode {
+      font-family: 'Libre Barcode 128', cursive;
+      font-size: 48px;
+      line-height: 1;
+      margin-top: 6px;
+    }
 
-  .title {
-    font-weight: bold;
-    margin-bottom: 4px;
-  }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 6px;
+    }
 
-  .barcode {
-    font-family: 'Libre Barcode 128', cursive;
-    font-size: 48px;
-    line-height: 1;
-    margin-top: 6px;
-  }
+    th, td {
+      border-bottom: 1px solid #000;
+      padding: 6px;
+      text-align: left;
+      vertical-align: top;
+    }
 
-  table {
-    width: 100%;
-    border-collapse: collapse;
-    margin-top: 6px;
-  }
+    th {
+      font-weight: bold;
+    }
 
-  th, td {
-    border-bottom: 1px solid #000;
-    padding: 6px;
-    text-align: left;
-  }
+    .summary {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 6px;
+    }
 
-  th {
-    font-weight: bold;
-  }
+    .footer-bold {
+      border-top: 1px solid #000;
+      padding-top: 6px;
+      margin-top: 6px;
+      font-weight: bold;
+    }
 
-  .summary {
-    display: flex;
-    justify-content: space-between;
-    margin-top: 6px;
-  }
-
-  .footer-bold {
-    font-weight: bold;
-    border-top: 1px solid #000;
-    padding-top: 6px;
-    margin-top: 6px;
-  }
-
-  .footer {
-    border-top: 1px solid #000;
-    padding-top: 6px;
-    margin-top: 6px;
-  }
-</style>
-
+    .footer {
+      border-top: 1px solid #000;
+      padding-top: 6px;
+      margin-top: 6px;
+    }
+  </style>
 </head>
 
 <body>
 <div class="page">
 
+  <!-- STORE LOGO -->
+  <div style="text-align:center; margin-bottom:6px;">
+    {% if store.logo %}
+      <img
+        src="{{ store.logo }}"
+        alt="{{ store.name }}"
+        style="height:50px; object-fit:contain;"
+      />
+    {% endif %}
+  </div>
+
+  <div class="divider"></div>
+
   <!-- SHIP TO -->
-  <div class="section">
+  <div>
     <div class="title">Ship To</div>
-    Nusrath Syed<br>
-    20-4-510-1 kota mitta, meclines road, near rehmatia masjid<br>
-    Nellore, Andhra Pradesh, India<br>
-    524001<br>
-    9666215779
+    {{ address.name }}<br>
+    {{ address.line1 }}{% if address.line2 %}, {{ address.line2 }}{% endif %}<br>
+    {{ address.city }}, {{ address.state }}, India<br>
+    {{ address.pincode }}<br>
+    {{ address.phone }}
   </div>
 
   <div class="divider"></div>
 
   <!-- ORDER DETAILS -->
-  <div class="section row">
+  <div class="row">
     <div class="left">
-      Dimensions: 21x31x2<br>
-      Payment: PREPAID<br>
-      Order Total: ₹398<br>
-      Weight: 0.5 kg<br>
-      EWaybill No:<br>
-      Routing code: NA<br>
-      RTO Routing code: NA
+      Payment:
+      {% if order.cash_on_delivery > 0 %}
+        COD
+      {% else %}
+        PREPAID
+      {% endif %}
+      <br>
+
+      Order Number: {{ order.order_number }}<br>
+      Order Date: {{ order.created_at|date:"d/m/Y" }}<br>
+      MRP: ₹{{ order.mrp }}<br>
+      Order Amount: ₹{{ order.amount }}<br>
+      Coupon Discount: ₹{{ order.coupon_discount }}
     </div>
 
     <div class="right">
-      <strong>DTDC Surface</strong><br>
-      <strong>AWB: 7D124748548</strong>
-      <div class="barcode">7D124748548</div>
+      <strong>{{ store.name }}</strong><br>
+      <div class="barcode">{{ order.order_number }}</div>
     </div>
   </div>
 
   <div class="divider"></div>
 
   <!-- SHIPPED BY -->
-  <div class="section row">
+  <div class="row">
     <div class="left">
-      <div class="title">Shipped By <i>(if undelivered, return to)</i></div>
-      Ishu’s Store<br>
-      Ishu's Store 3rd floor, GMR & GS Complex<br>
-      Kishanpura, Opp: Police Head Quarters<br>
-      Hanamkonda<br>
-      Warangal, Telangana<br>
-      506001<br>
-      9182348571<br><br>
-      Customer Care: 1800-123-4567<br>
-      Customer Email: shiprocket@.com
+      <div class="title">Shipped By (if undelivered, return to)</div>
+      {{ store.name }}<br>
+      {{ store.address }}<br>
+      Mobile: {{ store.mobile }}<br>
+      GSTIN: {{ store.gst_number|default:"" }}
     </div>
 
     <div class="right">
-      <strong>Order#: IS1128</strong>
-      <div class="barcode">IS1128</div>
-      Invoice No: ISV00067<br>
-      Invoice Date: 28/01/2026<br>
-      Order Date: 24/01/2026<br>
-      GSTIN:
+      <strong>Order#: {{ order.order_number }}</strong><br>
+      Invoice Date: {{ order.created_at|date:"d/m/Y" }}
     </div>
   </div>
 
   <div class="divider"></div>
 
-  <!-- ITEM TABLE -->
-  <div class="section">
-    <table>
-      <thead>
-        <tr>
-          <th>Item</th>
-          <th>SKU</th>
-          <th>Qty</th>
-          <th>Price</th>
-          <th>HSN</th>
-          <th>Taxable Value</th>
-          <th>Total</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr>
-          <td>ZOYA NIQAB...</td>
-          <td>4540979216...</td>
-          <td>1</td>
-          <td>₹299.00</td>
-          <td></td>
-          <td>₹299.00</td>
-          <td>₹299.00</td>
-        </tr>
-      </tbody>
-    </table>
+  <!-- ITEMS TABLE -->
+  <table>
+    <thead>
+      <tr>
+        <th>Item</th>
+        <th>SKU</th>
+        <th>Qty</th>
+        <th>MRP</th>
+        <th>Selling Price</th>
+        <th>GST</th>
+        <th>Total</th>
+      </tr>
+    </thead>
+    <tbody>
+    {% for item in items %}
+      <tr>
+        <td>{{ item.product.name }}</td>
+        <td>{{ item.sku }}</td>
+        <td>{{ item.qty }}</td>
+        <td>₹{{ item.mrp }}</td>
+        <td>₹{{ item.selling_price }}</td>
+        <td>₹{{ item.apportioned_gst }}</td>
+        <td>₹{{ item.selling_price }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
 
-    <div class="summary">
-      <div>
-        Platform Fee: ₹0<br>
-        Shipping Charges: ₹99
-      </div>
-      <div>
-        Discount: ₹0<br>
-        <strong>Collectable Amount: ₹0</strong>
-      </div>
+  <!-- SUMMARY -->
+  <div class="summary">
+    <div>
+      Wallet Paid: ₹{{ order.wallet_paid }}<br>
+      Paid Online: ₹{{ order.paid_online }}<br>
+      Coupon Discount: ₹{{ order.coupon_discount }}
+    </div>
+
+    <div>
+      <strong>Collectable Amount: ₹{{ order.cash_on_delivery }}</strong>
     </div>
   </div>
 
+  <!-- FOOTER -->
   <div class="footer-bold">
-    All disputes are subject to Haryana Jurisdiction only. Goods once sold will only be taken back or exchanged as per store's exchange and return policy
+    All disputes are subject to Haryana Jurisdiction only.
   </div>
 
   <div class="footer">
@@ -211,5 +435,4 @@
 
 </div>
 </body>
-
 </html>
