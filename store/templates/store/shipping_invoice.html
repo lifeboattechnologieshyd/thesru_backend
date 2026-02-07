@@ -216,19 +216,15 @@
 
 
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
   <meta charset="UTF-8">
   <title>Shipping Invoice</title>
 
-  <!-- Barcode Font -->
   <link href="https://fonts.googleapis.com/css2?family=Libre+Barcode+128&display=swap" rel="stylesheet">
 
   <style>
-    @page {
-      size: A4;
-      margin: 10mm;
-    }
+    @page { size: A4; margin: 10mm; }
 
     body {
       font-family: Arial, sans-serif;
@@ -246,45 +242,13 @@
       margin: 6px -8px;
     }
 
-    /* ---------- HEADER ---------- */
-    .header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-
-    .header-left {
-      width: 70%;
-      font-size: 12px;
-      line-height: 1.4;
-    }
-
-    .header-right {
-      width: 30%;
-      text-align: right;
-    }
-
-    .header-right img {
-      height: 55px;
-      object-fit: contain;
-    }
-
-    /* ---------- SECTIONS ---------- */
     .row {
       display: flex;
       justify-content: space-between;
     }
 
-    .left {
-      width: 65%;
-      line-height: 1.4;
-    }
-
-    .right {
-      width: 33%;
-      text-align: right;
-      line-height: 1.4;
-    }
+    .left { width: 65%; line-height: 1.4; }
+    .right { width: 33%; text-align: right; line-height: 1.4; }
 
     .title {
       font-weight: bold;
@@ -298,50 +262,29 @@
       margin-top: 6px;
     }
 
-    /* ---------- TABLE ---------- */
     table {
       width: 100%;
       border-collapse: collapse;
       margin-top: 6px;
     }
 
-    th {
+    th, td {
+      border-bottom: 1px solid #000;
+      padding: 6px;
       text-align: left;
-      font-weight: bold;
-      border-bottom: 1px solid #000;
-      padding: 6px;
     }
 
-    td {
-      padding: 6px;
-      border-bottom: 1px solid #000;
-    }
+    th { font-weight: bold; }
 
-    /* ---------- TOTALS ---------- */
     .totals {
       display: flex;
       justify-content: space-between;
       margin-top: 6px;
     }
 
-    .totals-left {
-      width: 60%;
-    }
-
     .totals-right {
-      width: 38%;
+      font-weight: bold;
       text-align: right;
-      font-weight: bold;
-    }
-
-    /* ---------- FOOTER ---------- */
-    .footer-bold {
-      font-weight: bold;
-      margin-top: 6px;
-    }
-
-    .footer {
-      margin-top: 4px;
     }
   </style>
 </head>
@@ -349,32 +292,22 @@
 <body>
 <div class="page">
 
-  <!-- HEADER -->
-  <div class="header">
-    <div class="header-left">
-      <strong>{{ order.store.name }}</strong><br>
-      {{ order.store.address }}<br>
-      Mobile: {{ order.store.mobile }}<br>
-      GSTIN: {{ order.store.gst_number|default:"" }}
+  <!-- SHIP TO + LOGO -->
+  <div class="row">
+    <div class="left">
+      <div class="title">Ship To</div>
+      {{ order.user.full_name }}<br>
+      {{ order.address.address }}<br>
+      {{ order.address.city }}, {{ order.address.state }}, India<br>
+      {{ order.address.pincode }}<br>
+      {{ order.address.mobile }}
     </div>
 
-    <div class="header-right">
+    <div class="right">
       {% if order.store.logo %}
-        <img src="{{ order.store.logo }}" alt="Store Logo">
+        <img src="{{ order.store.logo }}" style="height:60px;">
       {% endif %}
     </div>
-  </div>
-
-  <div class="divider"></div>
-
-  <!-- SHIP TO -->
-  <div>
-    <div class="title">Ship To</div>
-    {{ order.user.full_name }}<br>
-    {{ order.address.address }}<br>
-    {{ order.address.city }}, {{ order.address.state }}, India<br>
-    {{ order.address.pincode }}<br>
-    {{ order.address.mobile }}
   </div>
 
   <div class="divider"></div>
@@ -382,7 +315,7 @@
   <!-- ORDER DETAILS -->
   <div class="row">
     <div class="left">
-      Payment: {{ order.status }}<br>
+      Payment: <strong>PREPAID</strong><br>
       Order Number: {{ order.order_number }}<br>
       Order Date: {{ order.created_at|date:"d/m/Y" }}<br>
       MRP: ₹{{ order.mrp }}<br>
@@ -391,7 +324,7 @@
     </div>
 
     <div class="right">
-      <strong>{{ order.store.product_code }}</strong><br>
+      <strong>{{ order.store.name }}</strong>
       <div class="barcode">{{ order.order_number }}</div>
     </div>
   </div>
@@ -416,7 +349,7 @@
 
   <div class="divider"></div>
 
-  <!-- ITEMS TABLE -->
+  <!-- ITEMS -->
   <table>
     <thead>
       <tr>
@@ -444,9 +377,8 @@
     </tbody>
   </table>
 
-  <!-- TOTALS -->
   <div class="totals">
-    <div class="totals-left">
+    <div>
       Wallet Paid: ₹{{ order.wallet_paid }}<br>
       Paid Online: ₹{{ order.paid_online }}<br>
       Coupon Discount: ₹{{ order.coupon_discount }}
@@ -459,14 +391,8 @@
 
   <div class="divider"></div>
 
-  <!-- FOOTER -->
-  <div class="footer-bold">
-    All disputes are subject to Haryana Jurisdiction only.
-  </div>
-
-  <div class="footer">
-    This is an auto generated label and does not require any signature.
-  </div>
+  <strong>All disputes are subject to Haryana Jurisdiction only.</strong><br>
+  This is an auto generated label and does not require any signature.
 
 </div>
 </body>
