@@ -216,12 +216,12 @@
 
 
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <meta charset="utf-8">
+  <meta charset="UTF-8">
   <title>Shipping Invoice</title>
 
-  <!-- Barcode font -->
+  <!-- Barcode Font -->
   <link href="https://fonts.googleapis.com/css2?family=Libre+Barcode+128&display=swap" rel="stylesheet">
 
   <style>
@@ -238,27 +238,52 @@
 
     .page {
       border: 2px solid #000;
-      padding: 10px;
+      padding: 8px;
     }
 
     .divider {
-      border-top: 1px solid #000;
-      margin: 8px -10px; /* extend to outer border */
+      border-bottom: 1px solid #000;
+      margin: 6px -8px;
     }
 
+    /* ---------- HEADER ---------- */
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .header-left {
+      width: 70%;
+      font-size: 12px;
+      line-height: 1.4;
+    }
+
+    .header-right {
+      width: 30%;
+      text-align: right;
+    }
+
+    .header-right img {
+      height: 55px;
+      object-fit: contain;
+    }
+
+    /* ---------- SECTIONS ---------- */
     .row {
       display: flex;
       justify-content: space-between;
-      align-items: flex-start;
     }
 
     .left {
-      width: 60%;
+      width: 65%;
+      line-height: 1.4;
     }
 
     .right {
-      width: 38%;
+      width: 33%;
       text-align: right;
+      line-height: 1.4;
     }
 
     .title {
@@ -273,40 +298,50 @@
       margin-top: 6px;
     }
 
+    /* ---------- TABLE ---------- */
     table {
       width: 100%;
       border-collapse: collapse;
       margin-top: 6px;
     }
 
-    th, td {
+    th {
+      text-align: left;
+      font-weight: bold;
       border-bottom: 1px solid #000;
       padding: 6px;
-      text-align: left;
-      vertical-align: top;
     }
 
-    th {
-      font-weight: bold;
+    td {
+      padding: 6px;
+      border-bottom: 1px solid #000;
     }
 
-    .summary {
+    /* ---------- TOTALS ---------- */
+    .totals {
       display: flex;
       justify-content: space-between;
       margin-top: 6px;
     }
 
-    .footer-bold {
-      border-top: 1px solid #000;
-      padding-top: 6px;
-      margin-top: 6px;
+    .totals-left {
+      width: 60%;
+    }
+
+    .totals-right {
+      width: 38%;
+      text-align: right;
       font-weight: bold;
     }
 
-    .footer {
-      border-top: 1px solid #000;
-      padding-top: 6px;
+    /* ---------- FOOTER ---------- */
+    .footer-bold {
+      font-weight: bold;
       margin-top: 6px;
+    }
+
+    .footer {
+      margin-top: 4px;
     }
   </style>
 </head>
@@ -314,15 +349,20 @@
 <body>
 <div class="page">
 
-  <!-- STORE LOGO -->
-  <div style="text-align:center; margin-bottom:6px;">
-    {% if store.logo %}
-      <img
-        src="{{ store.logo }}"
-        alt="{{ store.name }}"
-        style="height:50px; object-fit:contain;"
-      />
-    {% endif %}
+  <!-- HEADER -->
+  <div class="header">
+    <div class="header-left">
+      <strong>{{ order.store.name }}</strong><br>
+      {{ order.store.address }}<br>
+      Mobile: {{ order.store.mobile }}<br>
+      GSTIN: {{ order.store.gst_number|default:"" }}
+    </div>
+
+    <div class="header-right">
+      {% if order.store.logo %}
+        <img src="{{ order.store.logo }}" alt="Store Logo">
+      {% endif %}
+    </div>
   </div>
 
   <div class="divider"></div>
@@ -330,11 +370,11 @@
   <!-- SHIP TO -->
   <div>
     <div class="title">Ship To</div>
-    {{ address.name }}<br>
-    {{ address.line1 }}{% if address.line2 %}, {{ address.line2 }}{% endif %}<br>
-    {{ address.city }}, {{ address.state }}, India<br>
-    {{ address.pincode }}<br>
-    {{ address.phone }}
+    {{ order.user.full_name }}<br>
+    {{ order.address.address }}<br>
+    {{ order.address.city }}, {{ order.address.state }}, India<br>
+    {{ order.address.pincode }}<br>
+    {{ order.address.mobile }}
   </div>
 
   <div class="divider"></div>
@@ -342,14 +382,7 @@
   <!-- ORDER DETAILS -->
   <div class="row">
     <div class="left">
-      Payment:
-      {% if order.cash_on_delivery > 0 %}
-        COD
-      {% else %}
-        PREPAID
-      {% endif %}
-      <br>
-
+      Payment: {{ order.status }}<br>
       Order Number: {{ order.order_number }}<br>
       Order Date: {{ order.created_at|date:"d/m/Y" }}<br>
       MRP: ₹{{ order.mrp }}<br>
@@ -358,7 +391,7 @@
     </div>
 
     <div class="right">
-      <strong>{{ store.name }}</strong><br>
+      <strong>{{ order.store.product_code }}</strong><br>
       <div class="barcode">{{ order.order_number }}</div>
     </div>
   </div>
@@ -368,11 +401,11 @@
   <!-- SHIPPED BY -->
   <div class="row">
     <div class="left">
-      <div class="title">Shipped By (if undelivered, return to)</div>
-      {{ store.name }}<br>
-      {{ store.address }}<br>
-      Mobile: {{ store.mobile }}<br>
-      GSTIN: {{ store.gst_number|default:"" }}
+      <div class="title">Shipped By <i>(if undelivered, return to)</i></div>
+      {{ order.store.name }}<br>
+      {{ order.store.address }}<br>
+      Mobile: {{ order.store.mobile }}<br>
+      GSTIN: {{ order.store.gst_number|default:"" }}
     </div>
 
     <div class="right">
@@ -397,7 +430,7 @@
       </tr>
     </thead>
     <tbody>
-    {% for item in items %}
+      {% for item in order.items.all %}
       <tr>
         <td>{{ item.product.name }}</td>
         <td>{{ item.sku }}</td>
@@ -407,22 +440,24 @@
         <td>₹{{ item.apportioned_gst }}</td>
         <td>₹{{ item.selling_price }}</td>
       </tr>
-    {% endfor %}
+      {% endfor %}
     </tbody>
   </table>
 
-  <!-- SUMMARY -->
-  <div class="summary">
-    <div>
+  <!-- TOTALS -->
+  <div class="totals">
+    <div class="totals-left">
       Wallet Paid: ₹{{ order.wallet_paid }}<br>
       Paid Online: ₹{{ order.paid_online }}<br>
       Coupon Discount: ₹{{ order.coupon_discount }}
     </div>
 
-    <div>
-      <strong>Collectable Amount: ₹{{ order.cash_on_delivery }}</strong>
+    <div class="totals-right">
+      Collectable Amount: ₹{{ order.cash_on_delivery }}
     </div>
   </div>
+
+  <div class="divider"></div>
 
   <!-- FOOTER -->
   <div class="footer-bold">
