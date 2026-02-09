@@ -45,39 +45,25 @@ def generate_otp():
     # return "1234"
     return str(random.randint(1000, 9999))
 
-def send_otp_to_mobile(otp, mobile):
+def send_sms_to_mobile(var1, mobile, store, msg):
     try:
-        print("[OTP SMS] Sending OTP")
-        print("Mobile:", mobile)
-        print("OTP:", otp)
-
         url = "https://sms.lifeboattechnologies.com/dev/bulkV2"
-
         params = {
-            "authorization": settings.SMS_AUTH_KEY,   # same as URL
+            "authorization": store.sms_auth_key,   # same as URL
             "route": "dlt",
-            "sender_id": settings.SMS_SENDER_ID,      # THESRU
-            "message": settings.SMS_DLT_TEMPLATE_ID,  # 8764
-            "variables_values": f"{otp}|",
+            "sender_id": store.sms_sender_id,      # THESRU
+            "message": msg,  # 8764
+            "variables_values": f"{var1}|",
             "flash": "0",
             "numbers": str(mobile)
         }
-
-        print("Final URL Params:")
-        print(json.dumps(params, indent=2))
-
         response = requests.get(
             url,
             params=params,
             timeout=10
         )
-
-        print("Response Status Code:", response.status_code)
-        print("Response Text:", response.text)
-
         if response.status_code == 200:
             return True
-
         return False
 
     except Exception as e:

@@ -30,7 +30,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 
 from utils.invoice_generator import generate_shipping_invoice
 from utils.store import generate_lsin, generate_order_number, BO_STATUS_FLOW
-from utils.user import generate_otp, send_otp_to_mobile
+from utils.user import generate_otp, send_sms_to_mobile
 
 
 class SendOTP(APIView):
@@ -45,7 +45,7 @@ class SendOTP(APIView):
             if DEBUG:
                 otp = 1234
             else:
-                send_otp_to_mobile(otp, data.get("mobile"))
+                send_sms_to_mobile(otp, data.get("mobile"), store, store.sms_otp_template_id)
             expires_at = timezone.now() + timedelta(minutes=15)
 
             UserOTP.objects.filter(
