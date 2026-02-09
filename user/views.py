@@ -22,7 +22,8 @@ from serializers.user import UserMasterSerializer
 from rest_framework import status
 
 from utils.storage import add_unique_suffix_to_filename, sanitize_filename
-from utils.user import generate_username, generate_referral_code, send_otp_to_mobile, generate_otp, version_to_tuple
+from utils.user import generate_username, generate_referral_code, generate_otp, version_to_tuple, \
+    send_sms_to_mobile
 
 
 # class MobileSendOTPView(APIView):
@@ -148,7 +149,7 @@ class MobileSendOTPView(APIView):
         if DEBUG:
             otp = 1234
         else:
-            send_otp_to_mobile(otp, mobile)
+            send_sms_to_mobile(otp, mobile, store, store.sms_otp_template_id)
         expires_at = timezone.now() + timedelta(minutes=15)
         # Invalidate old OTPs
         UserOTP.objects.filter(

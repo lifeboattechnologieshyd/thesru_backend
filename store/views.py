@@ -22,6 +22,7 @@ from db.models import AddressMaster, PinCode, Product, Order, OrderProducts, Pay
 from enums.store import OrderStatus, PaymentStatus
 from mixins.drf_views import CustomResponse
 from utils.store import generate_order_number, time_ago
+from utils.user import send_sms_to_mobile
 
 
 class CategoryListView(APIView):
@@ -74,7 +75,7 @@ class ProductListAPIView(APIView):
 
         # ---------- Query params ----------
         search = request.query_params.get("search")
-        category_id = request.query_params.get("category")
+        category_id = request.query_params.get("categories")
         tags = request.query_params.get("tags")
 
         page = int(request.query_params.get("page", 1))
@@ -1141,6 +1142,7 @@ class Webhook(APIView):
                             user=order.user,
                             order=order
                         )
+                    send_sms_to_mobile(order.order_number, order.user.mobile, order.store, order.store.sms_order_template_id)
 
                     remove_cart_items(order.user, order.store)
                 elif event_type == "PAYMENT_FAILED_WEBHOOK":
@@ -1244,9 +1246,8 @@ class PaymentStatusAPIView(APIView):
                         user=order.user,
                         order=order
                     )
-
+                send_sms_to_mobile(order.order_number, order.user.mobile, order.store, order.store.sms_order_template_id)
                 remove_cart_items(order.user, order.store)
-
             elif verified_status == PaymentStatus.FAILED:
                 order.status = OrderStatus.FAILED
                 order.updated_by = "PAYMENT STATUS BY FE"
@@ -1256,7 +1257,6 @@ class PaymentStatusAPIView(APIView):
                     status=OrderStatus.FAILED,
                     remarks="Order failed"
                 )
-
 
             elif verified_status == PaymentStatus.CANCELLED:
                 order.status = OrderStatus.CANCELLED
