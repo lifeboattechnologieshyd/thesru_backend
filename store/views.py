@@ -75,7 +75,7 @@ class ProductListAPIView(APIView):
 
         # ---------- Query params ----------
         search = request.query_params.get("search")
-        category_id = request.query_params.get("category")
+        category_id = request.query_params.get("categories")
         tags = request.query_params.get("tags")
 
         page = int(request.query_params.get("page", 1))

@@ -283,6 +283,7 @@ class ProductAPIView(APIView):
             size=data.get("size"),
             colour=data.get("colour"),
             mrp=data["mrp"],
+            group_code=data["group_code"],
             selling_price=data["selling_price"],
             gst_percentage=gst_percentage,
             gst_amount=gst_amount,
@@ -396,6 +397,8 @@ class ProductAPIView(APIView):
                 "name": product.name,
                 "colour": product.colour,
                 "size": product.size,
+                "gst_amount": product.gst_amount,
+                "gst_percentage": product.gst_percentage,
 
                 "mrp": str(product.mrp),
                 "selling_price": str(product.selling_price),
