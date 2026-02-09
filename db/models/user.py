@@ -37,6 +37,13 @@ class Store(AuditModel):
     webhook = models.CharField(max_length=100)
     url = models.CharField(max_length=100)
     product_code = models.CharField(max_length=3,null=True)
+    sms_auth_key = models.CharField(max_length=300,null=True)
+    sms_sender_id = models.CharField(max_length=10,null=True)
+    sms_otp_template_id = models.CharField(max_length=50,null=True)
+    sms_order_template_id = models.CharField(max_length=50,null=True)
+    sms_packed_template_id = models.CharField(max_length=50,null=True)
+    sms_shipped_template_id = models.CharField(max_length=50,null=True)
+    sms_delivered_template_id = models.CharField(max_length=50,null=True)
 
     class Meta:
         db_table = "store"
@@ -73,8 +80,10 @@ class User(AbstractBaseUser):
     email = models.EmailField(max_length=100, null=True)
     referral_code = models.CharField(max_length=20, null=True)
     wallet_balance = models.DecimalField(max_digits=12,decimal_places=2,default=0.00)
-    mobile = models.BigIntegerField(
-        validators=[MinValueValidator(1000000000), MaxValueValidator(9999999999)], null=True
+    mobile = models.CharField(
+    max_length=15,
+    db_index=True,
+        null=True
     )
     device_id = models.CharField(max_length=100, null=True)
     country = models.CharField(max_length=30,null=True)
@@ -212,3 +221,30 @@ class UserSession(AuditModel):
 
     def __str__(self):
         return f"{self.user_id} | {self.device_type}"
+
+
+# core/models.py
+
+class AppVersionConfig(AuditModel):
+    OS_CHOICES = (
+        ("android", "Android"),
+        ("ios", "iOS"),
+    )
+    os = models.CharField(max_length=10, choices=OS_CHOICES)
+    min_supported_version = models.CharField(max_length=20)
+    latest_version = models.CharField(max_length=20)
+    force_update = models.BooleanField(default=False)
+    update_title = models.CharField(max_length=100, blank=True, null=True)
+    update_message = models.TextField(blank=True, null=True)
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        db_table = "version_configuration"
+        indexes = [
+            models.Index(fields=["os", "latest_version", "is_active"]),
+        ]
+
+    def __str__(self):
+        return f"{self.os} | {self.latest_version}"
+
+

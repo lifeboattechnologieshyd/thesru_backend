@@ -100,3 +100,6 @@ def get_storage_path_from_url(url):
         return url.split("/media/", 1)[1]
 
     return None
+
+def version_to_tuple(version):
+    return tuple(map(int, version.split(".")))

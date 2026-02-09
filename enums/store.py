@@ -40,3 +40,4 @@ class OrderStatus(models.TextChoices):
     REFUNDED = "REFUNDED"
     UNFULFILLED = "UNFULFILLED"
     CANCELLED = "CANCELLED"
+

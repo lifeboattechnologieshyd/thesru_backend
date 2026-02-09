@@ -267,14 +267,17 @@ class PinCode(AuditModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     pin = models.PositiveIntegerField()
     state = models.CharField(max_length=50)
-    area = models.CharField(max_length=100)
-    city = models.CharField(max_length=100)
+    district = models.CharField(max_length=100)
+    city = models.CharField(max_length=100, null=True)
     country = models.CharField(max_length=100)
-
 
 
     class Meta:
         db_table = "pincode"
+        indexes = [
+
+            models.Index(fields=["pin"]),
+        ]
 
 class Coupons(AuditModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -403,6 +406,7 @@ class Order(AuditModel):
     paid_online = models.DecimalField(decimal_places=2, max_digits=10, default=0)
     cash_on_delivery = models.DecimalField(decimal_places=2, max_digits=10, default=0)
     status = models.CharField(choices=OrderStatus.choices, max_length=30, default=OrderStatus.INITIATED)
+    shipping_slip = models.CharField(max_length=500, null=True)
 
     class Meta:
         db_table = "order"

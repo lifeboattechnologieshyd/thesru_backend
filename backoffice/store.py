@@ -4,7 +4,7 @@ from tokenize import Double
 from unicodedata import category
 
 from django.core.files.storage import default_storage
-from django.db.models import Q
+from django.db.models import Q, F
 
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import transaction
@@ -22,13 +22,15 @@ from urllib3 import request
 from config.settings.common import DEBUG
 from db.models import Category, Product, Banner, Inventory, PinCode, Store, WebBanner, \
     FlashSaleBanner, Order, User, Cart, OrderProducts, UserOTP, StoreClient, UserSession, ProductMedia, Tag, \
-    OrderTimeLines, Coupons, CouponProduct, CouponCategory, CouponTag
+    OrderTimeLines, Coupons, CouponProduct, CouponCategory, CouponTag, AddressMaster
+from db.models.user import AppVersionConfig
 from enums.store import InventoryType, OrderStatus
 from mixins.drf_views import CustomResponse
 from rest_framework_simplejwt.tokens import RefreshToken
 
-from utils.store import generate_lsin, generate_order_number
-from utils.user import generate_otp, send_otp_to_mobile, get_storage_path_from_url
+from utils.invoice_generator import generate_shipping_invoice
+from utils.store import generate_lsin, generate_order_number, BO_STATUS_FLOW
+from utils.user import generate_otp, send_otp_to_mobile
 
 
 class SendOTP(APIView):
@@ -128,6 +130,111 @@ class Login(APIView):
             )
         else:
             return CustomResponse().errorResponse(data={}, description="Invalid Mobile Number")
+class UsersAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+    def get(self, request):
+        store = request.store
+        users_qs = User.objects.filter(
+                store=store
+            ).values()[:20]
+        return CustomResponse().successResponse(data=users_qs)
+
+
+class CreateAppVersionConfigAPI(APIView):
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        os = request.data.get("os")
+        min_version = request.data.get("min_supported_version")
+        latest_version = request.data.get("latest_version")
+
+        if not all([os, min_version, latest_version]):
+            return CustomResponse().successResponse(
+                data={}, description="Missing required fields"
+            )
+        # Check if active record already exists
+        if AppVersionConfig.objects.filter(os=os, is_active=True).exists():
+            return CustomResponse().successResponse(
+                data={}, description=f"Active config already exists for {os}"
+            )
+
+        config = AppVersionConfig.objects.create(
+            os=os,
+            min_supported_version=min_version,
+            latest_version=latest_version,
+            force_update=request.data.get("force_update", False),
+            update_title=request.data.get("update_title"),
+            update_message=request.data.get("update_message"),
+            is_active=True
+        )
+        return CustomResponse().successResponse(data={}, description="App version config created")
+
+    def put(self, request, config_id):
+        try:
+            config = AppVersionConfig.objects.get(id=config_id, is_active=True)
+        except AppVersionConfig.DoesNotExist:
+            return CustomResponse().successResponse(
+                data={}, description="Active config not found"
+            )
+
+        # Update allowed fields
+        for field in [
+            "min_supported_version",
+            "latest_version",
+            "force_update",
+            "update_title",
+            "update_message",
+        ]:
+            if field in request.data:
+                setattr(config, field, request.data[field])
+
+        config.save()
+        return CustomResponse().successResponse(data={}, description="App version config updated")
+
+
+class UserAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        mobile = request.query_params.get("mobile")
+        store = request.store
+        if not mobile or len(mobile) < 3:
+            return CustomResponse().errorResponse(data={}, description="Enter at least 3 digits of mobile number")
+        users_qs = User.objects.filter(
+                store=store,
+                mobile__startswith=mobile
+            ).first()
+        address = AddressMaster.objects.filter(store_id=store.id,
+                                               mobile=users_qs.mobile,
+                                               is_default=True).values().first()
+
+
+
+
+        return CustomResponse().successResponse(data={
+            "username": users_qs.username,
+            "name": users_qs.name,
+            "mobile": users_qs.mobile,
+            "email": users_qs.email,
+            "address": address,
+        })
+
+
+class UserAddress(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        mobile = request.query_params.get("mobile")
+        store = request.store
+        address = AddressMaster.objects.filter(store_id=store.id, mobile=mobile, is_default=True).values()
+        if address:
+            return CustomResponse().successResponse(data=address.first())
+        else:
+            return CustomResponse().errorResponse(data={}, description="No Address found for this user")
+
+
+
 
 
 class ProductAPIView(APIView):
@@ -1320,8 +1427,6 @@ class InventoryAPIView(APIView):
             return CustomResponse().errorResponse(
                 description="Invalid inventory type"
             )
-
-
         #  Price calculations
         purchase_price = data.get("purchase_price")
         sale_price = data.get("sale_price")
@@ -1354,9 +1459,6 @@ class InventoryAPIView(APIView):
         sale_price = sale_price or 0
         purchase_rate = purchase_rate or 0
         sale_rate = sale_rate or 0
-
-
-
 
         # 4️⃣ Save inventory atomically
         with transaction.atomic():
@@ -1510,11 +1612,11 @@ class PinCodeAPIView(APIView):
 
         try:
             PinCode.objects.create(
-            pin = data.get("pin"),
-            state = data.get("state"),
-            area = data.get("area"),
-            city = data.get("city"),
-            country = data.get("country")
+                pin = data.get("pin"),
+                state = data.get("state"),
+                district = data.get("district"),
+                city = data.get("city"),
+                country = data.get("country")
             )
             return CustomResponse.successResponse(data={},description="pincode created successfully")
 
@@ -1650,9 +1752,9 @@ class StoreAPIView(APIView):
                 description="store created successfully"
             )
 
-        except IntegrityError:
+        except IntegrityError as error:
             return CustomResponse.errorResponse(
-                description="Database integrity error"
+                description=f"Database integrity error {error}"
             )
 
     # ---------------- GET STORE / LIST ----------------
@@ -1742,95 +1844,183 @@ class StoreAPIView(APIView):
 class WebBannerAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
-    def post(self,request):
+    @transaction.atomic
+    def post(self, request):
         data = request.data
         store = request.store
 
-        required_fields = ["screen","image","is_active","priority","action","destination"]
+        required_fields = [
+            "screen",
+            "title",
+            "description",
+            "image",
+            "priority",
+            "action",
+            "destination"
+        ]
+
         for field in required_fields:
-            if not data.get(field):
-                return CustomResponse.errorResponse(description=f"{field} is required")
-
-        WebBanner.objects.create(
-            store_id=store.id,
-            screen = data.get("screen"),
-            title = data.get("title"),
-            description = data.get("description"),
-            image = data.get("image"),
-            is_active = data.get("is_active"),
-            priority = data.get("priority"),
-            action = data.get("action"),
-            destination = data.get("destination"),
-
-        )
-        return CustomResponse.successResponse(data={},description="web banner created successfully")
-
-    def get(self, request, id=None):
-        # ---------- SINGLE BANNER ----------
-        if id:
-            banner = WebBanner.objects.filter(id=id).values().first()
-            if not banner:
+            if field not in data or data[field] in [None, ""]:
                 return CustomResponse.errorResponse(
-                    description="web banner id required"
+                    description=f"{field} is required"
                 )
 
-            return CustomResponse.successResponse(
-                data=[banner],
-                total=1
+        try:
+            priority = int(data["priority"])
+        except ValueError:
+            return CustomResponse.errorResponse(
+                description="priority must be an integer"
             )
 
-        # ---------- PAGINATION ----------
+        screen = data["screen"]
+        # ---------- Handle priority conflicts ----------
+        WebBanner.objects.filter(
+            store_id=store.id,
+            screen=screen,
+            priority__gte=priority
+        ).update(
+            priority=F("priority") + 1
+        )
+
+        # ---------- Create banner ----------
+        banner = WebBanner.objects.create(
+            store_id=store.id,
+            screen=screen,
+            title=data["title"],
+            description=data["description"],
+            image=data["image"],
+            is_active=data.get("is_active", True),
+            priority=priority,
+            action=data["action"],
+            destination=data["destination"],
+            created_by=request.user.mobile
+        )
+
+        return CustomResponse.successResponse(
+            data={"banner_id": str(banner.id)},
+            description="Web banner created successfully"
+        )
+    def get(self, request):
         page = int(request.query_params.get("page", 1))
         page_size = int(request.query_params.get("page_size", 10))
-
         if page < 1 or page_size < 1:
             return CustomResponse.errorResponse(
                 description="page and page_size must be positive integers"
             )
-
         queryset = WebBanner.objects.all().order_by("-created_at")
-
         total = queryset.count()
         offset = (page - 1) * page_size
         queryset = queryset[offset: offset + page_size]
-
         data = list(queryset.values())
-
         return CustomResponse.successResponse(
             data=data,
             total=total
         )
 
-
-    def put(self,request,id=None):
+    @transaction.atomic
+    def put(self, request, id=None):
         if not id:
-            return CustomResponse.errorResponse(description="web banner id required")
+            return CustomResponse.errorResponse(
+                description="web banner id required"
+            )
 
-        banner = WebBanner.objects.filter(id=id).first()
+        store = request.store
+        data = request.data
+
+        banner = WebBanner.objects.filter(
+            id=id,
+            store_id=store.id
+        ).first()
 
         if not banner:
-            return CustomResponse.errorResponse(description="web banner not found")
+            return CustomResponse.errorResponse(
+                description="web banner not found"
+            )
 
+        old_priority = banner.priority
+        old_screen = banner.screen
 
-        for field in [
-            "screen","image","priority","is_active","action","destination"
-        ]:
-            if field in request.data:
-                setattr(banner,field,request.data.get(field))
+        new_screen = data.get("screen", old_screen)
+        new_priority = data.get("priority", old_priority)
+
+        # ---------- Validate priority ----------
+        try:
+            new_priority = int(new_priority)
+        except (TypeError, ValueError):
+            return CustomResponse.errorResponse(
+                description="priority must be an integer"
+            )
+
+        # ---------- Handle priority shift ----------
+        if new_priority != old_priority or new_screen != old_screen:
+            WebBanner.objects.filter(
+                store_id=store.id,
+                screen=new_screen,
+                priority__gte=new_priority
+            ).exclude(
+                id=banner.id
+            ).update(
+                priority=F("priority") + 1
+            )
+
+            banner.priority = new_priority
+            banner.screen = new_screen
+
+        # ---------- Update other fields safely ----------
+        updatable_fields = [
+            "image",
+            "is_active",
+            "action",
+            "destination",
+            "title",
+            "description",
+        ]
+
+        for field in updatable_fields:
+            if field in data:
+                setattr(banner, field, data[field])
 
         banner.save()
-        return CustomResponse.successResponse(data={},description="web banner updated successfully")
 
-    def delete(self,request,id=None):
+        return CustomResponse.successResponse(
+            data={"banner_id": str(banner.id)},
+            description="web banner updated successfully"
+        )
+
+    @transaction.atomic
+    def delete(self, request, id=None):
         if not id:
-            return CustomResponse.errorResponse(description="web banner id required")
+            return CustomResponse.errorResponse(
+                description="web banner id required"
+            )
 
-        banner = WebBanner.objects.filter(id=id).filter()
+        store = request.store
+
+        banner = WebBanner.objects.filter(
+            id=id,
+            store_id=store.id
+        ).first()
+
         if not banner:
-            return CustomResponse.errorResponse(description="web banner not found")
-
+            return CustomResponse.errorResponse(
+                description="web banner not found"
+            )
+        screen = banner.screen
+        deleted_priority = banner.priority
+        # ---------- Delete banner ----------
         banner.delete()
-        return CustomResponse.successResponse(data={},description="web banner deleted successfully")
+        # ---------- Rebalance priorities ----------
+        WebBanner.objects.filter(
+            store_id=store.id,
+            screen=screen,
+            priority__gt=deleted_priority
+        ).update(
+            priority=F("priority") - 1
+        )
+        return CustomResponse.successResponse(
+            description="web banner deleted successfully",
+            data={}
+        )
 
 
 class FlashSaleBannerAPIView(APIView):
@@ -2313,7 +2503,7 @@ class OrderListAPIView(APIView):
                 amount=subtotal,
                 wallet_paid=Decimal("0.00"),
                 paid_online=subtotal,
-                status=OrderStatus.CONFIRMED,
+                status=OrderStatus.PLACED,
                 created_by=admin.id
             )
 
@@ -2351,11 +2541,57 @@ class OrderListAPIView(APIView):
             description="Order created successfully"
         )
 
+    def put(self, request, id):
+        order = Order.objects.filter(
+            id=id
+        ).first()
+        if not order:
+            return CustomResponse().errorResponse(data={}, description="No order found with provided Id")
+        new_status = request.data.get("status")
+        remarks = request.data.get("remarks")
+
+        if not new_status:
+            return CustomResponse().errorResponse(data={}, description="status is required")
+
+        current_status = order.status
+        allowed_next = BO_STATUS_FLOW.get(current_status, [])
+        if new_status not in allowed_next:
+            return CustomResponse().errorResponse( data=
+                {
+                    "message": "Invalid status transition",
+                    "current_status": current_status,
+                    "allowed_next": allowed_next
+                },
+                description="Invalid status transition",
+            )
+        order.status = new_status
+        order.save()
+        if order.status == OrderStatus.PACKED:
+            shipping_slip_path = generate_shipping_invoice(order)
+            order.shipping_slip = shipping_slip_path
+            order.save(update_fields=["shipping_slip"])
+
+
+
+            #todo: generate shipping slip
+            # pass
+        OrderTimeLines.objects.create(
+            order=order,
+            status=new_status,
+            remarks=remarks
+        )
+        return CustomResponse.successResponse(
+            data={},
+            description="Order Updated successfully"
+        )
+
+
 
 class AdminOrderDetailAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
-    def get(self, request, order_id):
+    def get(self, request):
+        order_id = request.GET.get("id", "")
         store = request.store
         try:
             order = Order.objects.select_related(
@@ -2404,19 +2640,27 @@ class AdminOrderDetailAPIView(APIView):
             })
         # ---------- Timelines ----------
         timelines = []
+        coupon_details = {}
         for t in order.timelines.all():
             timelines.append({
                 "status": t.status,
                 "remarks": t.remarks,
                 "timestamp": t.created_at
             })
+        if order.coupon:
+            coupon_details = {
+                        "code": order.coupon.code,
+                        "target_type": order.coupon.target_type,
+                        "discount_type": order.coupon.discount_type,
+                        "discount_value": order.coupon.discount_value,
+                    }
         return CustomResponse.successResponse(
             data={
                 "order": {
                     "order_id": str(order.id),
                     "order_number": order.order_number,
                     "status": order.status,
-                    "subtotal": str(order.subtotal),
+                    "subtotal": str(order.amount),
                     "coupon_discount": str(order.coupon_discount),
                     "amount": str(order.amount),
                     "wallet_paid": str(order.wallet_paid),
@@ -2424,6 +2668,7 @@ class AdminOrderDetailAPIView(APIView):
                     "cash_on_delivery": str(order.cash_on_delivery),
                     "created_at": order.created_at,
                     "address": order.address,
+                    "coupon": coupon_details,
                     "user": {
                         "id": str(order.user.id),
                         "name": order.user.name,

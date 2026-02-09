@@ -8,6 +8,7 @@ from django.db import IntegrityError
 from django.db.models import Q, Count, Avg
 from decimal import Decimal
 
+from django.utils.timesince import timesince
 from django.utils.timezone import now
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated,AllowAny
@@ -493,7 +494,7 @@ class PinListView(APIView):
             "pin":pin.pin,
             "state":pin.state,
             "city":pin.city,
-            "area":pin.area,
+            "district":pin.district,
             "country":pin.country
         }
 
@@ -1023,8 +1024,8 @@ def initiateOrder(user, amount, order, store):
     """
     print("DEBUG CASHFREE CLIENT ID:", store.client_id)
     print("DEBUG CASHFREE CLIENT SECRET:", store.client_secret)
-    print("DEBUG CASHFREE URL:", store.url)
-    print("DEBUG CASHFREE WEBHOOK:", store.webhook)
+    print("DEBUG CASHFREE URL:", settings.CASHFREE_URL)
+    print("DEBUG CASHFREE WEBHOOK:", settings.CASHFREE_WEBHOOK)
 
     # --- Prepare payload ---
     payload = {
@@ -1037,7 +1038,7 @@ def initiateOrder(user, amount, order, store):
             "customer_name": str(user.username),
         },
         "order_meta": {
-            "notify_url": store.webhook,
+            "notify_url": settings.CASHFREE_WEBHOOK,
         },
     }
 
@@ -1054,7 +1055,7 @@ def initiateOrder(user, amount, order, store):
 
     try:
         # --- Send request to CashFree ---
-        response = requests.post(store.url, json=payload, headers=headers, timeout=15)
+        response = requests.post(settings.CASHFREE_URL, json=payload, headers=headers, timeout=15)
 
 
         # --- Validate response ---
@@ -1129,11 +1130,18 @@ class Webhook(APIView):
                     order.paid_online = order_amount
                     order.updated_by = event_type
                     order.save(update_fields=["status", "paid_online", "updated_by"])
-                    CouponUsage.objects.create(
-                        coupon=order.coupon,
-                        user=order.user,
-                        order=order
+                    OrderTimeLines.objects.create(
+                        order=order,
+                        status=OrderStatus.PLACED,
+                        remarks="Order Placed"
                     )
+                    if order.coupon is not None:
+                        CouponUsage.objects.create(
+                            coupon=order.coupon,
+                            user=order.user,
+                            order=order
+                        )
+
                     remove_cart_items(order.user, order.store)
                 elif event_type == "PAYMENT_FAILED_WEBHOOK":
                     payment.status = PaymentStatus.FAILED
@@ -1144,6 +1152,12 @@ class Webhook(APIView):
                     order.updated_by = event_type
                     order.save(update_fields=["status", "updated_by"])
 
+                    OrderTimeLines.objects.create(
+                        order=order,
+                        status=OrderStatus.FAILED,
+                        remarks="Order Failed"
+                    )
+
                 elif event_type == "PAYMENT_USER_DROPPED_WEBHOOK":
                     payment.status = PaymentStatus.CANCELLED
                     payment.updated_by = event_type
@@ -1152,6 +1166,11 @@ class Webhook(APIView):
                     order.status = OrderStatus.CANCELLED
                     order.updated_by = event_type
                     order.save(update_fields=["status", "updated_by"])
+                    OrderTimeLines.objects.create(
+                        order=order,
+                        status=OrderStatus.CANCELLED,
+                        remarks="Order Cancelled"
+                    )
                 else:
                     print("Unhandled webhook type:", event_type)
 
@@ -1189,9 +1208,14 @@ class PaymentStatusAPIView(APIView):
                 description="Payment not found"
             )
         if payment.status == PaymentStatus.COMPLETED:
-            return CustomResponse().successResponse(data={},
-                description="Payment already completed (webhook confirmed)"
+            return CustomResponse().successResponse(
+                data={
+                    "order_number": order_number,
+                    "final_payment_status": order.status,
+                },
+                description="Payment status verified with Cashfree and updated"
             )
+
 
         # 🔥 FETCH CASHFREE STATUS
         cf_response = fetch_cashfree_payment_status(order_number, request.store)
@@ -1209,31 +1233,45 @@ class PaymentStatusAPIView(APIView):
                 order.paid_online = payment.amount
                 order.updated_by = "PAYMENT STATUS BY FE"
                 order.save(update_fields=["status", "paid_online"])
-                CouponUsage.objects.create(
-                    coupon=order.coupon,
-                    user=order.user,
-                    order=order
+                OrderTimeLines.objects.create(
+                    order=order,
+                    status=OrderStatus.PLACED,
+                    remarks="Order Placed"
                 )
+                if order.coupon is not None:
+                    CouponUsage.objects.create(
+                        coupon=order.coupon,
+                        user=order.user,
+                        order=order
+                    )
+
                 remove_cart_items(order.user, order.store)
 
             elif verified_status == PaymentStatus.FAILED:
                 order.status = OrderStatus.FAILED
                 order.updated_by = "PAYMENT STATUS BY FE"
                 order.save(update_fields=["status", "updated_by"])
+                OrderTimeLines.objects.create(
+                    order=order,
+                    status=OrderStatus.FAILED,
+                    remarks="Order failed"
+                )
 
 
             elif verified_status == PaymentStatus.CANCELLED:
                 order.status = OrderStatus.CANCELLED
                 order.updated_by = "PAYMENT STATUS BY FE"
                 order.save(update_fields=["status", "updated_by"])
-
+                OrderTimeLines.objects.create(
+                    order=order,
+                    status=OrderStatus.CANCELLED,
+                    remarks="Order Cancelled"
+                )
 
         return CustomResponse().successResponse(
             data={
                 "order_number": order_number,
-                "cashfree_status": cf_order_status,
-                "final_payment_status": payment.status,
-                "order_status": order.status,
+                "final_payment_status": order.status,
             },
             description="Payment status verified with Cashfree and updated"
         )
@@ -1279,6 +1317,25 @@ class OrderedProducts(APIView):
 class OrderView(APIView):
     permission_classes = [IsAuthenticated]
 
+    TIMELINE_STATUS_MAP = {
+        "PAYMENT": [
+            OrderStatus.INITIATED,
+            OrderStatus.PLACED,
+            OrderStatus.CONFIRMED,
+            OrderStatus.FAILED,
+        ],
+        "PACKED": [
+            OrderStatus.PACKED,
+        ],
+        "SHIPPED": [
+            OrderStatus.SHIPPED,
+            OrderStatus.OUT_FOR_DELIVERY,
+        ],
+        "DELIVERED": [
+            OrderStatus.DELIVERED,
+        ],
+    }
+
     STATUS_FILTER_MAP = {
         "ONGOING": [
             OrderStatus.INITIATED,
@@ -1298,6 +1355,35 @@ class OrderView(APIView):
         ],
     }
 
+    def build_fe_timelines(self, order):
+        timeline_map = {
+            "PAYMENT": None,
+            "PACKED": None,
+            "SHIPPED": None,
+            "DELIVERED": None,
+        }
+
+        for t in order.timelines.all():
+            for fe_status, mapped_statuses in self.TIMELINE_STATUS_MAP.items():
+                if t.status in mapped_statuses:
+                    # pick the FIRST occurrence only
+                    if timeline_map[fe_status] is None:
+                        timeline_map[fe_status] = t
+
+        # ---------- Final FE timeline ----------
+        timelines = []
+
+        for fe_status in ["PAYMENT", "PACKED", "SHIPPED", "DELIVERED"]:
+            t = timeline_map[fe_status]
+
+            timelines.append({
+                "status": fe_status,
+                "completed": t is not None,
+                "date": t.created_at.strftime("%d %b %Y") if t else None,
+                "time_ago": f"{timesince(t.created_at)} ago" if t else None
+            })
+
+        return timelines
 
     def get(self, request):
         store = request.store
@@ -1318,8 +1404,10 @@ class OrderView(APIView):
         )
         # ---------- Prefetch order items ----------
         orders_qs = orders_qs.prefetch_related(
-            "items__product__media"
+            "items__product__media",
+            "timelines"
         )
+
 
         data = []
 
@@ -1352,6 +1440,9 @@ class OrderView(APIView):
                     "rating": float(item.rating),
                     "reviewed": item.review
                 })
+            timelines = self.build_fe_timelines(order)
+
+
 
             data.append({
                 "order": {
@@ -1372,6 +1463,7 @@ class OrderView(APIView):
                     "display_date": order.created_at.strftime("%d %b %Y"),
 
                 },
+                "timelines": timelines,   # 👈 ADDED
                 "items": items
             })
 
@@ -1451,89 +1543,68 @@ class WebBannerListView(APIView):
     def get(self, request, id=None):
         store = request.store
         action = request.query_params.get("action")
-        queryset = WebBanner.objects.filter(is_active=True,store_id=store.id)
 
-        #  ACTION FILTER
-        if action is not None:
-            if action.lower() == "true":
-                queryset = queryset.filter(action=True)
-            elif action.lower() == "false":
-                queryset = queryset.filter(action=False)
+        queryset = WebBanner.objects.filter(
+            store_id=store.id,
+            is_active=True
+        )
+        # ---------- Priority-based ordering ----------
+        queryset = queryset.order_by(
+            "priority",
+            "-created_at"
+        )
 
-        #  LIST BANNERS
-        data = []
-        for banner in queryset.order_by("-created_at"):
-            data.append({
+        data = [
+            {
                 "id": str(banner.id),
                 "screen": banner.screen,
+                "title": banner.title,
+                "description": banner.description,
                 "image": banner.image,
-                "is_active": banner.is_active,
                 "priority": banner.priority,
                 "action": banner.action,
                 "destination": banner.destination,
-            })
+                "is_active": banner.is_active,
+                "created_at": banner.created_at,
+                "updated_at": banner.updated_at,
+            }
+            for banner in queryset
+        ]
 
         return CustomResponse.successResponse(
             data=data,
             total=len(data)
         )
 
+
 class FlashSaleBannerListView(APIView):
     permission_classes = [AllowAny]
 
     def get(self, request):
         store = request.store
-        action = request.query_params.get("action")
-
-        queryset = FlashSaleBanner.objects.filter(
-            is_active=True,
-            store_id=store.id
+        queryset = WebBanner.objects.filter(
+            store_id=store.id,
+            is_active=True
+        ).order_by(
+            "priority",
+            "-created_at"
         )
-
-        # ACTION FILTER
-        if action is not None:
-            queryset = queryset.filter(action=action.lower() == "true")
-
-        # ---------- LIST BANNERS ----------
-        banners = list(queryset.order_by("-created_at"))
-
-        # Collect ALL product IDs from all banners
-        all_product_ids = set()
-        for banner in banners:
-            if banner.product_id:
-                all_product_ids.update(banner.product_id)
-
-        # Fetch products in ONE query
-        products = Product.objects.filter(id__in=all_product_ids)
-        product_map = {str(p.id): p.name for p in products}
-
-        data = []
-        for banner in banners:
-            product_names = []
-            if banner.product_id:
-                product_names = [
-                    product_map.get(str(pid))
-                    for pid in banner.product_id
-                    if str(pid) in product_map
-                ]
-
-            data.append({
+        data = [
+            {
                 "id": str(banner.id),
                 "screen": banner.screen,
-                "name":banner.name,
-                "title":banner.title,
-                "description":banner.description,
+                "title": banner.title,
+                "description": banner.description,
                 "image": banner.image,
-                "is_active": banner.is_active,
                 "priority": banner.priority,
                 "action": banner.action,
                 "destination": banner.destination,
-                "start_date": banner.start_date,
-                "end_date": banner.end_date,
-                "product_id": banner.product_id,
-                "product_names": product_names,
-                "discount": banner.discount
-            })
+                "is_active": banner.is_active,
+                "created_at": banner.created_at,
+                "updated_at": banner.updated_at,
+            }
+            for banner in queryset
+        ]
 
         return CustomResponse.successResponse(
             data=data,

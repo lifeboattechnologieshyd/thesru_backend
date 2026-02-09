@@ -3,12 +3,16 @@ from django.urls import path
 from backoffice.store import ProductAPIView, CategoriesAPIView, BannerAPIView, InventoryAPIView, \
     PinCodeAPIView, StoreAPIView, WebBannerAPIView, FlashSaleBannerAPIView, OrderStatsAPIView, \
     CartListView, OrderListAPIView, AbandonedOrderListAPIView, Login, SendOTP, TagsAPIView, AdminOrderDetailAPIView, \
-    AdminCreateCouponAPIView
+    AdminCreateCouponAPIView, UserAddress, UserAPIView, CreateAppVersionConfigAPI
+from db.models import AddressMaster
 
 urlpatterns = [
 
     path("send-otp",SendOTP.as_view()),
     path("verify-otp",Login.as_view()),
+
+    path("user/search",UserAPIView.as_view()),
+    path("user/address",UserAddress.as_view()),
 
     path("store", StoreAPIView.as_view()),
     path("store/<str:id>", StoreAPIView.as_view()),
@@ -22,6 +26,9 @@ urlpatterns = [
 
     path("tag",TagsAPIView.as_view()),
 
+    path("appversion",CreateAppVersionConfigAPI.as_view()),
+    path("appversion/<str:id>",CreateAppVersionConfigAPI.as_view()),
+
     path("banner",BannerAPIView.as_view()),
     path("banner/<str:id>",BannerAPIView.as_view()),
 
@@ -30,8 +37,6 @@ urlpatterns = [
 
     path("pin",PinCodeAPIView.as_view()),
     path("pin/<str:id>",PinCodeAPIView.as_view()),
-
-
 
     path("webbanner",WebBannerAPIView.as_view()),
     path("webbanner/<str:id>",WebBannerAPIView.as_view()),
@@ -43,10 +48,8 @@ urlpatterns = [
     path("cart/total",CartListView.as_view()),
 
     path("orders",OrderListAPIView.as_view()),
-    path("orders/<str:id>",AdminOrderDetailAPIView.as_view()),
-
+    path("orders/<str:id>",OrderListAPIView.as_view()),
+    path("order/details",AdminOrderDetailAPIView.as_view()),
 
     path("coupon",AdminCreateCouponAPIView.as_view()),
-
-
-    ]
+]

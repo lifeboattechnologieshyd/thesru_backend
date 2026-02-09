@@ -84,7 +84,7 @@ WSGI_APPLICATION = "config.wsgi.application"
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
-        "DIRS": [],
+        "DIRS": [BASE_DIR / "templates"],
         "APP_DIRS": True,
         "OPTIONS": {
             "context_processors": [
@@ -180,11 +180,11 @@ STATIC_URL = f"https://{AWS_S3_BUCKET}.s3.{AWS_S3_REGION_NAME}.amazonaws.com/sta
 MEDIA_URL = f"https://{AWS_S3_BUCKET}.s3.{AWS_S3_REGION_NAME}.amazonaws.com/"
 
 
-# CASHFREE_URL = "https://sandbox.cashfree.com/pg/orders"
+CASHFREE_URL = "https://sandbox.cashfree.com/pg/orders"
 CASHFREE_API_VERSION = "2025-01-01"
 # CASHFREE_CLIENT_ID = os.getenv("CASHFREE_CLIENT_ID")
 # CASHFREE_CLIENT_SECRET = os.getenv("CASHFREE_CLIENT_SECRET")
-# CASHFREE_WEBHOOK = "https://dev-api.sru.ai/payment/paymentWebhook"
+CASHFREE_WEBHOOK = "https://dev-api.sru.ai/store/paymentWebhook"
 
 SIMPLE_JWT = {
     "BLACKLIST_DB_ALIAS": "default",
@@ -266,7 +266,11 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 SMS_AUTH_KEY = "G5OsafzTnblgPcNLiU69BtXdpZCrKEmuYAIFvhoxb79M2jJwkWLDTxFjvrotcO8mKwfSB2WYXRdUbzka"
 SMS_SENDER_ID = "THESRU"
-SMS_DLT_TEMPLATE_ID = "8764"
+SMS_DLT_OTP_TEMPLATE_ID = "8764"
+SMS_DLT_ORDER_TEMPLATE_ID = "9124"
+SMS_DLT_PACKED_TEMPLATE_ID = "9145"
+SMS_DLT_SHIPPED_TEMPLATE_ID = "9144"
+SMS_DLT_DELIVERED_TEMPLATE_ID = "9143"
 
 
 
@@ -278,3 +282,4 @@ CRONJOBS = [
 
 
 ]
+
