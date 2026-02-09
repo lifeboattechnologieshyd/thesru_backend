@@ -37,6 +37,13 @@ class Store(AuditModel):
     webhook = models.CharField(max_length=100)
     url = models.CharField(max_length=100)
     product_code = models.CharField(max_length=3,null=True)
+    sms_auth_key = models.CharField(max_length=300,null=True)
+    sms_sender_id = models.CharField(max_length=10,null=True)
+    sms_otp_template_id = models.CharField(max_length=50,null=True)
+    sms_order_template_id = models.CharField(max_length=50,null=True)
+    sms_packed_template_id = models.CharField(max_length=50,null=True)
+    sms_shipped_template_id = models.CharField(max_length=50,null=True)
+    sms_delivered_template_id = models.CharField(max_length=50,null=True)
 
     class Meta:
         db_table = "store"
