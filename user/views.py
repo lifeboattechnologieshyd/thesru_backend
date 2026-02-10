@@ -413,7 +413,7 @@ class AppVersionCheckAPI(APIView):
     permission_classes = []
 
     def post(self, request):
-        os = request.header.get("os")
+        os = request.headers.get("os")
         version = request.data.get("version")
 
         if not os or not version:
