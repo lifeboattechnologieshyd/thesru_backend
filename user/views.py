@@ -441,7 +441,6 @@ class AppVersionCheckAPI(APIView):
                 "latest_version": config.latest_version,
                 "title": config.update_title,
                 "message": config.update_message,
-                "store_url": config.store_url
             })
 
         # 🔔 Normal update
@@ -452,7 +451,6 @@ class AppVersionCheckAPI(APIView):
                 "latest_version": config.latest_version,
                 "title": config.update_title,
                 "message": config.update_message,
-                "store_url": config.store_url
             })
 
         return CustomResponse().successResponse(data={
