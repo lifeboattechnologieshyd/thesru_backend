@@ -2083,13 +2083,10 @@ class FlashSaleBannerAPIView(APIView):
             )
 
         queryset = FlashSaleBanner.objects.all().order_by("-created_at")
-
         total = queryset.count()
         offset = (page - 1) * page_size
         queryset = queryset[offset: offset + page_size]
-
         data = list(queryset.values())
-
         return CustomResponse.successResponse(
             data=data,
             total=total

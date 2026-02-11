@@ -187,7 +187,7 @@ class ProductDetailAPIView(APIView):
 
         related_products = Product.objects.filter(
             store=store,
-            lsin=current.lsin,
+            group_code=current.group_code,
             is_active=True
         ).exclude(
             id=current.id
