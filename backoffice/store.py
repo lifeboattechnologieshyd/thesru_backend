@@ -285,6 +285,7 @@ class ProductAPIView(APIView):
             mrp=data["mrp"],
             group_code=data["group_code"],
             selling_price=data["selling_price"],
+            description=data["description"],
             gst_percentage=gst_percentage,
             gst_amount=gst_amount,
             current_stock=data["current_stock"],
@@ -399,6 +400,7 @@ class ProductAPIView(APIView):
                 "size": product.size,
                 "gst_amount": product.gst_amount,
                 "gst_percentage": product.gst_percentage,
+                "description": product.description,
 
                 "mrp": str(product.mrp),
                 "selling_price": str(product.selling_price),
