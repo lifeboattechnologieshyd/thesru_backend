@@ -459,7 +459,7 @@ class ProductAPIView(APIView):
         # ------------------ Update product fields ------------------
         updatable_fields = [
             "name", "size", "colour", "mrp",
-            "selling_price", "gst_percentage",
+            "selling_price", "gst_percentage", "description",
             "gst_amount", "current_stock", "is_active"
         ]
 
@@ -469,6 +469,30 @@ class ProductAPIView(APIView):
 
         product.updated_by = request.user.mobile
         product.save()
+
+        # ================== UPDATE CATEGORIES ==================
+        if "categories" in data:
+            category_ids = data.get("categories", [])
+
+            categories = Category.objects.filter(
+                id__in=category_ids,
+                store=store,
+                is_active=True
+            )
+
+            product.categories.set(categories)
+
+        # ================== UPDATE TAGS ==================
+        if "tags" in data:
+            tag_ids = data.get("tags", [])
+
+            tags = Tag.objects.filter(
+                id__in=tag_ids,
+                store=store,
+                is_active=True
+            )
+
+            product.tags.set(tags)
 
         # ================== DELETE MEDIA (DB + S3) ==================
         media_to_delete = data.get("media_to_delete", [])
