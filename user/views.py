@@ -413,7 +413,7 @@ class AppVersionCheckAPI(APIView):
     permission_classes = []
 
     def post(self, request):
-        os = request.header.get("os")
+        os = request.headers.get("os")
         version = request.data.get("version")
 
         if not os or not version:
@@ -441,7 +441,6 @@ class AppVersionCheckAPI(APIView):
                 "latest_version": config.latest_version,
                 "title": config.update_title,
                 "message": config.update_message,
-                "store_url": config.store_url
             })
 
         # 🔔 Normal update
@@ -452,7 +451,6 @@ class AppVersionCheckAPI(APIView):
                 "latest_version": config.latest_version,
                 "title": config.update_title,
                 "message": config.update_message,
-                "store_url": config.store_url
             })
 
         return CustomResponse().successResponse(data={
