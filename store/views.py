@@ -187,7 +187,7 @@ class ProductDetailAPIView(APIView):
 
         related_products = Product.objects.filter(
             store=store,
-            lsin=current.lsin,
+            group_code=current.group_code,
             is_active=True
         ).exclude(
             id=current.id
@@ -1582,7 +1582,7 @@ class FlashSaleBannerListView(APIView):
 
     def get(self, request):
         store = request.store
-        queryset = WebBanner.objects.filter(
+        queryset = FlashSaleBanner.objects.filter(
             store_id=store.id,
             is_active=True
         ).order_by(
@@ -1593,6 +1593,7 @@ class FlashSaleBannerListView(APIView):
             {
                 "id": str(banner.id),
                 "screen": banner.screen,
+                "name": banner.name,
                 "title": banner.title,
                 "description": banner.description,
                 "image": banner.image,
@@ -1600,6 +1601,10 @@ class FlashSaleBannerListView(APIView):
                 "action": banner.action,
                 "destination": banner.destination,
                 "is_active": banner.is_active,
+                "start_date": banner.start_date,
+                "end_date": banner.end_date,
+                "discount": banner.discount,
+                "product_ids": banner.product_id,
                 "created_at": banner.created_at,
                 "updated_at": banner.updated_at,
             }

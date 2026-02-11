@@ -38,7 +38,7 @@ urlpatterns = [
     path("address", AddressAPIView.as_view()),
     path("address/<str:id>", AddressAPIView.as_view()),
 
-    path("banner", BannerListView.as_view()),
+    path("banner", BannerListView.as_view()), # for mobile app
     path("web/banner", WebBannerListView.as_view()),
     path("flash/sale/banner", FlashSaleBannerListView.as_view()),
 
