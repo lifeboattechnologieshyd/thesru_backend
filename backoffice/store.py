@@ -2954,3 +2954,56 @@ class OrderShippingSlipAPIView(APIView):
         )
 
 
+
+
+class StoreAnalyticsAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        store = request.store
+
+        if not store:
+            return CustomResponse().errorResponse(
+                description="Store context not found"
+            )
+
+        # Only count completed orders
+        completed_orders = Order.objects.filter(
+            store=store,
+            status__in=[
+
+                OrderStatus.DELIVERED,
+            ]
+        )
+
+        #  Total Sales
+        total_sales = completed_orders.aggregate(
+            total=Sum("amount")
+        )["total"] or 0
+
+        #  Total Orders
+        total_orders = completed_orders.count()
+
+        # Total Customers (distinct users)
+        # total_customers = completed_orders.values("user").distinct().count()
+        total_customers = User.objects.filter(
+            store=store
+        ).count()
+
+
+        # Total Products
+        total_products = Product.objects.filter(
+            store=store
+        ).count()
+
+        data = {
+            "total_sales": float(total_sales),
+            "total_orders": total_orders,
+            "total_customers": total_customers,
+            "total_products": total_products,
+        }
+
+        return CustomResponse().successResponse(
+            data=data,
+            description="Store analytics fetched successfully"
+        )

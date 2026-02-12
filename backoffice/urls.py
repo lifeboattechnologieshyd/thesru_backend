@@ -3,7 +3,8 @@ from django.urls import path
 from backoffice.store import ProductAPIView, CategoriesAPIView, BannerAPIView, InventoryAPIView, \
     PinCodeAPIView, StoreAPIView, WebBannerAPIView, FlashSaleBannerAPIView, OrderStatsAPIView, \
     CartListView, OrderListAPIView, AbandonedOrderListAPIView, Login, SendOTP, TagsAPIView, AdminOrderDetailAPIView, \
-    AdminCreateCouponAPIView, UserAddress, UserAPIView, CreateAppVersionConfigAPI, OrderShippingSlipAPIView
+    AdminCreateCouponAPIView, UserAddress, UserAPIView, CreateAppVersionConfigAPI, OrderShippingSlipAPIView, \
+    StoreAnalyticsAPIView
 from db.models import AddressMaster
 
 urlpatterns = [
@@ -52,5 +53,6 @@ urlpatterns = [
     path("order/details",AdminOrderDetailAPIView.as_view()),
 
     path("coupon",AdminCreateCouponAPIView.as_view()),
-    path("shippingslip/<str:id>",OrderShippingSlipAPIView.as_view())
+    path("shippingslip/<str:id>",OrderShippingSlipAPIView.as_view()),
+    path("analytics",StoreAnalyticsAPIView.as_view())
 ]
