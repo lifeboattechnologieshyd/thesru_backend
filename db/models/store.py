@@ -406,6 +406,10 @@ class Order(AuditModel):
     paid_online = models.DecimalField(decimal_places=2, max_digits=10, default=0)
     cash_on_delivery = models.DecimalField(decimal_places=2, max_digits=10, default=0)
     status = models.CharField(choices=OrderStatus.choices, max_length=30, default=OrderStatus.INITIATED)
+    weight = models.DecimalField(max_digits=8,decimal_places=2,null=True,blank=True,help_text="Weight in KG")
+    length = models.DecimalField(max_digits=8,decimal_places=2,null=True,blank=True,help_text="Length in CM" )
+    breadth = models.DecimalField(max_digits=8,decimal_places=2,null=True,blank=True,help_text="Breadth in CM")
+    height = models.DecimalField(max_digits=8,decimal_places=2,null=True,blank=True, help_text="Height in CM")
     shipping_slip = models.CharField(max_length=500, null=True)
 
     class Meta:

@@ -58,11 +58,17 @@ class StoreClient(models.Model):
         ("POS", "POS"),
     ]
     client_type = models.CharField(max_length=20, choices=CLIENT_TYPE_CHOICES)
-    identifier = models.CharField(max_length=200, unique=True)
+    identifier = models.CharField(max_length=200)
     is_active = models.BooleanField(default=True)
 
     class Meta:
         db_table = "store_client"
+        constraints = [
+            models.UniqueConstraint(
+                fields=['store', 'identifier'],
+                name='unique_identifier_per_store'
+            )
+        ]
 
 class User(AbstractBaseUser):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)

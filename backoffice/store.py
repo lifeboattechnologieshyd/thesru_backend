@@ -31,6 +31,8 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from utils.invoice_generator import generate_shipping_invoice
 from utils.store import generate_lsin, generate_order_number, BO_STATUS_FLOW
 from utils.user import generate_otp, send_sms_to_mobile
+from django.db.models import Sum, F, DecimalField, ExpressionWrapper
+
 
 
 class SendOTP(APIView):
@@ -249,6 +251,8 @@ class ProductAPIView(APIView):
             "sku",
             "name",
             "mrp",
+            "group_code",
+            "description",
             "selling_price",
             "current_stock"
         ]
@@ -2396,8 +2400,7 @@ class OrderListAPIView(APIView):
     STATUS_FILTER_MAP = {
         "ONGOING": [
             OrderStatus.INITIATED,
-            OrderStatus.PLACED,
-            OrderStatus.CONFIRMED,
+            OrderStatus.CREATED,
             OrderStatus.PACKED,
             OrderStatus.SHIPPED,
         ],
@@ -2529,7 +2532,7 @@ class OrderListAPIView(APIView):
                 amount=subtotal,
                 wallet_paid=Decimal("0.00"),
                 paid_online=subtotal,
-                status=OrderStatus.PLACED,
+                status=OrderStatus.CREATED,
                 created_by=admin.id
             )
 
@@ -2566,51 +2569,127 @@ class OrderListAPIView(APIView):
             },
             description="Order created successfully"
         )
-
     def put(self, request, id):
-        order = Order.objects.filter(
-            id=id
-        ).first()
+        order = Order.objects.filter(id=id).first()
+
         if not order:
-            return CustomResponse().errorResponse(data={}, description="No order found with provided Id")
+            return CustomResponse().errorResponse(
+                description="No order found with provided Id"
+            )
+
         new_status = request.data.get("status")
         remarks = request.data.get("remarks")
 
         if not new_status:
-            return CustomResponse().errorResponse(data={}, description="status is required")
+            return CustomResponse().errorResponse(
+                description="status is required"
+            )
 
         current_status = order.status
         allowed_next = BO_STATUS_FLOW.get(current_status, [])
+
         if new_status not in allowed_next:
-            return CustomResponse().errorResponse( data=
-                {
+            return CustomResponse().errorResponse(
+                data={
                     "message": "Invalid status transition",
                     "current_status": current_status,
                     "allowed_next": allowed_next
                 },
                 description="Invalid status transition",
             )
+
+        # Detect first time becoming PACKED
+        is_becoming_packed = (
+                current_status != OrderStatus.PACKED
+                and new_status == OrderStatus.PACKED
+        )
+
+        #  Require dimensions only when first time PACKED
+        if is_becoming_packed:
+
+            weight = request.data.get("weight")
+            length = request.data.get("length")
+            breadth = request.data.get("breadth")
+            height = request.data.get("height")
+
+            if not all([weight, length, breadth, height]):
+                return CustomResponse().errorResponse(
+                    description="Weight, length, breadth and height are required"
+                )
+
+            # Convert safely to Decimal
+            order.weight = Decimal(weight)
+            order.length = Decimal(length)
+            order.breadth = Decimal(breadth)
+            order.height = Decimal(height)
+
+        #  Update status
         order.status = new_status
         order.save()
-        if order.status == OrderStatus.PACKED:
+
+        #  Generate shipping slip only first time PACKED
+        if is_becoming_packed and not order.shipping_slip:
             shipping_slip_path = generate_shipping_invoice(order)
             order.shipping_slip = shipping_slip_path
             order.save(update_fields=["shipping_slip"])
 
-
-
-            #todo: generate shipping slip
-            # pass
+        # Timeline
         OrderTimeLines.objects.create(
             order=order,
             status=new_status,
             remarks=remarks
         )
+
         return CustomResponse.successResponse(
             data={},
             description="Order Updated successfully"
         )
 
+
+    # def put(self, request, id):
+    #     order = Order.objects.filter(
+    #         id=id
+    #     ).first()
+    #     if not order:
+    #         return CustomResponse().errorResponse(data={}, description="No order found with provided Id")
+    #     new_status = request.data.get("status")
+    #     remarks = request.data.get("remarks")
+    #
+    #     if not new_status:
+    #         return CustomResponse().errorResponse(data={}, description="status is required")
+    #
+    #     current_status = order.status
+    #     allowed_next = BO_STATUS_FLOW.get(current_status, [])
+    #     if new_status not in allowed_next:
+    #         return CustomResponse().errorResponse( data=
+    #             {
+    #                 "message": "Invalid status transition",
+    #                 "current_status": current_status,
+    #                 "allowed_next": allowed_next
+    #             },
+    #             description="Invalid status transition",
+    #         )
+    #     order.status = new_status
+    #     order.save()
+    #     if order.status == OrderStatus.PACKED:
+    #         shipping_slip_path = generate_shipping_invoice(order)
+    #         order.shipping_slip = shipping_slip_path
+    #         order.save(update_fields=["shipping_slip"])
+    #
+    #
+    #
+    #         #todo: generate shipping slip
+    #         # pass
+    #     OrderTimeLines.objects.create(
+    #         order=order,
+    #         status=new_status,
+    #         remarks=remarks
+    #     )
+    #     return CustomResponse.successResponse(
+    #         data={},
+    #         description="Order Updated successfully"
+    #     )
+    #
 
 
 class AdminOrderDetailAPIView(APIView):
@@ -2623,7 +2702,7 @@ class AdminOrderDetailAPIView(APIView):
             order = Order.objects.select_related(
                 "user"
             ).prefetch_related(
-                "items__product",
+                "items__product__media",
                 "payments",
                 "timelines"
             ).get(
@@ -2637,6 +2716,11 @@ class AdminOrderDetailAPIView(APIView):
         items = []
         for item in order.items.all():
             product = item.product
+            image = None
+            product_images = product.media.filter(media_type=ProductMedia.IMAGE)
+
+            if product_images.exists():
+                image = product_images.first().url
 
             items.append({
                 "order_product_id": str(item.id),
@@ -2650,7 +2734,8 @@ class AdminOrderDetailAPIView(APIView):
                 "mrp": str(item.mrp),
                 "total_price": str(item.selling_price * item.qty),
                 "rating": float(item.rating),
-                "reviewed": item.review
+                "reviewed": item.review,
+                "image": image
             })
 
         # ---- payments ----
@@ -2904,4 +2989,175 @@ class AdminCreateCouponAPIView(APIView):
             data=data,
             total=total,
             description="Coupons fetched successfully"
+        )
+
+
+class OrderShippingSlipAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, id):
+        store = request.store
+
+        if not store:
+            return CustomResponse().errorResponse(
+                description="Store context not found"
+            )
+
+        order = Order.objects.filter(
+            id=id,
+            store=store
+        ).first()
+
+        if not order:
+            return CustomResponse().errorResponse(
+                description="Order not found"
+            )
+
+        #  Status validation
+        if order.status not in [
+            OrderStatus.PACKED,
+            OrderStatus.SHIPPED,
+            OrderStatus.DELIVERED,
+        ]:
+            return CustomResponse().errorResponse(
+                description="Shipping slip not available for this status"
+            )
+
+        if not order.shipping_slip:
+            return CustomResponse().errorResponse(
+                description="Shipping slip not generated yet"
+            )
+
+        return CustomResponse().successResponse(
+            data={
+                "order_id": str(order.id),
+                "order_number": order.order_number,
+                "shipping_slip": order.shipping_slip,
+                "status": order.status
+            },
+            description="Shipping slip fetched successfully"
+        )
+
+
+
+
+class StoreAnalyticsAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        store = request.store
+
+        if not store:
+            return CustomResponse().errorResponse(
+                description="Store context not found"
+            )
+
+        # -------------------------
+        # Use ALL these statuses
+        # -------------------------
+        completed_orders = Order.objects.filter(
+            store=store,
+            status__in=[
+                OrderStatus.CREATED,
+                OrderStatus.PACKED,
+                OrderStatus.SHIPPED,
+                OrderStatus.DELIVERED,
+            ]
+        )
+
+        # -------------------------
+        # 1️⃣ Total Sales
+        # -------------------------
+        total_sales = completed_orders.aggregate(
+            total=Sum("amount")
+        )["total"] or 0
+
+        # -------------------------
+        # 2️⃣ Total Orders
+        # -------------------------
+        total_orders = completed_orders.count()
+
+        # -------------------------
+        # 3️⃣ Total Customers (All store users)
+        # -------------------------
+        total_customers = User.objects.filter(
+            store=store
+        ).count()
+
+        # -------------------------
+        # 4️⃣ Total Products
+        # -------------------------
+        total_products = Product.objects.filter(
+            store=store
+        ).count()
+
+        # -------------------------
+        # 5️⃣ Recent 5 Orders
+        # -------------------------
+        recent_orders_qs = completed_orders.select_related("user") \
+            .order_by("-created_at")[:5]
+
+        recent_orders = []
+        for order in recent_orders_qs:
+            recent_orders.append({
+                "order_id": str(order.id),
+                "order_number": order.order_number,
+                "customer_name": order.user.name,
+                "amount": float(order.amount),
+                "status": order.status,
+                "created_at": order.created_at,
+            })
+
+        # -------------------------
+        # 6️⃣ Top 5 Selling Products
+        # -------------------------
+        top_products_qs = (
+            OrderProducts.objects
+            .filter(
+                order__store=store,
+                order__status__in=[
+                    OrderStatus.CREATED,
+                    OrderStatus.PACKED,
+                    OrderStatus.SHIPPED,
+                    OrderStatus.DELIVERED,
+                ],
+                product__isnull=False
+            )
+            .values("product_id", "product__name")
+            .annotate(
+                number_of_sales=Sum("qty"),
+                amount=Sum(
+                    ExpressionWrapper(
+                        F("selling_price") * F("qty"),
+                        output_field=DecimalField(max_digits=12, decimal_places=2)
+                    )
+                )
+            )
+            .order_by("-number_of_sales")[:5]
+        )
+
+        top_products = []
+        for product in top_products_qs:
+            top_products.append({
+                "product_id": str(product["product_id"]),
+                "name": product["product__name"],
+                "number_of_sales": product["number_of_sales"],
+                "amount": float(product["amount"] or 0),
+            })
+
+        # -------------------------
+        # Final Response
+        # -------------------------
+        data = {
+            "total_sales": float(total_sales),
+            "total_orders": total_orders,
+            "total_customers": total_customers,
+            "total_products": total_products,
+            "recent_orders": recent_orders,
+            "top_selling_products": top_products,
+        }
+
+        return CustomResponse().successResponse(
+            data=data,
+            description="Store analytics fetched successfully"
         )

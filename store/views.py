@@ -1127,13 +1127,13 @@ class Webhook(APIView):
                     payment.updated_by = event_type
                     payment.save(update_fields=["status", "updated_by"])
 
-                    order.status = OrderStatus.PLACED
+                    order.status = OrderStatus.CREATED
                     order.paid_online = order_amount
                     order.updated_by = event_type
                     order.save(update_fields=["status", "paid_online", "updated_by"])
                     OrderTimeLines.objects.create(
                         order=order,
-                        status=OrderStatus.PLACED,
+                        status=OrderStatus.CREATED,
                         remarks="Order Placed"
                     )
                     if order.coupon is not None:
@@ -1231,13 +1231,13 @@ class PaymentStatusAPIView(APIView):
             payment.save(update_fields=["status"])
 
             if verified_status == PaymentStatus.COMPLETED:
-                order.status = OrderStatus.PLACED
+                order.status = OrderStatus.CREATED
                 order.paid_online = payment.amount
                 order.updated_by = "PAYMENT STATUS BY FE"
                 order.save(update_fields=["status", "paid_online"])
                 OrderTimeLines.objects.create(
                     order=order,
-                    status=OrderStatus.PLACED,
+                    status=OrderStatus.CREATED,
                     remarks="Order Placed"
                 )
                 if order.coupon is not None:
@@ -1320,9 +1320,9 @@ class OrderView(APIView):
     TIMELINE_STATUS_MAP = {
         "PAYMENT": [
             OrderStatus.INITIATED,
-            OrderStatus.PLACED,
-            OrderStatus.CONFIRMED,
+            OrderStatus.CREATED,
             OrderStatus.FAILED,
+            OrderStatus.CANCELLED,
         ],
         "PACKED": [
             OrderStatus.PACKED,
@@ -1339,8 +1339,7 @@ class OrderView(APIView):
     STATUS_FILTER_MAP = {
         "ONGOING": [
             OrderStatus.INITIATED,
-            OrderStatus.PLACED,
-            OrderStatus.CONFIRMED,
+            OrderStatus.CREATED,
             OrderStatus.PACKED,
             OrderStatus.SHIPPED,
             OrderStatus.OUT_FOR_DELIVERY,
