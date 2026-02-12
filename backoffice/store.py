@@ -2567,51 +2567,131 @@ class OrderListAPIView(APIView):
             },
             description="Order created successfully"
         )
-
     def put(self, request, id):
-        order = Order.objects.filter(
-            id=id
-        ).first()
+        order = Order.objects.filter(id=id).first()
+
         if not order:
-            return CustomResponse().errorResponse(data={}, description="No order found with provided Id")
+            return CustomResponse().errorResponse(
+                description="No order found with provided Id"
+            )
+
         new_status = request.data.get("status")
         remarks = request.data.get("remarks")
 
         if not new_status:
-            return CustomResponse().errorResponse(data={}, description="status is required")
+            return CustomResponse().errorResponse(
+                description="status is required"
+            )
 
         current_status = order.status
         allowed_next = BO_STATUS_FLOW.get(current_status, [])
+
         if new_status not in allowed_next:
-            return CustomResponse().errorResponse( data=
-                {
+            return CustomResponse().errorResponse(
+                data={
                     "message": "Invalid status transition",
                     "current_status": current_status,
                     "allowed_next": allowed_next
                 },
                 description="Invalid status transition",
             )
+
+        # If order is becoming PACKED → require dimensions
+        is_becoming_packed = (
+                current_status != OrderStatus.PACKED
+                and new_status == OrderStatus.PACKED
+        )
+
+        if is_becoming_packed:
+
+            weight = request.data.get("weight")
+            length = request.data.get("length")
+            breadth = request.data.get("breadth")
+            height = request.data.get("height")
+
+            if not all([weight, length, breadth, height]):
+                return CustomResponse().errorResponse(
+                    description="weight, length, breadth and height are required when packing order"
+                )
+
+            # Optional: convert to decimal safely
+            try:
+                order.weight = float(weight)
+                order.length = float(length)
+                order.breadth = float(breadth)
+                order.height = float(height)
+            except ValueError:
+                return CustomResponse().errorResponse(
+                    description="Invalid dimension or weight format"
+                )
+
+        # Update status
         order.status = new_status
         order.save()
-        if order.status == OrderStatus.PACKED:
+
+        # Generate shipping slip only once
+        if is_becoming_packed and not order.shipping_slip:
             shipping_slip_path = generate_shipping_invoice(order)
             order.shipping_slip = shipping_slip_path
             order.save(update_fields=["shipping_slip"])
 
-
-
-            #todo: generate shipping slip
-            # pass
+        # Create timeline
         OrderTimeLines.objects.create(
             order=order,
             status=new_status,
             remarks=remarks
         )
+
         return CustomResponse.successResponse(
             data={},
             description="Order Updated successfully"
         )
 
+
+    # def put(self, request, id):
+    #     order = Order.objects.filter(
+    #         id=id
+    #     ).first()
+    #     if not order:
+    #         return CustomResponse().errorResponse(data={}, description="No order found with provided Id")
+    #     new_status = request.data.get("status")
+    #     remarks = request.data.get("remarks")
+    #
+    #     if not new_status:
+    #         return CustomResponse().errorResponse(data={}, description="status is required")
+    #
+    #     current_status = order.status
+    #     allowed_next = BO_STATUS_FLOW.get(current_status, [])
+    #     if new_status not in allowed_next:
+    #         return CustomResponse().errorResponse( data=
+    #             {
+    #                 "message": "Invalid status transition",
+    #                 "current_status": current_status,
+    #                 "allowed_next": allowed_next
+    #             },
+    #             description="Invalid status transition",
+    #         )
+    #     order.status = new_status
+    #     order.save()
+    #     if order.status == OrderStatus.PACKED:
+    #         shipping_slip_path = generate_shipping_invoice(order)
+    #         order.shipping_slip = shipping_slip_path
+    #         order.save(update_fields=["shipping_slip"])
+    #
+    #
+    #
+    #         #todo: generate shipping slip
+    #         # pass
+    #     OrderTimeLines.objects.create(
+    #         order=order,
+    #         status=new_status,
+    #         remarks=remarks
+    #     )
+    #     return CustomResponse.successResponse(
+    #         data={},
+    #         description="Order Updated successfully"
+    #     )
+    #
 
 
 class AdminOrderDetailAPIView(APIView):
