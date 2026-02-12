@@ -2596,12 +2596,13 @@ class OrderListAPIView(APIView):
                 description="Invalid status transition",
             )
 
-        # If order is becoming PACKED → require dimensions
+        # Detect first time becoming PACKED
         is_becoming_packed = (
                 current_status != OrderStatus.PACKED
                 and new_status == OrderStatus.PACKED
         )
 
+        #  Require dimensions only when first time PACKED
         if is_becoming_packed:
 
             weight = request.data.get("weight")
@@ -2611,31 +2612,26 @@ class OrderListAPIView(APIView):
 
             if not all([weight, length, breadth, height]):
                 return CustomResponse().errorResponse(
-                    description="weight, length, breadth and height are required when packing order"
+                    description="Weight, length, breadth and height are required"
                 )
 
-            # Optional: convert to decimal safely
-            try:
-                order.weight = float(weight)
-                order.length = float(length)
-                order.breadth = float(breadth)
-                order.height = float(height)
-            except ValueError:
-                return CustomResponse().errorResponse(
-                    description="Invalid dimension or weight format"
-                )
+            # Convert safely to Decimal
+            order.weight = Decimal(weight)
+            order.length = Decimal(length)
+            order.breadth = Decimal(breadth)
+            order.height = Decimal(height)
 
-        # Update status
+        #  Update status
         order.status = new_status
         order.save()
 
-        # Generate shipping slip only once
+        #  Generate shipping slip only first time PACKED
         if is_becoming_packed and not order.shipping_slip:
             shipping_slip_path = generate_shipping_invoice(order)
             order.shipping_slip = shipping_slip_path
             order.save(update_fields=["shipping_slip"])
 
-        # Create timeline
+        # Timeline
         OrderTimeLines.objects.create(
             order=order,
             status=new_status,
