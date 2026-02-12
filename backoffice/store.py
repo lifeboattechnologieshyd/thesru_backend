@@ -251,6 +251,8 @@ class ProductAPIView(APIView):
             "sku",
             "name",
             "mrp",
+            "group_code",
+            "description",
             "selling_price",
             "current_stock"
         ]
