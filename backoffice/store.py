@@ -2623,7 +2623,7 @@ class AdminOrderDetailAPIView(APIView):
             order = Order.objects.select_related(
                 "user"
             ).prefetch_related(
-                "items__product",
+                "items__product__media",
                 "payments",
                 "timelines"
             ).get(
@@ -2637,6 +2637,11 @@ class AdminOrderDetailAPIView(APIView):
         items = []
         for item in order.items.all():
             product = item.product
+            image = None
+            product_images = product.media.filter(media_type=ProductMedia.IMAGE)
+
+            if product_images.exists():
+                image = product_images.first().url
 
             items.append({
                 "order_product_id": str(item.id),
@@ -2650,7 +2655,8 @@ class AdminOrderDetailAPIView(APIView):
                 "mrp": str(item.mrp),
                 "total_price": str(item.selling_price * item.qty),
                 "rating": float(item.rating),
-                "reviewed": item.review
+                "reviewed": item.review,
+                "image": image
             })
 
         # ---- payments ----
