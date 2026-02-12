@@ -2905,3 +2905,52 @@ class AdminCreateCouponAPIView(APIView):
             total=total,
             description="Coupons fetched successfully"
         )
+
+
+class OrderShippingSlipAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, id):
+        store = request.store
+
+        if not store:
+            return CustomResponse().errorResponse(
+                description="Store context not found"
+            )
+
+        order = Order.objects.filter(
+            id=id,
+            store=store
+        ).first()
+
+        if not order:
+            return CustomResponse().errorResponse(
+                description="Order not found"
+            )
+
+        #  Status validation
+        if order.status not in [
+            OrderStatus.PACKED,
+            OrderStatus.SHIPPED,
+            OrderStatus.DELIVERED,
+        ]:
+            return CustomResponse().errorResponse(
+                description="Shipping slip not available for this status"
+            )
+
+        if not order.shipping_slip:
+            return CustomResponse().errorResponse(
+                description="Shipping slip not generated yet"
+            )
+
+        return CustomResponse().successResponse(
+            data={
+                "order_id": str(order.id),
+                "order_number": order.order_number,
+                "shipping_slip": order.shipping_slip,
+                "status": order.status
+            },
+            description="Shipping slip fetched successfully"
+        )
+
+
