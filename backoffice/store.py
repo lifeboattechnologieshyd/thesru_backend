@@ -31,6 +31,8 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from utils.invoice_generator import generate_shipping_invoice
 from utils.store import generate_lsin, generate_order_number, BO_STATUS_FLOW
 from utils.user import generate_otp, send_sms_to_mobile
+from django.db.models import Sum, F, DecimalField, ExpressionWrapper
+
 
 
 class SendOTP(APIView):
@@ -2972,7 +2974,9 @@ class StoreAnalyticsAPIView(APIView):
                 description="Store context not found"
             )
 
-        # Only count completed orders
+        # -------------------------
+        # Use ALL these statuses
+        # -------------------------
         completed_orders = Order.objects.filter(
             store=store,
             status__in=[
@@ -2983,31 +2987,96 @@ class StoreAnalyticsAPIView(APIView):
             ]
         )
 
-        #  Total Sales
+        # -------------------------
+        # 1️⃣ Total Sales
+        # -------------------------
         total_sales = completed_orders.aggregate(
             total=Sum("amount")
         )["total"] or 0
 
-        #  Total Orders
+        # -------------------------
+        # 2️⃣ Total Orders
+        # -------------------------
         total_orders = completed_orders.count()
 
-        # Total Customers (distinct users)
-        # total_customers = completed_orders.values("user").distinct().count()
+        # -------------------------
+        # 3️⃣ Total Customers (All store users)
+        # -------------------------
         total_customers = User.objects.filter(
             store=store
         ).count()
 
-
-        # Total Products
+        # -------------------------
+        # 4️⃣ Total Products
+        # -------------------------
         total_products = Product.objects.filter(
             store=store
         ).count()
 
+        # -------------------------
+        # 5️⃣ Recent 5 Orders
+        # -------------------------
+        recent_orders_qs = completed_orders.select_related("user") \
+            .order_by("-created_at")[:5]
+
+        recent_orders = []
+        for order in recent_orders_qs:
+            recent_orders.append({
+                "order_id": str(order.id),
+                "order_number": order.order_number,
+                "customer_name": order.user.name,
+                "amount": float(order.amount),
+                "status": order.status,
+                "created_at": order.created_at,
+            })
+
+        # -------------------------
+        # 6️⃣ Top 5 Selling Products
+        # -------------------------
+        top_products_qs = (
+            OrderProducts.objects
+            .filter(
+                order__store=store,
+                order__status__in=[
+                    OrderStatus.CREATED,
+                    OrderStatus.PACKED,
+                    OrderStatus.SHIPPED,
+                    OrderStatus.DELIVERED,
+                ],
+                product__isnull=False
+            )
+            .values("product_id", "product__name")
+            .annotate(
+                number_of_sales=Sum("qty"),
+                amount=Sum(
+                    ExpressionWrapper(
+                        F("selling_price") * F("qty"),
+                        output_field=DecimalField(max_digits=12, decimal_places=2)
+                    )
+                )
+            )
+            .order_by("-number_of_sales")[:5]
+        )
+
+        top_products = []
+        for product in top_products_qs:
+            top_products.append({
+                "product_id": str(product["product_id"]),
+                "name": product["product__name"],
+                "number_of_sales": product["number_of_sales"],
+                "amount": float(product["amount"] or 0),
+            })
+
+        # -------------------------
+        # Final Response
+        # -------------------------
         data = {
             "total_sales": float(total_sales),
             "total_orders": total_orders,
             "total_customers": total_customers,
             "total_products": total_products,
+            "recent_orders": recent_orders,
+            "top_selling_products": top_products,
         }
 
         return CustomResponse().successResponse(
