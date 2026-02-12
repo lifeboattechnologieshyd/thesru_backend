@@ -28,9 +28,9 @@ class PaymentStatus(models.TextChoices):
 
 class OrderStatus(models.TextChoices):
     INITIATED = "INITIATED"
-    PLACED = "CREATED"
+    CREATED = "CREATED"
     FAILED = "FAILED"
-    CONFIRMED = "CONFIRMED"
+    # CONFIRMED = "CONFIRMED"
     PACKED = "PACKED" # after this address change for this order won't be there  from here on
     SHIPPED = "SHIPPED" # shipping details like partner name, url, id, expected_delivery_date,
     OUT_FOR_DELIVERY = "OUT_FOR_DELIVERY" # we are not using this.

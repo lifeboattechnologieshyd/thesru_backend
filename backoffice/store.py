@@ -2396,8 +2396,7 @@ class OrderListAPIView(APIView):
     STATUS_FILTER_MAP = {
         "ONGOING": [
             OrderStatus.INITIATED,
-            OrderStatus.PLACED,
-            OrderStatus.CONFIRMED,
+            OrderStatus.CREATED,
             OrderStatus.PACKED,
             OrderStatus.SHIPPED,
         ],
@@ -2529,7 +2528,7 @@ class OrderListAPIView(APIView):
                 amount=subtotal,
                 wallet_paid=Decimal("0.00"),
                 paid_online=subtotal,
-                status=OrderStatus.PLACED,
+                status=OrderStatus.CREATED,
                 created_by=admin.id
             )
 
@@ -2977,7 +2976,9 @@ class StoreAnalyticsAPIView(APIView):
         completed_orders = Order.objects.filter(
             store=store,
             status__in=[
-
+                OrderStatus.CREATED,
+                OrderStatus.PACKED,
+                OrderStatus.SHIPPED,
                 OrderStatus.DELIVERED,
             ]
         )

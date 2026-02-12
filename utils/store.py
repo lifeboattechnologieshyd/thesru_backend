@@ -71,9 +71,7 @@ def generate_order_number(store, prefix):
 
 
 BO_STATUS_FLOW = {
-    OrderStatus.PLACED: [OrderStatus.PACKED],
-    OrderStatus.CONFIRMED: [OrderStatus.PACKED],
-
+    OrderStatus.CREATED: [OrderStatus.PACKED],
     OrderStatus.PACKED: [OrderStatus.SHIPPED],
     OrderStatus.SHIPPED: [OrderStatus.DELIVERED],
 }
