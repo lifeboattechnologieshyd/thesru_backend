@@ -94,10 +94,11 @@ def version_to_tuple(version):
 def send_otp_email(email, otp):
     send_mail(
         subject="Your OTP Code",
-        message=f"Your OTP is {otp}. It is valid for 15 minutes.",
+        message=f"Use OTP {otp} to login to thesapphire house. OTP is valid for 10 minutes. Do not share this OTP with anyone.",
         from_email=settings.DEFAULT_FROM_EMAIL,
         recipient_list=[email],
         fail_silently=False,
     )
 
 # ldvq myjr huxg ekco
+# Use OTP {#numeric#} to login to FamiliFirst. OTP is valid for 10 minutes. Do not share this OTP with anyone.
