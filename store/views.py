@@ -79,7 +79,7 @@ class ProductListAPIView(APIView):
         tags = request.query_params.get("tags")
 
         page = int(request.query_params.get("page", 1))
-        page_size = int(request.query_params.get("page_size", 12))
+        page_size = int(request.query_params.get("page_size", 15))
 
         # ---------- Base queryset ----------
         queryset = Product.objects.filter(

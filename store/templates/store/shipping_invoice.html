@@ -445,21 +445,32 @@
 
   <!-- SHIP TO + LOGO -->
   <div class="row">
+
+    <!-- LEFT: SHIPPING ADDRESS -->
     <div class="col">
       <div class="title">Ship To</div>
-      {{ order.user.name }}<br>
-      {{ order.address.address }}<br>
-      {{ order.address.city }}, {{ order.address.state }}<br>
-      {{ order.address.pincode }}<br>
-      {{ order.address.mobile }}
+
+      {{ address.full_name }}<br>
+
+      {{ address.house_number }},
+      {{ address.area }}{% if address.street_address %}, {{ address.street_address }}{% endif %}<br>
+
+      {{ address.district }}, {{ address.state }}, {{ address.country }}<br>
+
+      {{ address.pincode }}<br>
+
+      {{ address.mobile }}
     </div>
 
+    <!-- RIGHT: STORE LOGO -->
     <div class="col" style="text-align:right;">
       {% if order.store.logo %}
-        <img src="{{ order.store.logo }}">
+        <img src="{{ order.store.logo }}" alt="Store Logo">
       {% endif %}
     </div>
+
   </div>
+
 
   <div class="divider"></div>
 
