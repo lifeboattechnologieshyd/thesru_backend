@@ -273,6 +273,14 @@ SMS_DLT_SHIPPED_TEMPLATE_ID = "9144"
 SMS_DLT_DELIVERED_TEMPLATE_ID = "9143"
 
 
+EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+EMAIL_HOST='smtp.gmail.com'
+EMAIL_USE_TLS=0
+EMAIL_PORT=465
+EMAIL_USE_SSL=1
+EMAIL_HOST_USER='thesapphirehouse.in@gmail.com'
+EMAIL_HOST_PASSWORD='ldvqmyjrhuxgekco'
+DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
 
 CRONJOBS = [
     (f"0 */1 * * * cd {BASE_DIR} && ",

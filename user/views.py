@@ -23,7 +23,7 @@ from rest_framework import status
 
 from utils.storage import add_unique_suffix_to_filename, sanitize_filename
 from utils.user import generate_username, generate_referral_code, generate_otp, version_to_tuple, \
-    send_sms_to_mobile
+    send_sms_to_mobile, send_otp_email
 
 
 # class MobileSendOTPView(APIView):
@@ -456,3 +456,179 @@ class AppVersionCheckAPI(APIView):
         return CustomResponse().successResponse(data={
             "update_required": False,
         })
+
+
+class EmailSendOTPView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        store = request.store
+        email = request.data.get("email")
+
+        if not email:
+            return CustomResponse().errorResponse(
+                description="Email is required",
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        user = User.objects.filter(email=email, store=store).first()
+        is_new_user = not bool(user)
+
+        otp = generate_otp()
+
+        # if DEBUG:
+        #     otp = 1234
+        # else:
+        send_otp_email(email, otp)
+
+        expires_at = timezone.now() + timedelta(minutes=15)
+
+        # Invalidate old OTPs
+        UserOTP.objects.filter(
+            store=store,
+            email=email,
+            is_used=False
+        ).update(is_used=True)
+
+        # Save OTP
+        UserOTP.objects.create(
+            store=store,
+            email=email,
+            otp=otp,
+            expires_at=expires_at
+        )
+
+        return CustomResponse().successResponse(
+            description="OTP sent successfully to email",
+            data={
+                "is_new_user": is_new_user,
+                "email": email,
+                "otp": otp if DEBUG else None,  # never expose in prod
+            },
+            status=status.HTTP_200_OK
+        )
+
+
+class EmailVerifyOTPView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        email = request.data.get("email")
+        otp = request.data.get("otp")
+        device_id = request.data.get("device_id")
+
+        if not email or not otp:
+            return CustomResponse().errorResponse(
+                description="Email and OTP are required",
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # ---------------- Validate OTP (STORE-SCOPED) ----------------
+        otp_obj = (
+            UserOTP.objects
+            .filter(
+                store=request.store,
+                email=email,
+                otp=otp,
+                is_used=False
+            )
+            .order_by("-expires_at")
+            .first()
+        )
+
+        if not otp_obj:
+            return CustomResponse().errorResponse(
+                description="Invalid OTP",
+                status=status.HTTP_401_UNAUTHORIZED
+            )
+
+        if timezone.now() > otp_obj.expires_at:
+            return CustomResponse().errorResponse(
+                description="OTP has expired",
+                status=status.HTTP_401_UNAUTHORIZED
+            )
+
+        # Mark OTP as used
+        otp_obj.is_used = True
+        otp_obj.save(update_fields=["is_used"])
+
+        # ---------------- Check existing user ----------------
+        user = User.objects.filter(email=email).first()
+        is_new_user = False
+
+        if not user:
+            temp_user = TempUser.objects.filter(
+                email=email,
+                store=request.store
+            ).first()
+
+            if not temp_user:
+                return CustomResponse().errorResponse(
+                    description="Temp user not found",
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            # Create user with STORE
+            user = User.objects.create(
+                email=email,
+                device_id=device_id,
+                store=request.store
+            )
+            is_new_user = True
+
+            user.username = generate_username(user)
+            user.referral_code = generate_referral_code()
+            user.save()
+
+            temp_user.delete()
+        else:
+            if device_id and user.device_id != device_id:
+                user.device_id = device_id
+
+            if not user.username:
+                user.username = generate_username(user)
+
+            if not user.referral_code:
+                user.referral_code = generate_referral_code()
+
+            # Ensure store is attached
+            if not user.store:
+                user.store = request.store
+
+            user.last_login = datetime.now()
+            user.save()
+
+        # ---------------- Tokens ----------------
+        refresh = RefreshToken.for_user(user)
+        access = str(refresh.access_token)
+        refresh_token = str(refresh)
+
+        UserSession.objects.create(
+            user=user,
+            store=request.store,
+            session_token=access,
+            refresh_token=refresh_token,
+            device_id=device_id,
+            device_type=request.client_type,
+            ip_address=request.META.get("REMOTE_ADDR"),
+            user_agent=request.META.get("HTTP_USER_AGENT"),
+            expires_at=timezone.now() + timedelta(days=7)
+        )
+
+        return CustomResponse().successResponse(
+            description="OTP verified successfully",
+            data={
+                "is_new_user": is_new_user,
+                "access": access,
+                "refresh": refresh_token,
+                "user": {
+                    "id": str(user.id),
+                    "email": user.email,
+                    "username": user.username,
+                    "referral_code": user.referral_code,
+                    "device_id": user.device_id,
+                    "store_id": str(user.store.id)
+                }
+            },
+            status=status.HTTP_200_OK
+        )

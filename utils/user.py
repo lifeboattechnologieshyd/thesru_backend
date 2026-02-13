@@ -2,7 +2,7 @@ import uuid
 import random
 import json
 import requests
-
+from django.core.mail import send_mail
 from django.conf import settings
 
 from db.models import User
@@ -89,3 +89,15 @@ def get_storage_path_from_url(url):
 
 def version_to_tuple(version):
     return tuple(map(int, version.split(".")))
+
+
+def send_otp_email(email, otp):
+    send_mail(
+        subject="Your OTP Code",
+        message=f"Your OTP is {otp}. It is valid for 15 minutes.",
+        from_email=settings.DEFAULT_FROM_EMAIL,
+        recipient_list=[email],
+        fail_silently=False,
+    )
+
+# ldvq myjr huxg ekco
