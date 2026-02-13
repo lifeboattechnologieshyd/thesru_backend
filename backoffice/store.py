@@ -503,14 +503,14 @@ class ProductAPIView(APIView):
 
         if media_to_delete:
             media_qs = ProductMedia.objects.filter(
-                id__in=media_to_delete,
+                url__in=media_to_delete,
                 product=product
             )
 
             for media in media_qs:
                 #  delete from S3 using stored path
-                if media.file_path and default_storage.exists(media.file_path):
-                    default_storage.delete(media.file_path)
+                if media.url and default_storage.exists(media.url):
+                    default_storage.delete(media.url)
 
                 media.delete()
 
