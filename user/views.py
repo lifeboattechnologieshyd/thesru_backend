@@ -462,8 +462,8 @@ class EmailSendOTPView(APIView):
     permission_classes = [AllowAny]
 
     def post(self, request):
-        store = request.store
         email = request.data.get("email")
+        store = request.store
 
         if not email:
             return CustomResponse().errorResponse(
@@ -471,26 +471,24 @@ class EmailSendOTPView(APIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        user = User.objects.filter(email=email, store=store).first()
+        user = User.objects.filter(email=email).first()
         is_new_user = not bool(user)
 
+        if is_new_user:
+            TempUser.objects.update_or_create(
+                email=email,
+                store=store
+            )
+
         otp = generate_otp()
-
-        # if DEBUG:
-        #     otp = 1234
-        # else:
-        send_otp_email(email, otp)
-
         expires_at = timezone.now() + timedelta(minutes=15)
 
-        # Invalidate old OTPs
         UserOTP.objects.filter(
             store=store,
             email=email,
             is_used=False
         ).update(is_used=True)
 
-        # Save OTP
         UserOTP.objects.create(
             store=store,
             email=email,
@@ -498,15 +496,16 @@ class EmailSendOTPView(APIView):
             expires_at=expires_at
         )
 
+        send_otp_email(email, otp)
+
         return CustomResponse().successResponse(
-            description="OTP sent successfully to email",
+            description="OTP sent successfully",
             data={
                 "is_new_user": is_new_user,
-                "email": email,
-                "otp": otp if DEBUG else None,  # never expose in prod
-            },
-            status=status.HTTP_200_OK
+                "email": email
+            }
         )
+
 
 
 class EmailVerifyOTPView(APIView):
