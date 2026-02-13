@@ -2,6 +2,8 @@ from datetime import timedelta
 from decimal import Decimal
 from tokenize import Double
 from unicodedata import category
+from django.utils.timezone import make_aware
+from datetime import datetime
 
 from django.core.files.storage import default_storage
 from django.db.models import Q, F
@@ -3037,9 +3039,6 @@ class OrderShippingSlipAPIView(APIView):
             description="Shipping slip fetched successfully"
         )
 
-
-
-
 class StoreAnalyticsAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -3052,7 +3051,25 @@ class StoreAnalyticsAPIView(APIView):
             )
 
         # -------------------------
-        # Use ALL these statuses
+        # Date Filters (ONLY for Orders & Sales)
+        # -------------------------
+        from_date = request.query_params.get("from_date")
+        to_date = request.query_params.get("to_date")
+
+        order_date_filters = {}
+
+        if from_date:
+            order_date_filters["created_at__gte"] = make_aware(
+                datetime.strptime(from_date, "%Y-%m-%d")
+            )
+
+        if to_date:
+            order_date_filters["created_at__lte"] = make_aware(
+                datetime.strptime(to_date, "%Y-%m-%d")
+            )
+
+        # -------------------------
+        # Completed Orders (Date-filtered)
         # -------------------------
         completed_orders = Order.objects.filter(
             store=store,
@@ -3061,37 +3078,38 @@ class StoreAnalyticsAPIView(APIView):
                 OrderStatus.PACKED,
                 OrderStatus.SHIPPED,
                 OrderStatus.DELIVERED,
-            ]
+            ],
+            **order_date_filters
         )
 
         # -------------------------
-        # 1️⃣ Total Sales
+        # 1️⃣ Total Sales (Date-filtered)
         # -------------------------
         total_sales = completed_orders.aggregate(
             total=Sum("amount")
         )["total"] or 0
 
         # -------------------------
-        # 2️⃣ Total Orders
+        # 2️⃣ Total Orders (Date-filtered)
         # -------------------------
         total_orders = completed_orders.count()
 
         # -------------------------
-        # 3️⃣ Total Customers (All store users)
+        # 3️⃣ Total Customers (NO date filter)
         # -------------------------
         total_customers = User.objects.filter(
             store=store
         ).count()
 
         # -------------------------
-        # 4️⃣ Total Products
+        # 4️⃣ Total Products (NO date filter)
         # -------------------------
         total_products = Product.objects.filter(
             store=store
         ).count()
 
         # -------------------------
-        # 5️⃣ Recent 5 Orders
+        # 5️⃣ Recent 5 Orders (Date-filtered)
         # -------------------------
         recent_orders_qs = completed_orders.select_related("user") \
             .order_by("-created_at")[:5]
@@ -3108,7 +3126,7 @@ class StoreAnalyticsAPIView(APIView):
             })
 
         # -------------------------
-        # 6️⃣ Top 5 Selling Products
+        # 6️⃣ Top 5 Selling Products (Date-filtered)
         # -------------------------
         top_products_qs = (
             OrderProducts.objects
@@ -3120,6 +3138,7 @@ class StoreAnalyticsAPIView(APIView):
                     OrderStatus.SHIPPED,
                     OrderStatus.DELIVERED,
                 ],
+                **{f"order__{k}": v for k, v in order_date_filters.items()},
                 product__isnull=False
             )
             .values("product_id", "product__name")
@@ -3148,6 +3167,7 @@ class StoreAnalyticsAPIView(APIView):
         # Final Response
         # -------------------------
         data = {
+
             "total_sales": float(total_sales),
             "total_orders": total_orders,
             "total_customers": total_customers,
@@ -3160,3 +3180,125 @@ class StoreAnalyticsAPIView(APIView):
             data=data,
             description="Store analytics fetched successfully"
         )
+
+#
+# class StoreAnalyticsAPIView(APIView):
+#     permission_classes = [IsAuthenticated]
+#
+#     def get(self, request):
+#         store = request.store
+#
+#         if not store:
+#             return CustomResponse().errorResponse(
+#                 description="Store context not found"
+#             )
+#
+#         # -------------------------
+#         # Use ALL these statuses
+#         # -------------------------
+#         completed_orders = Order.objects.filter(
+#             store=store,
+#             status__in=[
+#                 OrderStatus.CREATED,
+#                 OrderStatus.PACKED,
+#                 OrderStatus.SHIPPED,
+#                 OrderStatus.DELIVERED,
+#             ]
+#         )
+#
+#         # -------------------------
+#         # 1️⃣ Total Sales
+#         # -------------------------
+#         total_sales = completed_orders.aggregate(
+#             total=Sum("amount")
+#         )["total"] or 0
+#
+#         # -------------------------
+#         # 2️⃣ Total Orders
+#         # -------------------------
+#         total_orders = completed_orders.count()
+#
+#         # -------------------------
+#         # 3️⃣ Total Customers (All store users)
+#         # -------------------------
+#         total_customers = User.objects.filter(
+#             store=store
+#         ).count()
+#
+#         # -------------------------
+#         # 4️⃣ Total Products
+#         # -------------------------
+#         total_products = Product.objects.filter(
+#             store=store
+#         ).count()
+#
+#         # -------------------------
+#         # 5️⃣ Recent 5 Orders
+#         # -------------------------
+#         recent_orders_qs = completed_orders.select_related("user") \
+#             .order_by("-created_at")[:5]
+#
+#         recent_orders = []
+#         for order in recent_orders_qs:
+#             recent_orders.append({
+#                 "order_id": str(order.id),
+#                 "order_number": order.order_number,
+#                 "customer_name": order.user.name,
+#                 "amount": float(order.amount),
+#                 "status": order.status,
+#                 "created_at": order.created_at,
+#             })
+#
+#         # -------------------------
+#         # 6️⃣ Top 5 Selling Products
+#         # -------------------------
+#         top_products_qs = (
+#             OrderProducts.objects
+#             .filter(
+#                 order__store=store,
+#                 order__status__in=[
+#                     OrderStatus.CREATED,
+#                     OrderStatus.PACKED,
+#                     OrderStatus.SHIPPED,
+#                     OrderStatus.DELIVERED,
+#                 ],
+#                 product__isnull=False
+#             )
+#             .values("product_id", "product__name")
+#             .annotate(
+#                 number_of_sales=Sum("qty"),
+#                 amount=Sum(
+#                     ExpressionWrapper(
+#                         F("selling_price") * F("qty"),
+#                         output_field=DecimalField(max_digits=12, decimal_places=2)
+#                     )
+#                 )
+#             )
+#             .order_by("-number_of_sales")[:5]
+#         )
+#
+#         top_products = []
+#         for product in top_products_qs:
+#             top_products.append({
+#                 "product_id": str(product["product_id"]),
+#                 "name": product["product__name"],
+#                 "number_of_sales": product["number_of_sales"],
+#                 "amount": float(product["amount"] or 0),
+#             })
+#
+#         # -------------------------
+#         # Final Response
+#         # -------------------------
+#         data = {
+#             "total_sales": float(total_sales),
+#             "total_orders": total_orders,
+#             "total_customers": total_customers,
+#             "total_products": total_products,
+#             "recent_orders": recent_orders,
+#             "top_selling_products": top_products,
+#         }
+#
+#         return CustomResponse().successResponse(
+#             data=data,
+#             description="Store analytics fetched successfully"
+#         )
