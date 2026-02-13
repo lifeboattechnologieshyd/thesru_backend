@@ -518,13 +518,12 @@ class ProductAPIView(APIView):
         media_to_add = data.get("media_to_add", [])
 
         for media in media_to_add:
-            if not all(k in media for k in ("url", "file_path", "media_type")):
+            if not all(k in media for k in ("url", "position", "media_type")):
                 continue
 
             ProductMedia.objects.create(
                 product=product,
                 url=media["url"],                 #  from request
-                file_path=media["file_path"],     #  from request
                 media_type=media["media_type"],
                 position=media.get("position", 0),
                 created_by=request.user.mobile
