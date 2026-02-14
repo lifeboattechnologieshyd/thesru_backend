@@ -155,7 +155,7 @@ def send_order_created_admin_email(order):
     }
 
     html_body = render_to_string(
-        "emails/admin_order_created.html",
+        "store/admin_order_created.html",
         context
     )
 

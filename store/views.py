@@ -954,6 +954,10 @@ class InitiateOrder(APIView):
                 status=OrderStatus.INITIATED,
                 created_by=user.mobile
             )
+            try:
+                send_order_created_admin_email(order)
+            except ImproperlyConfigured as e:
+                pass
 
             # ---------- Create Order Products ----------
             for item in products_data:
