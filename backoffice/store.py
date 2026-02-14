@@ -3081,6 +3081,28 @@ class StoreAnalyticsAPIView(APIView):
             ],
             **order_date_filters
         )
+        # -------------------------
+        # Order count by status (Date-filtered)
+        # -------------------------
+        status_counts_qs = (
+            completed_orders
+            .values("status")
+            .annotate(count=Count("id"))
+        )
+
+        order_status_counts = {
+            status["status"]: status["count"]
+            for status in status_counts_qs
+        }
+
+        # Ensure all statuses are present (even if count = 0)
+        for status in [
+            OrderStatus.CREATED,
+            OrderStatus.PACKED,
+            OrderStatus.SHIPPED,
+            OrderStatus.DELIVERED,
+        ]:
+            order_status_counts.setdefault(status, 0)
 
         # -------------------------
         # 1️⃣ Total Sales (Date-filtered)
@@ -3164,17 +3186,68 @@ class StoreAnalyticsAPIView(APIView):
             })
 
         # -------------------------
+        # 7️⃣ Category-wise Sales Count (Date-filtered)
+        # -------------------------
+        category_qs = (
+            OrderProducts.objects
+            .filter(
+                order__store=store,
+                order__status__in=[
+                    OrderStatus.CREATED,
+                    OrderStatus.PACKED,
+                    OrderStatus.SHIPPED,
+                    OrderStatus.DELIVERED,
+                ],
+                **{f"order__{k}": v for k, v in order_date_filters.items()},
+                product__isnull=False
+            )
+            .values(
+                "product__categories__id",
+                "product__categories__name"
+            )
+            .annotate(
+                total_qty=Sum("qty"),
+                total_amount=Sum(
+                    ExpressionWrapper(
+                        F("selling_price") * F("qty"),
+                        output_field=DecimalField(max_digits=12, decimal_places=2)
+                    )
+                )
+            )
+            .order_by("-total_qty")
+        )
+
+        categories = []
+        for cat in category_qs:
+            if cat["product__categories__id"]:
+                categories.append({
+                    "category_id": str(cat["product__categories__id"]),
+                    "category_name": cat["product__categories__name"],
+                    "total_quantity": cat["total_qty"],
+                    "total_amount": float(cat["total_amount"] or 0),
+                })
+
+
+
+
+
+        # -------------------------
         # Final Response
         # -------------------------
         data = {
-
             "total_sales": float(total_sales),
             "total_orders": total_orders,
             "total_customers": total_customers,
             "total_products": total_products,
+
+            "order_status_counts": order_status_counts,
+
             "recent_orders": recent_orders,
             "top_selling_products": top_products,
+
+            "category_numbers": categories,
         }
+
 
         return CustomResponse().successResponse(
             data=data,
