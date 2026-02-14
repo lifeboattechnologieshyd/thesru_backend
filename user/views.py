@@ -255,7 +255,7 @@ class MobileVerifyOTPView(APIView):
         otp_obj.save(update_fields=["is_used"])
 
         # ---------------- Check existing user ----------------
-        user = User.objects.filter(mobile=mobile).first()
+        user = User.objects.filter(mobile=mobile,store=request.store).first()
         is_new_user = False
 
         if not user:
