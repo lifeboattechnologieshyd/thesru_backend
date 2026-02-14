@@ -4,9 +4,12 @@ import json
 import requests
 from django.core.mail import send_mail
 from django.conf import settings
-
+from django.core.mail import get_connection
+from django.core.exceptions import ImproperlyConfigured
 from db.models import User
-
+from django.template.loader import render_to_string
+from django.core.mail import EmailMultiAlternatives
+from django.core.exceptions import ImproperlyConfigured
 
 def generate_username(user):
     """
@@ -102,3 +105,78 @@ def send_otp_email(email, otp):
 
 # ldvq myjr huxg ekco
 # Use OTP {#numeric#} to login to FamiliFirst. OTP is valid for 10 minutes. Do not share this OTP with anyone.
+
+
+
+
+def get_store_email_connection(store):
+    """
+    Returns SMTP connection for the store.
+    Raises error if SMTP is not configured.
+    """
+    if not all([
+        store.smtp_host,
+        store.smtp_port,
+        store.smtp_username,
+        store.smtp_password,
+    ]):
+        raise ImproperlyConfigured(
+            f"SMTP not configured for store: {store.name}"
+        )
+
+    return get_connection(
+        host=store.smtp_host,
+        port=store.smtp_port,
+        username=store.smtp_username,
+        password=store.smtp_password,
+        use_tls=store.smtp_use_tls,
+    )
+
+
+def send_order_created_admin_email(order):
+    store = order.store
+
+    admins = User.objects.filter(
+        store=store,
+        user_role__contains=["ADMIN"],
+        email__isnull=False
+    ).exclude(email="")
+
+    if not admins.exists():
+        return
+
+    recipients = [a.email for a in admins]
+
+    subject = f"New Order Created | {order.order_number}"
+
+    context = {
+        "order": order,
+        "store": store,
+    }
+
+    html_body = render_to_string(
+        "emails/admin_order_created.html",
+        context
+    )
+
+    text_body = f"""
+New order created
+
+Order Number: {order.order_number}
+Amount: ₹{order.amount}
+"""
+
+    from_email = f"{store.name} <{store.smtp_username}>"
+
+    connection = get_store_email_connection(store)
+
+    email = EmailMultiAlternatives(
+        subject=subject,
+        body=text_body,
+        from_email=from_email,
+        to=recipients,
+        connection=connection
+    )
+
+    email.attach_alternative(html_body, "text/html")
+    email.send(fail_silently=False)

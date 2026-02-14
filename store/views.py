@@ -7,6 +7,7 @@ from django.db import transaction
 from django.db import IntegrityError
 from django.db.models import Q, Count, Avg
 from decimal import Decimal
+from django.core.exceptions import ImproperlyConfigured
 
 from django.utils.timesince import timesince
 from django.utils.timezone import now
@@ -22,7 +23,7 @@ from db.models import AddressMaster, PinCode, Product, Order, OrderProducts, Pay
 from enums.store import OrderStatus, PaymentStatus
 from mixins.drf_views import CustomResponse
 from utils.store import generate_order_number, time_ago
-from utils.user import send_sms_to_mobile
+from utils.user import send_sms_to_mobile, send_order_created_admin_email
 
 
 class CategoryListView(APIView):
@@ -953,6 +954,7 @@ class InitiateOrder(APIView):
                 status=OrderStatus.INITIATED,
                 created_by=user.mobile
             )
+
             # ---------- Create Order Products ----------
             for item in products_data:
                 product = item["product"]
@@ -1136,6 +1138,10 @@ class Webhook(APIView):
                         status=OrderStatus.CREATED,
                         remarks="Order Placed"
                     )
+                    try:
+                        send_order_created_admin_email(order)
+                    except ImproperlyConfigured as e:
+                        pass
                     if order.coupon is not None:
                         CouponUsage.objects.create(
                             coupon=order.coupon,

@@ -552,7 +552,7 @@ class EmailVerifyOTPView(APIView):
         otp_obj.save(update_fields=["is_used"])
 
         # ---------------- Check existing user ----------------
-        user = User.objects.filter(email=email).first()
+        user = User.objects.filter(email=email,store=request.store).first()
         is_new_user = False
 
         if not user:

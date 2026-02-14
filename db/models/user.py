@@ -44,6 +44,11 @@ class Store(AuditModel):
     sms_packed_template_id = models.CharField(max_length=50,null=True)
     sms_shipped_template_id = models.CharField(max_length=50,null=True)
     sms_delivered_template_id = models.CharField(max_length=50,null=True)
+    smtp_host = models.CharField(max_length=200, null=True, blank=True)
+    smtp_port = models.PositiveIntegerField(null=True, blank=True)
+    smtp_username = models.CharField(max_length=200, null=True, blank=True)
+    smtp_password = models.CharField(max_length=200, null=True, blank=True)
+    smtp_use_tls = models.BooleanField(default=True)
 
     class Meta:
         db_table = "store"
