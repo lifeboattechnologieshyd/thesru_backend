@@ -438,20 +438,15 @@
 
   <!-- SHIP TO + LOGO -->
   <div class="row">
-
-    <!-- LEFT: SHIPPING ADDRESS -->
     <div class="col">
       <div class="title">Ship To</div>
 
       <strong>{{ address.name }}</strong><br>
-
-      {{ address.house_number }}{% if address.house_number %},{% endif %}
+      {% if address.house_number %}{{ address.house_number }}, {% endif %}
       {{ address.full_address }}<br>
 
       {{ address.area }}, {{ address.district }}<br>
-
-      {{ address.state }}, {{ address.country }} - {{ address.pin_code }}<br>
-
+      {{ address.state }}, {{ address.country }} - {{ address.pincode }}<br>
       Mobile: {{ address.mobile }}<br>
 
       <span style="font-size:9px;">
@@ -459,13 +454,11 @@
       </span>
     </div>
 
-    <!-- RIGHT: STORE LOGO -->
     <div class="col" style="text-align:right;">
       {% if order.store.logo %}
         <img src="{{ order.store.logo }}" alt="Store Logo">
       {% endif %}
     </div>
-
   </div>
 
   <div class="divider"></div>
@@ -496,7 +489,7 @@
     Order#: {{ order.order_number }} |
     Date: {{ order.created_at|date:"d/m/Y" }} |
     Weight: {{ order.weight }} kg |
-    Dim: {{ order.length }} × {{ order.breadth }} × {{ order.height }} cm
+    Dim (L×B×H): {{ order.length }} × {{ order.breadth }} × {{ order.height }} cm
   </div>
 
   <div class="divider"></div>
@@ -507,7 +500,7 @@
       <tr>
         <th>Item</th>
         <th>Qty</th>
-        <th>Price</th>
+        <th>Unit Price</th>
         <th>Total</th>
       </tr>
     </thead>
@@ -517,7 +510,7 @@
         <td>{{ item.product.name }}</td>
         <td>{{ item.qty }}</td>
         <td>₹{{ item.selling_price }}</td>
-        <td>₹{{ item.selling_price|floatformat:2 }}</td>
+        <td>₹{{ item.selling_price|mul:item.qty|floatformat:2 }}</td>
       </tr>
       {% endfor %}
     </tbody>
@@ -531,7 +524,7 @@
   <div class="divider"></div>
 
   <div style="font-size:8px;">
-    This is auto generated shipping label.
+    This is an auto-generated shipping label.
   </div>
 
 </div>
