@@ -380,6 +380,8 @@ class AddressAPIView(APIView):
     def post(self,request):
         data = request.data
         store = request.store
+        user = request.user
+
 
         required_fields = ["mobile","name","address_name","address_type","full_address",
                            "house_number","country","city","state","area","pin_code",
@@ -389,6 +391,10 @@ class AddressAPIView(APIView):
         for field in required_fields:
             if not data.get(field):
                 return CustomResponse.errorResponse(description=f"{field} is required")
+
+        if not user.name:
+            user.name = data.get("name")
+            user.save(update_fields=["name"])
 
         if data.get("is_default"):
             AddressMaster.objects.filter(user_id=request.user.id,is_default = True).update(is_default = False)
