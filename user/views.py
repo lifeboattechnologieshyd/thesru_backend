@@ -322,9 +322,15 @@ class MobileVerifyOTPView(APIView):
                     "id": str(user.id),
                     "mobile": user.mobile,
                     "username": user.username,
+                    "name": user.name,
                     "referral_code": user.referral_code,
                     "device_id": user.device_id,
-                    "store_id": user.store.id
+                    "store_id": user.store.id,
+                    "gender": user.gender,
+                    "dob": user.dob,
+                    "wallet_balance": user.wallet_balance,
+                    "email": user.email,
+                    "profile_image": user.profile_image,
                 }
             },
             status=status.HTTP_200_OK
