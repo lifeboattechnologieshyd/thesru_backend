@@ -4,13 +4,16 @@ from backoffice.store import ProductAPIView, CategoriesAPIView, BannerAPIView, I
     PinCodeAPIView, StoreAPIView, WebBannerAPIView, FlashSaleBannerAPIView, OrderStatsAPIView, \
     CartListView, OrderListAPIView, AbandonedOrderListAPIView, Login, SendOTP, TagsAPIView, AdminOrderDetailAPIView, \
     AdminCreateCouponAPIView, UserAddress, UserAPIView, CreateAppVersionConfigAPI, OrderShippingSlipAPIView, \
-    StoreAnalyticsAPIView
+    StoreAnalyticsAPIView, EmailSendOTPView, EmailVerifyOTPView
 from db.models import AddressMaster
 
 urlpatterns = [
 
     path("send-otp",SendOTP.as_view()),
     path("verify-otp",Login.as_view()),
+
+    path("email-send-otp",EmailSendOTPView.as_view()),
+    path("email-verify-otp",EmailVerifyOTPView.as_view()),
 
     path("user/search",UserAPIView.as_view()),
     path("user/address",UserAddress.as_view()),
@@ -54,5 +57,5 @@ urlpatterns = [
 
     path("coupon",AdminCreateCouponAPIView.as_view()),
     path("shippingslip/<str:id>",OrderShippingSlipAPIView.as_view()),
-    path("analytics",StoreAnalyticsAPIView.as_view())
+    path("analytics",StoreAnalyticsAPIView.as_view()),
 ]
