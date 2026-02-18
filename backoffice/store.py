@@ -22,7 +22,7 @@ from rest_framework.permissions import IsAuthenticated, AllowAny
 from urllib3 import request
 
 from config import settings
-from config.settings.common import DEBUG
+from django.conf import settings
 from db.models import Category, Product, Banner, Inventory, PinCode, Store, WebBanner, \
     FlashSaleBanner, Order, User, Cart, OrderProducts, UserOTP, StoreClient, UserSession, ProductMedia, Tag, \
     OrderTimeLines, Coupons, CouponProduct, CouponCategory, CouponTag, AddressMaster
