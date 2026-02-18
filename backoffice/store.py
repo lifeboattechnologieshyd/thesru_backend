@@ -3534,7 +3534,7 @@ class ClientInfo(APIView):
 
     permission_classes = [AllowAny]
 
-    def post(self, request):
+    def get(self, request):
         store = request.store
         res = {
             "logo": store.logo,
