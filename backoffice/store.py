@@ -271,7 +271,6 @@ class EmailVerifyOTPView(APIView):
         return CustomResponse().successResponse(
             description="OTP verified successfully",
             data={
-                "is_new_user": is_new_user,
                 "access": access,
                 "refresh": refresh_token,
                 "user": {
