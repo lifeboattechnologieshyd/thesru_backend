@@ -21,6 +21,7 @@ from django.core.files.storage import default_storage
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from urllib3 import request
 
+from config import settings
 from config.settings.common import DEBUG
 from db.models import Category, Product, Banner, Inventory, PinCode, Store, WebBanner, \
     FlashSaleBanner, Order, User, Cart, OrderProducts, UserOTP, StoreClient, UserSession, ProductMedia, Tag, \
@@ -164,10 +165,11 @@ class EmailSendOTPView(APIView):
         # Only ADMIN reaches here
         otp = generate_otp()
 
-        if DEBUG:
+        if settings.DEBUG:
             otp = 1234
         else:
             send_otp_email(email, otp)
+
 
         expires_at = timezone.now() + timedelta(minutes=15)
 
