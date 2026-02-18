@@ -3546,5 +3546,9 @@ class ClientInfo(APIView):
             "is_email_login": store.email_login,
             "is_mobile_login": store.mobile_login,
         }
+        return CustomResponse().successResponse(
+            data=res,
+            description="Client info fetched successfully"
+        )
 
 
