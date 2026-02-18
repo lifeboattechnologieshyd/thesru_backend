@@ -3529,3 +3529,22 @@ class StoreAnalyticsAPIView(APIView):
 #             data=data,
 #             description="Store analytics fetched successfully"
 #         )
+
+class ClientInfo(APIView):
+
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        store = request.store
+        res = {
+            "logo": store.logo,
+            "name": store.name,
+            "mobile": store.mobile,
+            "address": store.address,
+            "secondary_color": store.secondary_color,
+            "primary_color": store.primary_color,
+            "is_email_login": store.email_login,
+            "is_mobile_login": store.mobile_login,
+        }
+
+

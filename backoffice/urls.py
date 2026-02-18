@@ -4,7 +4,11 @@ from backoffice.store import ProductAPIView, CategoriesAPIView, BannerAPIView, I
     PinCodeAPIView, StoreAPIView, WebBannerAPIView, FlashSaleBannerAPIView, OrderStatsAPIView, \
     CartListView, OrderListAPIView, AbandonedOrderListAPIView, Login, SendOTP, TagsAPIView, AdminOrderDetailAPIView, \
     AdminCreateCouponAPIView, UserAddress, UserAPIView, CreateAppVersionConfigAPI, OrderShippingSlipAPIView, \
+<<<<<<< HEAD
     StoreAnalyticsAPIView, EmailSendOTPView, EmailVerifyOTPView
+=======
+    StoreAnalyticsAPIView, ClientInfo
+>>>>>>> 7cf6c91 (store details api added.)
 from db.models import AddressMaster
 
 urlpatterns = [
@@ -58,4 +62,12 @@ urlpatterns = [
     path("coupon",AdminCreateCouponAPIView.as_view()),
     path("shippingslip/<str:id>",OrderShippingSlipAPIView.as_view()),
     path("analytics",StoreAnalyticsAPIView.as_view()),
+<<<<<<< HEAD
+=======
+
+
+
+
+    path("client_info",ClientInfo.as_view())
+>>>>>>> 7cf6c91 (store details api added.)
 ]
