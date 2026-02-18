@@ -1919,7 +1919,20 @@ class StoreAPIView(APIView):
                 address=data.get("address"),
                 logo=data.get("logo"),
                 created_by="SUPERADMIN",
-                product_code = data.get("product_code")
+                product_code = data.get("product_code"),
+                aws_bucket_name = data.get("aws_bucket_name"),
+                bo_title = data.get("bo_title"),
+                bo_subtitle = data.get("bo_subtitle"),
+                highlights = data.get("highlights"),
+                email_login = data.get("email_login"),
+                mobile_login = data.get("mobile_login"),
+                primary_color = data.get("primary_color"),
+                secondary_color = data.get("secondary_color"),
+
+
+
+
+
             )
             User.objects.create(
                 mobile=store.mobile,
