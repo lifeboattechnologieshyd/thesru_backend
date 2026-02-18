@@ -53,6 +53,10 @@ class Store(AuditModel):
     smtp_use_tls = models.BooleanField(default=True)
     email_login = models.BooleanField(default=True)
     mobile_login = models.BooleanField(default=True)
+    aws_bucket_name = models.CharField(max_length=50, null=True, blank=True)
+    bo_title = models.CharField(max_length=50, null=True, blank=True)
+    bo_subtitle = models.CharField(max_length=50, null=True, blank=True)
+    highlights = models.TextField(null=True, blank=True)
 
     class Meta:
         db_table = "store"
@@ -66,6 +70,7 @@ class StoreClient(models.Model):
         ("IOS", "iOS"),
         ("POS", "POS"),
     ]
+
     client_type = models.CharField(max_length=20, choices=CLIENT_TYPE_CHOICES)
     identifier = models.CharField(max_length=200)
     is_active = models.BooleanField(default=True)
