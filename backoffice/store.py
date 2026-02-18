@@ -146,25 +146,39 @@ class EmailSendOTPView(APIView):
 
         if not email:
             return CustomResponse().errorResponse(
-                description="Email is required",
+                description="Email is required"
             )
 
-        user = User.objects.filter(email=email,
-                                   user_role__contains=["ADMIN"],
-                                   store=store).first()
-        is_new_user = not bool(user)
+        # ADMIN CHECK ONLY
+        user = User.objects.filter(
+            email=email,
+            user_role__contains=["ADMIN"],
+            store=store
+        ).first()
 
+        if not user:
+            return CustomResponse().errorResponse(
+                description="Invalid email or access denied"
+            )
 
-
+        # Only ADMIN reaches here
         otp = generate_otp()
+
+        if DEBUG:
+            otp = 1234
+        else:
+            send_otp_email(email, otp)
+
         expires_at = timezone.now() + timedelta(minutes=15)
 
+        # Invalidate previous OTPs
         UserOTP.objects.filter(
             store=store,
             email=email,
             is_used=False
         ).update(is_used=True)
 
+        # Save new OTP
         UserOTP.objects.create(
             store=store,
             email=email,
@@ -172,15 +186,13 @@ class EmailSendOTPView(APIView):
             expires_at=expires_at
         )
 
-        send_otp_email(email, otp)
-
         return CustomResponse().successResponse(
             description="OTP sent successfully",
             data={
-                "is_new_user": is_new_user,
                 "email": email
             }
         )
+
 
 
 
