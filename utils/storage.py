@@ -30,6 +30,7 @@ def add_unique_suffix_to_filename(filename: str, length=8):
 # storages.py
 
 class StoreS3Storage(S3Storage):
+    querystring_auth = False
     def __init__(self, bucket_name, *args, **kwargs):
         self.bucket_name = bucket_name
         super().__init__(*args, **kwargs)
