@@ -2,7 +2,7 @@
 from django.urls import path
 
 from user.views import MobileSendOTPView, MobileVerifyOTPView, FileUploadView, CreateAdmin, AdminLogin, ProfileUpdate, \
-    AppVersionCheckAPI
+    AppVersionCheckAPI, EmailSendOTPView, EmailVerifyOTPView
 
 urlpatterns = [
     path("send-otp", MobileSendOTPView.as_view()),
@@ -12,4 +12,7 @@ urlpatterns = [
     path("storage/upload", FileUploadView.as_view()),
     path("profile", ProfileUpdate.as_view()),
     path("app-version",AppVersionCheckAPI.as_view()),
+
+    path("send-email-otp", EmailSendOTPView.as_view()),
+    path("verify-email-otp", EmailVerifyOTPView.as_view()),
 ]

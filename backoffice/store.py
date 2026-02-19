@@ -2,6 +2,8 @@ from datetime import timedelta
 from decimal import Decimal
 from tokenize import Double
 from unicodedata import category
+from django.utils.timezone import make_aware
+from datetime import datetime
 
 from django.core.files.storage import default_storage
 from django.db.models import Q, F
@@ -19,6 +21,9 @@ from django.core.files.storage import default_storage
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from urllib3 import request
 
+from config import settings
+from django.conf import settings
+
 from config.settings.common import DEBUG
 from db.models import Category, Product, Banner, Inventory, PinCode, Store, WebBanner, \
     FlashSaleBanner, Order, User, Cart, OrderProducts, UserOTP, StoreClient, UserSession, ProductMedia, Tag, \
@@ -30,7 +35,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 
 from utils.invoice_generator import generate_shipping_invoice
 from utils.store import generate_lsin, generate_order_number, BO_STATUS_FLOW
-from utils.user import generate_otp, send_sms_to_mobile
+from utils.user import generate_otp, send_sms_to_mobile, send_otp_email, generate_username, generate_referral_code
 from django.db.models import Sum, F, DecimalField, ExpressionWrapper
 
 
@@ -132,6 +137,157 @@ class Login(APIView):
             )
         else:
             return CustomResponse().errorResponse(data={}, description="Invalid Mobile Number")
+
+
+
+class EmailSendOTPView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        email = request.data.get("email")
+        store = request.store
+
+        if not email:
+            return CustomResponse().errorResponse(
+                description="Email is required"
+            )
+
+        # ADMIN CHECK ONLY
+        user = User.objects.filter(
+            email=email,
+            user_role__contains=["ADMIN"],
+            store=store
+        ).first()
+
+        if not user:
+            return CustomResponse().errorResponse(
+                description="Invalid email or access denied"
+            )
+
+        # Only ADMIN reaches here
+        otp = generate_otp()
+
+        # if settings.DEBUG:
+        #     otp = 1234
+        # else:
+        send_otp_email(email, otp)
+
+
+        expires_at = timezone.now() + timedelta(minutes=15)
+
+        # Invalidate previous OTPs
+        UserOTP.objects.filter(
+            store=store,
+            email=email,
+            is_used=False
+        ).update(is_used=True)
+
+        # Save new OTP
+        UserOTP.objects.create(
+            store=store,
+            email=email,
+            otp=otp,
+            expires_at=expires_at
+        )
+
+        return CustomResponse().successResponse(
+            description="OTP sent successfully",
+            data={
+                "email": email
+            }
+        )
+
+
+
+
+class EmailVerifyOTPView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        email = request.data.get("email")
+        otp = request.data.get("otp")
+        device_id = request.data.get("device_id")
+        store = request.store
+
+        if not email or not otp:
+            return CustomResponse().errorResponse(
+                description="Email and OTP are required"
+            )
+
+        otp_obj = (
+            UserOTP.objects
+            .filter(
+                store=store,
+                email=email,
+                otp=otp,
+                is_used=False
+            )
+            .order_by("-expires_at")
+            .first()
+        )
+
+        if not otp_obj:
+            return CustomResponse().errorResponse(description="Invalid OTP")
+
+        if timezone.now() > otp_obj.expires_at:
+            return CustomResponse().errorResponse(description="OTP has expired")
+
+        otp_obj.is_used = True
+        otp_obj.save(update_fields=["is_used"])
+
+        #  Correct user handling
+        user = User.objects.filter(email=email, store=store).first()
+        is_new_user = False
+
+
+
+
+        # Ensure required fields
+        if not user.username:
+            user.username = generate_username(user)
+
+        if not user.referral_code:
+            user.referral_code = generate_referral_code()
+
+        if device_id and user.device_id != device_id:
+            user.device_id = device_id
+
+        user.last_login = timezone.now()
+        user.save()
+
+        # Tokens
+        refresh = RefreshToken.for_user(user)
+        access = str(refresh.access_token)
+        refresh_token = str(refresh)
+
+        UserSession.objects.create(
+            user=user,
+            store=store,
+            session_token=access,
+            refresh_token=refresh_token,
+            device_id=device_id,
+            device_type=request.client_type,
+            ip_address=request.META.get("REMOTE_ADDR"),
+            user_agent=request.META.get("HTTP_USER_AGENT"),
+            expires_at=timezone.now() + timedelta(days=7)
+        )
+
+        return CustomResponse().successResponse(
+            description="OTP verified successfully",
+            data={
+                "access": access,
+                "refresh": refresh_token,
+                "user": {
+                    "id": str(user.id),
+                    "email": user.email,
+                    "username": user.username,
+                    "referral_code": user.referral_code,
+                    "device_id": user.device_id,
+                    "store_id": str(store.id)
+                }
+            }
+        )
+
 class UsersAPIView(APIView):
     permission_classes = [IsAuthenticated]
     def get(self, request):
@@ -503,14 +659,14 @@ class ProductAPIView(APIView):
 
         if media_to_delete:
             media_qs = ProductMedia.objects.filter(
-                id__in=media_to_delete,
+                url__in=media_to_delete,
                 product=product
             )
 
             for media in media_qs:
                 #  delete from S3 using stored path
-                if media.file_path and default_storage.exists(media.file_path):
-                    default_storage.delete(media.file_path)
+                if media.url and default_storage.exists(media.url):
+                    default_storage.delete(media.url)
 
                 media.delete()
 
@@ -518,13 +674,12 @@ class ProductAPIView(APIView):
         media_to_add = data.get("media_to_add", [])
 
         for media in media_to_add:
-            if not all(k in media for k in ("url", "file_path", "media_type")):
+            if not all(k in media for k in ("url", "position", "media_type")):
                 continue
 
             ProductMedia.objects.create(
                 product=product,
                 url=media["url"],                 #  from request
-                file_path=media["file_path"],     #  from request
                 media_type=media["media_type"],
                 position=media.get("position", 0),
                 created_by=request.user.mobile
@@ -1764,7 +1919,20 @@ class StoreAPIView(APIView):
                 address=data.get("address"),
                 logo=data.get("logo"),
                 created_by="SUPERADMIN",
-                product_code = data.get("product_code")
+                product_code = data.get("product_code"),
+                aws_bucket_name = data.get("aws_bucket_name"),
+                bo_title = data.get("bo_title"),
+                bo_subtitle = data.get("bo_subtitle"),
+                highlights = data.get("highlights"),
+                email_login = data.get("email_login"),
+                mobile_login = data.get("mobile_login"),
+                primary_color = data.get("primary_color"),
+                secondary_color = data.get("secondary_color"),
+
+
+
+
+
             )
             User.objects.create(
                 mobile=store.mobile,
@@ -3038,9 +3206,6 @@ class OrderShippingSlipAPIView(APIView):
             description="Shipping slip fetched successfully"
         )
 
-
-
-
 class StoreAnalyticsAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -3053,7 +3218,25 @@ class StoreAnalyticsAPIView(APIView):
             )
 
         # -------------------------
-        # Use ALL these statuses
+        # Date Filters (ONLY for Orders & Sales)
+        # -------------------------
+        from_date = request.query_params.get("from_date")
+        to_date = request.query_params.get("to_date")
+
+        order_date_filters = {}
+
+        if from_date:
+            order_date_filters["created_at__gte"] = make_aware(
+                datetime.strptime(from_date, "%Y-%m-%d")
+            )
+
+        if to_date:
+            order_date_filters["created_at__lte"] = make_aware(
+                datetime.strptime(to_date, "%Y-%m-%d")
+            )
+
+        # -------------------------
+        # Completed Orders (Date-filtered)
         # -------------------------
         completed_orders = Order.objects.filter(
             store=store,
@@ -3062,37 +3245,60 @@ class StoreAnalyticsAPIView(APIView):
                 OrderStatus.PACKED,
                 OrderStatus.SHIPPED,
                 OrderStatus.DELIVERED,
-            ]
+            ],
+            **order_date_filters
+        )
+        # -------------------------
+        # Order count by status (Date-filtered)
+        # -------------------------
+        status_counts_qs = (
+            completed_orders
+            .values("status")
+            .annotate(count=Count("id"))
         )
 
+        order_status_counts = {
+            status["status"]: status["count"]
+            for status in status_counts_qs
+        }
+
+        # Ensure all statuses are present (even if count = 0)
+        for status in [
+            OrderStatus.CREATED,
+            OrderStatus.PACKED,
+            OrderStatus.SHIPPED,
+            OrderStatus.DELIVERED,
+        ]:
+            order_status_counts.setdefault(status, 0)
+
         # -------------------------
-        # 1️⃣ Total Sales
+        # 1️⃣ Total Sales (Date-filtered)
         # -------------------------
         total_sales = completed_orders.aggregate(
             total=Sum("amount")
         )["total"] or 0
 
         # -------------------------
-        # 2️⃣ Total Orders
+        # 2️⃣ Total Orders (Date-filtered)
         # -------------------------
         total_orders = completed_orders.count()
 
         # -------------------------
-        # 3️⃣ Total Customers (All store users)
+        # 3️⃣ Total Customers (NO date filter)
         # -------------------------
         total_customers = User.objects.filter(
             store=store
         ).count()
 
         # -------------------------
-        # 4️⃣ Total Products
+        # 4️⃣ Total Products (NO date filter)
         # -------------------------
         total_products = Product.objects.filter(
             store=store
         ).count()
 
         # -------------------------
-        # 5️⃣ Recent 5 Orders
+        # 5️⃣ Recent 5 Orders (Date-filtered)
         # -------------------------
         recent_orders_qs = completed_orders.select_related("user") \
             .order_by("-created_at")[:5]
@@ -3109,7 +3315,7 @@ class StoreAnalyticsAPIView(APIView):
             })
 
         # -------------------------
-        # 6️⃣ Top 5 Selling Products
+        # 6️⃣ Top 5 Selling Products (Date-filtered)
         # -------------------------
         top_products_qs = (
             OrderProducts.objects
@@ -3121,6 +3327,7 @@ class StoreAnalyticsAPIView(APIView):
                     OrderStatus.SHIPPED,
                     OrderStatus.DELIVERED,
                 ],
+                **{f"order__{k}": v for k, v in order_date_filters.items()},
                 product__isnull=False
             )
             .values("product_id", "product__name")
@@ -3146,6 +3353,52 @@ class StoreAnalyticsAPIView(APIView):
             })
 
         # -------------------------
+        # 7️⃣ Category-wise Sales Count (Date-filtered)
+        # -------------------------
+        category_qs = (
+            OrderProducts.objects
+            .filter(
+                order__store=store,
+                order__status__in=[
+                    OrderStatus.CREATED,
+                    OrderStatus.PACKED,
+                    OrderStatus.SHIPPED,
+                    OrderStatus.DELIVERED,
+                ],
+                **{f"order__{k}": v for k, v in order_date_filters.items()},
+                product__isnull=False
+            )
+            .values(
+                "product__categories__id",
+                "product__categories__name"
+            )
+            .annotate(
+                total_qty=Sum("qty"),
+                total_amount=Sum(
+                    ExpressionWrapper(
+                        F("selling_price") * F("qty"),
+                        output_field=DecimalField(max_digits=12, decimal_places=2)
+                    )
+                )
+            )
+            .order_by("-total_qty")
+        )
+
+        categories = []
+        for cat in category_qs:
+            if cat["product__categories__id"]:
+                categories.append({
+                    "category_id": str(cat["product__categories__id"]),
+                    "category_name": cat["product__categories__name"],
+                    "total_quantity": cat["total_qty"],
+                    "total_amount": float(cat["total_amount"] or 0),
+                })
+
+
+
+
+
+        # -------------------------
         # Final Response
         # -------------------------
         data = {
@@ -3153,11 +3406,162 @@ class StoreAnalyticsAPIView(APIView):
             "total_orders": total_orders,
             "total_customers": total_customers,
             "total_products": total_products,
+
+            "order_status_counts": order_status_counts,
+
             "recent_orders": recent_orders,
             "top_selling_products": top_products,
+
+            "category_numbers": categories,
         }
+
 
         return CustomResponse().successResponse(
             data=data,
             description="Store analytics fetched successfully"
         )
+
+#
+# class StoreAnalyticsAPIView(APIView):
+#     permission_classes = [IsAuthenticated]
+#
+#     def get(self, request):
+#         store = request.store
+#
+#         if not store:
+#             return CustomResponse().errorResponse(
+#                 description="Store context not found"
+#             )
+#
+#         # -------------------------
+#         # Use ALL these statuses
+#         # -------------------------
+#         completed_orders = Order.objects.filter(
+#             store=store,
+#             status__in=[
+#                 OrderStatus.CREATED,
+#                 OrderStatus.PACKED,
+#                 OrderStatus.SHIPPED,
+#                 OrderStatus.DELIVERED,
+#             ]
+#         )
+#
+#         # -------------------------
+#         # 1️⃣ Total Sales
+#         # -------------------------
+#         total_sales = completed_orders.aggregate(
+#             total=Sum("amount")
+#         )["total"] or 0
+#
+#         # -------------------------
+#         # 2️⃣ Total Orders
+#         # -------------------------
+#         total_orders = completed_orders.count()
+#
+#         # -------------------------
+#         # 3️⃣ Total Customers (All store users)
+#         # -------------------------
+#         total_customers = User.objects.filter(
+#             store=store
+#         ).count()
+#
+#         # -------------------------
+#         # 4️⃣ Total Products
+#         # -------------------------
+#         total_products = Product.objects.filter(
+#             store=store
+#         ).count()
+#
+#         # -------------------------
+#         # 5️⃣ Recent 5 Orders
+#         # -------------------------
+#         recent_orders_qs = completed_orders.select_related("user") \
+#             .order_by("-created_at")[:5]
+#
+#         recent_orders = []
+#         for order in recent_orders_qs:
+#             recent_orders.append({
+#                 "order_id": str(order.id),
+#                 "order_number": order.order_number,
+#                 "customer_name": order.user.name,
+#                 "amount": float(order.amount),
+#                 "status": order.status,
+#                 "created_at": order.created_at,
+#             })
+#
+#         # -------------------------
+#         # 6️⃣ Top 5 Selling Products
+#         # -------------------------
+#         top_products_qs = (
+#             OrderProducts.objects
+#             .filter(
+#                 order__store=store,
+#                 order__status__in=[
+#                     OrderStatus.CREATED,
+#                     OrderStatus.PACKED,
+#                     OrderStatus.SHIPPED,
+#                     OrderStatus.DELIVERED,
+#                 ],
+#                 product__isnull=False
+#             )
+#             .values("product_id", "product__name")
+#             .annotate(
+#                 number_of_sales=Sum("qty"),
+#                 amount=Sum(
+#                     ExpressionWrapper(
+#                         F("selling_price") * F("qty"),
+#                         output_field=DecimalField(max_digits=12, decimal_places=2)
+#                     )
+#                 )
+#             )
+#             .order_by("-number_of_sales")[:5]
+#         )
+#
+#         top_products = []
+#         for product in top_products_qs:
+#             top_products.append({
+#                 "product_id": str(product["product_id"]),
+#                 "name": product["product__name"],
+#                 "number_of_sales": product["number_of_sales"],
+#                 "amount": float(product["amount"] or 0),
+#             })
+#
+#         # -------------------------
+#         # Final Response
+#         # -------------------------
+#         data = {
+#             "total_sales": float(total_sales),
+#             "total_orders": total_orders,
+#             "total_customers": total_customers,
+#             "total_products": total_products,
+#             "recent_orders": recent_orders,
+#             "top_selling_products": top_products,
+#         }
+#
+#         return CustomResponse().successResponse(
+#             data=data,
+#             description="Store analytics fetched successfully"
+#         )
+
+class ClientInfo(APIView):
+
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        store = request.store
+        res = {
+            "logo": store.logo,
+            "name": store.name,
+            "mobile": store.mobile,
+            "address": store.address,
+            "secondary_color": store.secondary_color,
+            "primary_color": store.primary_color,
+            "is_email_login": store.email_login,
+            "is_mobile_login": store.mobile_login,
+        }
+        return CustomResponse().successResponse(
+            data=res,
+            description="Client info fetched successfully"
+        )
+
+

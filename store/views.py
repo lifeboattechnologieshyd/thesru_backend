@@ -7,6 +7,7 @@ from django.db import transaction
 from django.db import IntegrityError
 from django.db.models import Q, Count, Avg
 from decimal import Decimal
+from django.core.exceptions import ImproperlyConfigured
 
 from django.utils.timesince import timesince
 from django.utils.timezone import now
@@ -22,7 +23,7 @@ from db.models import AddressMaster, PinCode, Product, Order, OrderProducts, Pay
 from enums.store import OrderStatus, PaymentStatus
 from mixins.drf_views import CustomResponse
 from utils.store import generate_order_number, time_ago
-from utils.user import send_sms_to_mobile
+from utils.user import send_sms_to_mobile, send_order_created_admin_email
 
 
 class CategoryListView(APIView):
@@ -79,7 +80,7 @@ class ProductListAPIView(APIView):
         tags = request.query_params.get("tags")
 
         page = int(request.query_params.get("page", 1))
-        page_size = int(request.query_params.get("page_size", 12))
+        page_size = int(request.query_params.get("page_size", 15))
 
         # ---------- Base queryset ----------
         queryset = Product.objects.filter(
@@ -379,6 +380,8 @@ class AddressAPIView(APIView):
     def post(self,request):
         data = request.data
         store = request.store
+        user = request.user
+
 
         required_fields = ["mobile","name","address_name","address_type","full_address",
                            "house_number","country","city","state","area","pin_code",
@@ -388,6 +391,10 @@ class AddressAPIView(APIView):
         for field in required_fields:
             if not data.get(field):
                 return CustomResponse.errorResponse(description=f"{field} is required")
+
+        if not user.name:
+            user.name = data.get("name")
+            user.save(update_fields=["name"])
 
         if data.get("is_default"):
             AddressMaster.objects.filter(user_id=request.user.id,is_default = True).update(is_default = False)
@@ -953,6 +960,11 @@ class InitiateOrder(APIView):
                 status=OrderStatus.INITIATED,
                 created_by=user.mobile
             )
+            try:
+                send_order_created_admin_email(order)
+            except ImproperlyConfigured as e:
+                pass
+
             # ---------- Create Order Products ----------
             for item in products_data:
                 product = item["product"]
@@ -1136,6 +1148,10 @@ class Webhook(APIView):
                         status=OrderStatus.CREATED,
                         remarks="Order Placed"
                     )
+                    try:
+                        send_order_created_admin_email(order)
+                    except ImproperlyConfigured as e:
+                        pass
                     if order.coupon is not None:
                         CouponUsage.objects.create(
                             coupon=order.coupon,

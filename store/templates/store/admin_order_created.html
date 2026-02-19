@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>New Order Created</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      background-color: #f4f6f8;
+      font-family: Arial, Helvetica, sans-serif;
+    }
+
+    .container {
+      max-width: 600px;
+      margin: 30px auto;
+      background: #ffffff;
+      border-radius: 6px;
+      overflow: hidden;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+    }
+
+    .header {
+      background: #0d6efd;
+      color: #ffffff;
+      padding: 16px 20px;
+      font-size: 18px;
+      font-weight: bold;
+    }
+
+    .content {
+      padding: 20px;
+      color: #333333;
+      font-size: 14px;
+      line-height: 1.6;
+    }
+
+    .order-box {
+      border: 1px solid #e5e7eb;
+      border-radius: 4px;
+      padding: 14px;
+      margin-top: 15px;
+      background: #fafafa;
+    }
+
+    .order-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 6px 0;
+      border-bottom: 1px dashed #ddd;
+    }
+
+    .order-row:last-child {
+      border-bottom: none;
+    }
+
+    .label {
+      font-weight: bold;
+      color: #555;
+    }
+
+    .footer {
+      padding: 12px 20px;
+      background: #f1f3f5;
+      font-size: 12px;
+      color: #777;
+      text-align: center;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container">
+
+    <!-- HEADER -->
+    <div class="header">
+      {{ store.name }} – New Order Alert
+    </div>
+
+    <!-- CONTENT -->
+    <div class="content">
+      <p>Hello Admin,</p>
+
+      <p>
+        A new order has been successfully placed in
+        <strong>{{ store.name }}</strong>.
+      </p>
+
+      <div class="order-box">
+        <div class="order-row">
+          <div class="label">Order Number</div>
+          <div>{{ order.order_number }}</div>
+        </div>
+
+        <div class="order-row">
+          <div class="label">Order Amount</div>
+          <div>₹{{ order.amount }}</div>
+        </div>
+
+        <div class="order-row">
+          <div class="label">Customer</div>
+          <div>{{ order.user.mobile }}</div>
+        </div>
+
+        <div class="order-row">
+          <div class="label">Payment Mode</div>
+          <div>
+            {% if order.cash_on_delivery > 0 %}
+              Cash on Delivery
+            {% else %}
+              Online Payment
+            {% endif %}
+          </div>
+        </div>
+
+        <div class="order-row">
+          <div class="label">Order Date</div>
+          <div>{{ order.created_at|date:"d M Y, h:i A" }}</div>
+        </div>
+      </div>
+
+      <p style="margin-top: 20px;">
+        Please log in to the admin panel to process this order.
+      </p>
+
+      <p>
+        Regards,<br>
+        <strong>{{ store.name }}</strong>
+      </p>
+    </div>
+
+    <!-- FOOTER -->
+    <div class="footer">
+      This is an automated email. Please do not reply.
+    </div>
+
+  </div>
+</body>
+</html>

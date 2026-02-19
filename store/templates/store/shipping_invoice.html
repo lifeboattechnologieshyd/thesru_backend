@@ -372,10 +372,7 @@
   <title>Shipping Invoice</title>
 
   <style>
-    @page {
-      size: A5 portrait;
-      margin: 6mm;
-    }
+    @page { size: A5 portrait; margin: 6mm; }
 
     body {
       font-family: Arial, sans-serif;
@@ -423,9 +420,7 @@
       text-align: left;
     }
 
-    th {
-      font-weight: bold;
-    }
+    th { font-weight: bold; }
 
     .totals {
       display: flex;
@@ -434,9 +429,7 @@
       font-weight: bold;
     }
 
-    img {
-      max-height: 40px;
-    }
+    img { max-height: 40px; }
   </style>
 </head>
 
@@ -447,23 +440,30 @@
   <div class="row">
     <div class="col">
       <div class="title">Ship To</div>
-      {{ order.user.name }}<br>
-      {{ order.address.address }}<br>
-      {{ order.address.city }}, {{ order.address.state }}<br>
-      {{ order.address.pincode }}<br>
-      {{ order.address.mobile }}
+
+      <strong>{{ address.name }}</strong><br>
+      {% if address.house_number %}{{ address.house_number }}, {% endif %}
+      {{ address.full_address }}<br>
+
+      {{ address.area }}, {{ address.district }}<br>
+      {{ address.state }}, {{ address.country }} - {{ address.pincode }}<br>
+      Mobile: {{ address.mobile }}<br>
+
+      <span style="font-size:9px;">
+        ({{ address.address_type|default:"Home" }})
+      </span>
     </div>
 
     <div class="col" style="text-align:right;">
       {% if order.store.logo %}
-        <img src="{{ order.store.logo }}">
+        <img src="{{ order.store.logo }}" alt="Store Logo">
       {% endif %}
     </div>
   </div>
 
   <div class="divider"></div>
 
-  <!-- PAYMENT + SHIPPED SECTION (SAME LINE) -->
+  <!-- PAYMENT + SHIPPED -->
   <div class="row">
     <div class="col">
       <div class="title">Payment Details</div>
@@ -489,7 +489,7 @@
     Order#: {{ order.order_number }} |
     Date: {{ order.created_at|date:"d/m/Y" }} |
     Weight: {{ order.weight }} kg |
-    Dim: {{ order.length }} x {{ order.breadth }} x {{ order.height }} cm
+    Dim (L×B×H): {{ order.length }} × {{ order.breadth }} × {{ order.height }} cm
   </div>
 
   <div class="divider"></div>
@@ -500,19 +500,20 @@
       <tr>
         <th>Item</th>
         <th>Qty</th>
-        <th>Price</th>
+        <th>Unit Price</th>
         <th>Total</th>
       </tr>
     </thead>
     <tbody>
-      {% for item in order.items.all %}
-      <tr>
-        <td>{{ item.product.name }}</td>
-        <td>{{ item.qty }}</td>
-        <td>₹{{ item.selling_price }}</td>
-        <td>₹{{ item.selling_price|floatformat:2 }}</td>
-      </tr>
-      {% endfor %}
+      {% for item in items %}
+<tr>
+  <td>{{ item.name }}</td>
+  <td>{{ item.qty }}</td>
+  <td>₹{{ item.unit_price }}</td>
+  <td>₹{{ item.total_price|floatformat:2 }}</td>
+</tr>
+{% endfor %}
+
     </tbody>
   </table>
 
@@ -524,9 +525,10 @@
   <div class="divider"></div>
 
   <div style="font-size:8px;">
-    This is auto generated shipping label.
+    This is an auto-generated shipping label.
   </div>
 
 </div>
 </body>
 </html>
+

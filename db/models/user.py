@@ -25,6 +25,8 @@ class CustomUserManager(BaseUserManager):
 class Store(AuditModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     name = models.CharField(max_length=100)
+    primary_color = models.CharField(max_length=100, default="FFFFFF")
+    secondary_color = models.CharField(max_length=100, default="FFFFFF")
     mobile = models.BigIntegerField(
         validators=[MinValueValidator(1000000000), MaxValueValidator(9999999999)],
         null=False
@@ -44,6 +46,17 @@ class Store(AuditModel):
     sms_packed_template_id = models.CharField(max_length=50,null=True)
     sms_shipped_template_id = models.CharField(max_length=50,null=True)
     sms_delivered_template_id = models.CharField(max_length=50,null=True)
+    smtp_host = models.CharField(max_length=200, null=True, blank=True)
+    smtp_port = models.PositiveIntegerField(null=True, blank=True)
+    smtp_username = models.CharField(max_length=200, null=True, blank=True)
+    smtp_password = models.CharField(max_length=200, null=True, blank=True)
+    smtp_use_tls = models.BooleanField(default=True)
+    email_login = models.BooleanField(default=True)
+    mobile_login = models.BooleanField(default=True)
+    aws_bucket_name = models.CharField(max_length=50, null=True, blank=True)
+    bo_title = models.CharField(max_length=50, null=True, blank=True)
+    bo_subtitle = models.CharField(max_length=50, null=True, blank=True)
+    highlights = models.TextField(null=True, blank=True)
 
     class Meta:
         db_table = "store"
@@ -57,6 +70,7 @@ class StoreClient(models.Model):
         ("IOS", "iOS"),
         ("POS", "POS"),
     ]
+
     client_type = models.CharField(max_length=20, choices=CLIENT_TYPE_CHOICES)
     identifier = models.CharField(max_length=200)
     is_active = models.BooleanField(default=True)
