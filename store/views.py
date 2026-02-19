@@ -2250,3 +2250,59 @@ class UserCouponListAPIView(APIView):
             data=data,
             description="Active coupons fetched successfully"
         )
+
+
+
+class TestOrderSMSView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        try:
+            order_number = request.data.get("order_number")
+
+            if not order_number:
+                return CustomResponse().errorResponse(
+                    description="order_number is required"
+                )
+
+            order = Order.objects.filter(order_number=order_number).select_related(
+                "user", "store"
+            ).first()
+
+            if not order:
+                return CustomResponse().errorResponse(
+                    description="Order not found"
+                )
+
+            if not order.user or not order.user.mobile:
+                return CustomResponse().errorResponse(
+                    description="User mobile number not found"
+                )
+
+            if not order.store.sms_order_template_id:
+                return CustomResponse().errorResponse(
+                    description="SMS template not configured for store"
+                )
+
+            # ✅ SEND SMS
+            send_sms_to_mobile(
+                order.order_number,
+                order.user.mobile,
+                order.store,
+                order.store.sms_order_template_id
+            )
+
+            return CustomResponse().successResponse(
+                description="Order SMS sent successfully",
+                data={
+                    "order_number": order.order_number,
+                    "mobile": order.user.mobile,
+                    "store": order.store.name
+                }
+            )
+
+        except Exception as e:
+            return CustomResponse().errorResponse(
+                description="Failed to send SMS",
+                data={"error": str(e)}
+            )
