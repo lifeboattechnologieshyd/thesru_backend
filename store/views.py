@@ -591,7 +591,7 @@ class CheckoutPreview(APIView):
                 return CustomResponse.errorResponse(str(e))
 
         # ---------- Charges (future ready) ----------
-        shipping_charge = Decimal("0.00")  # later based on pin_code
+        shipping_charge = Decimal("40.00")  # later based on pin_code
         platform_fee = Decimal("0.00")  # later config-based
 
         final_payable = (
