@@ -19,7 +19,7 @@ from django.conf import settings
 from db import models
 from db.models import AddressMaster, PinCode, Product, Order, OrderProducts, Payment, OrderTimeLines, \
     Banner, Category, Cart, CouponUsage, Wishlist, CouponProduct, CouponCategory, CouponTag, WebBanner, FlashSaleBanner, \
-    ProductReviews, ContactMessage, Tag, Coupons, ProductReviewMedia
+    ProductReviews, ContactMessage, Tag, Coupons, ProductReviewMedia, Store
 from enums.store import OrderStatus, PaymentStatus
 from mixins.drf_views import CustomResponse
 from utils.store import generate_order_number, time_ago
@@ -1158,7 +1158,7 @@ class Webhook(APIView):
                             user=order.user,
                             order=order
                         )
-                    send_sms_to_mobile(order.order_number, order.user.mobile, order.store, order.store.sms_order_template_id)
+                    send_sms_to_mobile(f"{order.order_number}|", order.user.mobile, order.store, order.store.sms_order_template_id)
 
                     remove_cart_items(order.user, order.store)
                 elif event_type == "PAYMENT_FAILED_WEBHOOK":
@@ -1262,7 +1262,7 @@ class PaymentStatusAPIView(APIView):
                         user=order.user,
                         order=order
                     )
-                send_sms_to_mobile(order.order_number, order.user.mobile, order.store, order.store.sms_order_template_id)
+                send_sms_to_mobile(f"{order.order_number}|", order.user.mobile, order.store, order.store.sms_order_template_id)
                 remove_cart_items(order.user, order.store)
             elif verified_status == PaymentStatus.FAILED:
                 order.status = OrderStatus.FAILED
@@ -2253,56 +2253,4 @@ class UserCouponListAPIView(APIView):
 
 
 
-class TestOrderSMSView(APIView):
-    permission_classes = [AllowAny]
 
-    def post(self, request):
-        try:
-            order_number = request.data.get("order_number")
-
-            if not order_number:
-                return CustomResponse().errorResponse(
-                    description="order_number is required"
-                )
-
-            order = Order.objects.filter(order_number=order_number).select_related(
-                "user", "store"
-            ).first()
-
-            if not order:
-                return CustomResponse().errorResponse(
-                    description="Order not found"
-                )
-
-            if not order.user or not order.user.mobile:
-                return CustomResponse().errorResponse(
-                    description="User mobile number not found"
-                )
-
-            if not order.store.sms_order_template_id:
-                return CustomResponse().errorResponse(
-                    description="SMS template not configured for store"
-                )
-
-            # ✅ SEND SMS
-            send_sms_to_mobile(
-                order.order_number,
-                order.user.mobile,
-                order.store,
-                order.store.sms_order_template_id
-            )
-
-            return CustomResponse().successResponse(
-                description="Order SMS sent successfully",
-                data={
-                    "order_number": order.order_number,
-                    "mobile": order.user.mobile,
-                    "store": order.store.name
-                }
-            )
-
-        except Exception as e:
-            return CustomResponse().errorResponse(
-                description="Failed to send SMS",
-                data={"error": str(e)}
-            )

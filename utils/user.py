@@ -52,11 +52,11 @@ def send_sms_to_mobile(var1, mobile, store, msg):
     try:
         url = "https://sms.lifeboattechnologies.com/dev/bulkV2"
         params = {
-            "authorization": store.sms_auth_key,   # same as URL
+            "authorization": store.sms_auth_key,
             "route": "dlt",
             "sender_id": store.sms_sender_id,      # THESRU
             "message": msg,  # 8764
-            "variables_values": f"{var1}|",
+            "variables_values": var1,
             "flash": "0",
             "numbers": str(mobile)
         }

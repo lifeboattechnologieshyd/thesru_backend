@@ -150,7 +150,7 @@ class MobileSendOTPView(APIView):
             otp = 1234
         else:
             otp = generate_otp()
-            send_sms_to_mobile(otp, mobile, store, store.sms_otp_template_id)
+            send_sms_to_mobile(f"{otp}|", mobile, store, store.sms_otp_template_id)
 
         expires_at = timezone.now() + timedelta(minutes=15)
         # Invalidate old OTPs
