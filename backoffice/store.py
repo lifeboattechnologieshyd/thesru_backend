@@ -167,10 +167,10 @@ class EmailSendOTPView(APIView):
         # Only ADMIN reaches here
         otp = generate_otp()
 
-        if settings.DEBUG:
-            otp = 1234
-        else:
-            send_otp_email(email, otp)
+        # if settings.DEBUG:
+        #     otp = 1234
+        # else:
+        send_otp_email(email, otp)
 
 
         expires_at = timezone.now() + timedelta(minutes=15)
