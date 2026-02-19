@@ -146,10 +146,7 @@ class MobileSendOTPView(APIView):
         if is_new_user:
             TempUser.objects.update_or_create(mobile=mobile, store=request.store)
         otp = generate_otp()
-        if DEBUG:
-            otp = 1234
-        else:
-            send_sms_to_mobile(otp, mobile, store, store.sms_otp_template_id)
+        send_sms_to_mobile(otp, mobile, store, store.sms_otp_template_id)
         expires_at = timezone.now() + timedelta(minutes=15)
         # Invalidate old OTPs
         UserOTP.objects.filter(

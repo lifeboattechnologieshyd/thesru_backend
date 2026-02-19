@@ -49,10 +49,7 @@ class SendOTP(APIView):
         user = User.objects.filter(mobile=data.get("mobile"),user_role__contains=["ADMIN"], store=store).first()
         if user:
             otp = generate_otp()
-            if DEBUG:
-                otp = 1234
-            else:
-                send_sms_to_mobile(otp, data.get("mobile"), store, store.sms_otp_template_id)
+            send_sms_to_mobile(otp, data.get("mobile"), store, store.sms_otp_template_id)
             expires_at = timezone.now() + timedelta(minutes=15)
 
             UserOTP.objects.filter(
