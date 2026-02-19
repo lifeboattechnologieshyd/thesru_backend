@@ -1,5 +1,6 @@
 import re
 import uuid
+from storages.backends.s3 import S3Storage
 
 
 
@@ -24,3 +25,13 @@ def add_unique_suffix_to_filename(filename: str, length=8):
         else f"{filename_list[0]}_{unique_suffix}"
     )
     return new_filename
+
+
+# storages.py
+
+class StoreS3Storage(S3Storage):
+    querystring_auth = False
+
+    def __init__(self, bucket_name, *args, **kwargs):
+        kwargs["bucket_name"] = bucket_name
+        super().__init__(*args, **kwargs)

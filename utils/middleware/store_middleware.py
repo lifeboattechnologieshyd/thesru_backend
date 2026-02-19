@@ -21,7 +21,6 @@ class StoreMiddleware:
             "/backoffice/store",
             "/user/createadmin",
             "/user/admin-login",
-            "/user/storage/upload",
             "/user/update-users"
         )
 

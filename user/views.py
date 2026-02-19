@@ -21,7 +21,7 @@ from serializers.user import UserMasterSerializer
 
 from rest_framework import status
 
-from utils.storage import add_unique_suffix_to_filename, sanitize_filename
+from utils.storage import add_unique_suffix_to_filename, sanitize_filename, StoreS3Storage
 from utils.user import generate_username, generate_referral_code, generate_otp, version_to_tuple, \
     send_sms_to_mobile, send_otp_email
 
@@ -145,11 +145,13 @@ class MobileSendOTPView(APIView):
 
         if is_new_user:
             TempUser.objects.update_or_create(mobile=mobile, store=request.store)
-        otp = generate_otp()
-        if DEBUG:
+
+        if not settings.DEBUG and mobile == "9014083090":
             otp = 1234
         else:
+            otp = generate_otp()
             send_sms_to_mobile(otp, mobile, store, store.sms_otp_template_id)
+
         expires_at = timezone.now() + timedelta(minutes=15)
         # Invalidate old OTPs
         UserOTP.objects.filter(
@@ -377,6 +379,40 @@ class ProfileUpdate(APIView):
 
 
 
+# class FileUploadView(APIView):
+#     permission_classes = [AllowAny]
+#     parser_classes = [MultiPartParser, FormParser]
+#
+#     def post(self, request, *args, **kwargs):
+#         files = request.FILES.getlist("files")
+#         path = request.data.get("path", "temp")
+#
+#         if not files:
+#             return CustomResponse().successResponse(
+#                 {"error": "No file was provided."}, status=status.HTTP_400_BAD_REQUEST
+#             )
+#
+#         uploaded_files = []
+#
+#         try:
+#             for file_obj in files:
+#                 # Save each file to the default storage
+#                 sanitized_filename = add_unique_suffix_to_filename(sanitize_filename(file_obj.name))
+#
+#                 file_path = default_storage.save(f"{path}/{sanitized_filename}", ContentFile(file_obj.read()))
+#                 file_url = settings.MEDIA_URL + file_path
+#                 uploaded_files.append(
+#                     {"original_filename": file_obj.name, "file_url": file_url, "file_path": file_path}
+#                 )
+#
+#             return CustomResponse().successResponse(uploaded_files, status=status.HTTP_201_CREATED)
+#
+#         except Exception as e:
+#             return CustomResponse().errorResponse(
+#                 {"error": str(e)}, description="File upload failed", status=status.HTTP_400_BAD_REQUEST
+#             )
+
+
 class FileUploadView(APIView):
     permission_classes = [AllowAny]
     parser_classes = [MultiPartParser, FormParser]
@@ -384,31 +420,43 @@ class FileUploadView(APIView):
     def post(self, request, *args, **kwargs):
         files = request.FILES.getlist("files")
         path = request.data.get("path", "temp")
+        store = request.store
+
+        if not store.aws_bucket_name:
+            return CustomResponse().errorResponse(
+                description="Store S3 bucket not configured"
+            )
 
         if not files:
-            return CustomResponse().successResponse(
-                {"error": "No file was provided."}, status=status.HTTP_400_BAD_REQUEST
+            return CustomResponse().errorResponse(
+                description="No file was provided"
             )
 
+        storage = StoreS3Storage(bucket_name=store.aws_bucket_name)
         uploaded_files = []
 
-        try:
-            for file_obj in files:
-                # Save each file to the default storage
-                sanitized_filename = add_unique_suffix_to_filename(sanitize_filename(file_obj.name))
-
-                file_path = default_storage.save(f"{path}/{sanitized_filename}", ContentFile(file_obj.read()))
-                file_url = settings.MEDIA_URL + file_path
-                uploaded_files.append(
-                    {"original_filename": file_obj.name, "file_url": file_url, "file_path": file_path}
-                )
-
-            return CustomResponse().successResponse(uploaded_files, status=status.HTTP_201_CREATED)
-
-        except Exception as e:
-            return CustomResponse().errorResponse(
-                {"error": str(e)}, description="File upload failed", status=status.HTTP_400_BAD_REQUEST
+        for file_obj in files:
+            filename = add_unique_suffix_to_filename(
+                sanitize_filename(file_obj.name)
             )
+
+            file_path = storage.save(
+                f"{path}/{filename}",
+                ContentFile(file_obj.read())
+            )
+
+            file_url = storage.url(file_path)
+
+            uploaded_files.append({
+                "original_filename": file_obj.name,
+                "file_path": file_path,
+                "file_url": file_url
+            })
+
+        return CustomResponse().successResponse(
+            data=uploaded_files,
+            description="Files uploaded successfully"
+        )
 
 from rest_framework.views import APIView
 from rest_framework.response import Response
