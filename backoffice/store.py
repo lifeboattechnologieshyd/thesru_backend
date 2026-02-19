@@ -1490,8 +1490,9 @@ class BannerAPIView(APIView):
 
     def get(self, request, id=None):
         # ---------- SINGLE BANNER ----------
+        store = request.store
         if id:
-            banner = Banner.objects.filter(id=id).values().first()
+            banner = Banner.objects.filter(id=id, store_id=store.id).values().first()
             if not banner:
                 return CustomResponse.errorResponse(
                     description="banner id required"
@@ -1511,7 +1512,7 @@ class BannerAPIView(APIView):
                 description="page and page_size must be positive integers"
             )
 
-        queryset = Banner.objects.all().order_by("-created_at")
+        queryset = Banner.objects.filter(store_id=store.id).order_by("-created_at")
 
         total = queryset.count()
         offset = (page - 1) * page_size
@@ -2102,13 +2103,14 @@ class WebBannerAPIView(APIView):
             description="Web banner created successfully"
         )
     def get(self, request):
+        store = request.store
         page = int(request.query_params.get("page", 1))
         page_size = int(request.query_params.get("page_size", 10))
         if page < 1 or page_size < 1:
             return CustomResponse.errorResponse(
                 description="page and page_size must be positive integers"
             )
-        queryset = WebBanner.objects.all().order_by("-created_at")
+        queryset = WebBanner.objects.filter(store_id=store.id).order_by("-created_at")
         total = queryset.count()
         offset = (page - 1) * page_size
         queryset = queryset[offset: offset + page_size]
@@ -2257,8 +2259,9 @@ class FlashSaleBannerAPIView(APIView):
 
     def get(self, request, id=None):
         # ---------- SINGLE BANNER ----------
+        store = request.store
         if id:
-            banner = FlashSaleBanner.objects.filter(id=id).values().first()
+            banner = FlashSaleBanner.objects.filter(id=id, store_id=store.id).values().first()
             if not banner:
                 return CustomResponse.errorResponse(
                     description="flash sale banner id required"
@@ -2278,7 +2281,7 @@ class FlashSaleBannerAPIView(APIView):
                 description="page and page_size must be positive integers"
             )
 
-        queryset = FlashSaleBanner.objects.all().order_by("-created_at")
+        queryset = FlashSaleBanner.objects.filter(store_id=store.id).order_by("-created_at")
         total = queryset.count()
         offset = (page - 1) * page_size
         queryset = queryset[offset: offset + page_size]
