@@ -146,7 +146,7 @@ class MobileSendOTPView(APIView):
         if is_new_user:
             TempUser.objects.update_or_create(mobile=mobile, store=request.store)
 
-        if not settings.DEBUG and mobile == "9014083090":
+        if  mobile == "9014083090":
             otp = 1234
         else:
             otp = generate_otp()
