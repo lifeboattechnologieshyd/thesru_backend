@@ -27,9 +27,10 @@ from django.conf import settings
 from config.settings.common import DEBUG
 from db.models import Category, Product, Banner, Inventory, PinCode, Store, WebBanner, \
     FlashSaleBanner, Order, User, Cart, OrderProducts, UserOTP, StoreClient, UserSession, ProductMedia, Tag, \
-    OrderTimeLines, Coupons, CouponProduct, CouponCategory, CouponTag, AddressMaster
+    OrderTimeLines, Coupons, CouponProduct, CouponCategory, CouponTag, AddressMaster, NotificationChannelConfig, \
+    NotificationTemplate
 from db.models.user import AppVersionConfig
-from enums.store import InventoryType, OrderStatus
+from enums.store import InventoryType, OrderStatus, NotificationChannel
 from mixins.drf_views import CustomResponse
 from rest_framework_simplejwt.tokens import RefreshToken
 
@@ -1900,7 +1901,10 @@ class StoreAPIView(APIView):
     # ---------------- CREATE STORE ----------------
     def post(self, request):
         data = request.data
-        required_fields = ["name", "mobile", "address", "logo","product_code"]
+        required_fields = ["name", "mobile", "email",
+                           "address", "logo","product_code",
+                           "clients", "aws_bucket_name", "email_login"
+                           "mobile_login", "primary_color", "secondary_color"]
         clients = request.data.get("clients")
         for field in required_fields:
             if not data.get(field):
@@ -1914,6 +1918,7 @@ class StoreAPIView(APIView):
             store = Store.objects.create(
                 name=data.get("name"),
                 mobile=data.get("mobile"),
+                email=data.get("email"),
                 address=data.get("address"),
                 logo=data.get("logo"),
                 created_by="SUPERADMIN",
@@ -1926,14 +1931,10 @@ class StoreAPIView(APIView):
                 mobile_login = data.get("mobile_login"),
                 primary_color = data.get("primary_color"),
                 secondary_color = data.get("secondary_color"),
-
-
-
-
-
             )
             User.objects.create(
                 mobile=store.mobile,
+                email=store.email,
                 store=store,
                 user_role=["ADMIN"],
                 username=store.mobile
@@ -3573,5 +3574,60 @@ class ClientInfo(APIView):
             data=res,
             description="Client info fetched successfully"
         )
+
+
+class NotificationConfig(APIView):
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        store = request.store
+        data = request.data
+        config = NotificationChannelConfig()
+        config.store = store
+        config.channel = data["channel"] # dropdown
+        if config.channel == NotificationChannel.EMAIL:
+            config.smtp_host = data.get("smtp_host", "")
+            config.smtp_port = data.get("smtp_port", "")
+            config.smtp_user = data.get("smtp_user", "")
+            config.smtp_password = data.get("smtp_password", "")
+        elif config.channel == NotificationChannel.SMS:
+            config.api_key = data.get("api_key", "")
+            config.sender_id = data.get("sender_id", "")
+        elif config.channel == NotificationChannel.WHATSAPP:
+            config.api_key = data.get("api_key", "")
+        else:
+            config.fcm_server_key = data.get("fcm_server_key", "")
+        config.save()
+        return CustomResponse().successResponse(
+            data={},
+            description="Notification Channel Configured"
+        )
+
+
+class NotificationTemplateConfig(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        store = request.store
+        data = request.data
+        # todo: pre check if the record exists for store, event, channel combo
+        config = NotificationTemplate()
+        config.store = store
+        config.event = data["event"]  # dropdown
+        config.channel = data["channel"]
+        config.title = data["title"]
+        config.description = data["description"]
+        config.template_id = data["template_id"]
+        config.save()
+        return CustomResponse().successResponse(
+            data={},
+            description="Notification Channel Configured"
+        )
+
+
+
+
+
 
 

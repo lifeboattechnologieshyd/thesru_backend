@@ -41,3 +41,15 @@ class OrderStatus(models.TextChoices):
     UNFULFILLED = "UNFULFILLED"
     CANCELLED = "CANCELLED"
 
+class NotificationChannel(models.TextChoices):
+    SMS = "SMS"
+    WHATSAPP = "WHATSAPP"
+    EMAIL = "EMAIL"
+    PUSH = "PUSH"
+
+class NotificationEvent(models.TextChoices):
+    ORDER_PLACED = "ORDER_PLACED"
+    ORDER_PACKED = "ORDER_PACKED"
+    ORDER_SHIPPED = "ORDER_SHIPPED"
+    ORDER_DELIVERED = "ORDER_DELIVERED"
+    OTP_AUTHENTICATION = "OTP_AUTHENTICATION"

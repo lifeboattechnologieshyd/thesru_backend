@@ -20,8 +20,9 @@ from db import models
 from db.models import AddressMaster, PinCode, Product, Order, OrderProducts, Payment, OrderTimeLines, \
     Banner, Category, Cart, CouponUsage, Wishlist, CouponProduct, CouponCategory, CouponTag, WebBanner, FlashSaleBanner, \
     ProductReviews, ContactMessage, Tag, Coupons, ProductReviewMedia, Store
-from enums.store import OrderStatus, PaymentStatus
+from enums.store import OrderStatus, PaymentStatus, NotificationEvent
 from mixins.drf_views import CustomResponse
+from utils.notification import trigger_notification
 from utils.store import generate_order_number, time_ago
 from utils.user import send_sms_to_mobile, send_order_created_admin_email
 
@@ -1262,7 +1263,15 @@ class PaymentStatusAPIView(APIView):
                         user=order.user,
                         order=order
                     )
-                send_sms_to_mobile(f"{order.order_number}|", order.user.mobile, order.store, order.store.sms_order_template_id)
+                context = {
+                    "var" : f"{order.order_number}|"
+                }
+                trigger_notification(order.store,
+                                     NotificationEvent.ORDER_PLACED,
+                                     context,
+                                     order.user.mobile, order.user.email)
+                # todo: send an email to admin also
+                # todo: send a sms n whatsapp to admin also.
                 remove_cart_items(order.user, order.store)
             elif verified_status == PaymentStatus.FAILED:
                 order.status = OrderStatus.FAILED

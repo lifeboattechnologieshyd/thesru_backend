@@ -4,7 +4,8 @@ from db.mixins import AuditModel
 from django.db import models
 
 from db.models import Store, User
-from enums.store import BannerScreen, InventoryType, AddressType, OrderStatus, PaymentStatus
+from enums.store import BannerScreen, InventoryType, AddressType, OrderStatus, PaymentStatus, NotificationChannel, \
+    NotificationEvent
 
 
 class Tag(AuditModel):
@@ -707,3 +708,71 @@ class CouponUsage(models.Model):
             models.Index(fields=["coupon", "user"]),
             models.Index(fields=["user"]),
         ]
+
+
+class NotificationChannelConfig(AuditModel):
+
+    store = models.ForeignKey(
+        Store,
+        on_delete=models.CASCADE,
+        related_name="notification_channel_configs"
+    )
+    channel = models.CharField(
+        max_length=20,
+        choices=NotificationChannel.choices
+    )
+
+    # ---- SMS / WhatsApp ----
+    api_key = models.CharField(max_length=255, null=True, blank=True)
+    sender_id = models.CharField(max_length=100, null=True, blank=True)
+
+    # ---- Email ----
+    smtp_host = models.CharField(max_length=255, null=True, blank=True)
+    smtp_port = models.IntegerField(null=True, blank=True)
+    smtp_user = models.CharField(max_length=255, null=True, blank=True)
+    smtp_password = models.CharField(max_length=255, null=True, blank=True)
+
+    # ---- Push (Optional future use) ----
+    fcm_server_key = models.TextField(null=True, blank=True)
+
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        db_table = "notification_channel_config"
+        unique_together = ("store", "channel")
+
+    def __str__(self):
+        return f"{self.store.name} - {self.channel}"
+
+
+class NotificationTemplate(AuditModel):
+
+    store = models.ForeignKey(
+        Store,
+        on_delete=models.CASCADE,
+        related_name="notification_templates"
+    )
+
+    event = models.CharField(
+        max_length=50,
+        choices=NotificationEvent.choices
+    )
+
+    channel = models.CharField(
+        max_length=20,
+        choices=NotificationChannel.choices
+    )
+
+    # Email subject / Push title
+    title = models.CharField(max_length=255, null=True, blank=True)
+    # Main content
+    description = models.TextField(null=True)
+    template_id = models.CharField(max_length=255, null=True, blank=True)
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        db_table = "notification_template"
+        unique_together = ("store", "event", "channel")
+
+    def __str__(self):
+        return f"{self.store.name} - {self.event} - {self.channel}"

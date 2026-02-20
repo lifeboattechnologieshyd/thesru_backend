@@ -16,14 +16,16 @@ import random
 from config.settings.common import DEBUG
 from db.models import User, UserOTP, TempUser, Store, UserSession
 from db.models.user import AppVersionConfig
+from enums.store import NotificationEvent
 from mixins.drf_views import CustomResponse
 from serializers.user import UserMasterSerializer
 
 from rest_framework import status
 
+from utils.notification import trigger_notification
 from utils.storage import add_unique_suffix_to_filename, sanitize_filename, StoreS3Storage
 from utils.user import generate_username, generate_referral_code, generate_otp, version_to_tuple, \
-    send_sms_to_mobile, send_otp_email
+    send_otp_email
 
 
 class MobileSendOTPView(APIView):
@@ -47,7 +49,14 @@ class MobileSendOTPView(APIView):
             otp = 1234
         else:
             otp = generate_otp()
-            send_sms_to_mobile(f"{otp}|", mobile, store, store.sms_otp_template_id)
+            context = {
+                "var": f"{otp}|"
+            }
+            trigger_notification(store,
+                                 NotificationEvent.OTP_AUTHENTICATION,
+                                 context,
+                                 mobile)
+            # send_sms_to_mobile(f"{otp}|", mobile, store, store.sms_otp_template_id)
 
         expires_at = timezone.now() + timedelta(minutes=15)
         # Invalidate old OTPs
