@@ -617,7 +617,7 @@ class ProductAPIView(APIView):
         updatable_fields = [
             "name", "size", "colour", "mrp",
             "selling_price", "gst_percentage", "description",
-            "gst_amount", "current_stock", "is_active"
+            "gst_amount", "current_stock", "is_active","group_code"
         ]
 
         for field in updatable_fields:
