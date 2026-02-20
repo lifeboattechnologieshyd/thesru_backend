@@ -61,5 +61,10 @@ urlpatterns = [
     path("client_info",ClientInfo.as_view()),
 
     path("notification/config",NotificationConfig.as_view()),
-    path("notification/template/config",NotificationTemplateConfig.as_view())
+    path("notification/config/<str:id>",NotificationConfig.as_view()),
+
+
+    path("notification/template/config",NotificationTemplateConfig.as_view()),
+    path("notification/template/config/<str:id>",NotificationTemplateConfig.as_view())
+
 ]

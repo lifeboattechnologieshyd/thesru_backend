@@ -3603,6 +3603,86 @@ class NotificationConfig(APIView):
             data={},
             description="Notification Channel Configured"
         )
+    def get(self, request):
+        store = request.store
+        channel = request.query_params.get("channel")
+
+        if not channel:
+            return CustomResponse().errorResponse(
+                description="channel is required"
+            )
+
+        config = NotificationChannelConfig.objects.filter(
+            store=store,
+            channel=channel
+        ).first()
+
+        if not config:
+            return CustomResponse().successResponse(
+                data={},
+                description="No configuration found"
+            )
+
+        response = {
+            "channel": config.channel,
+            "smtp_host": config.smtp_host,
+            "smtp_port": config.smtp_port,
+            "smtp_user": config.smtp_user,
+            "api_key": config.api_key,
+            "sender_id": config.sender_id,
+            "fcm_server_key": config.fcm_server_key,
+        }
+
+        return CustomResponse().successResponse(
+            data=response,
+            description="Notification configuration fetched"
+        )
+    def put(self, request, id=None):
+        store = request.store
+        data = request.data
+
+        if not id:
+            return CustomResponse().errorResponse(
+                description="Configuration id is required"
+            )
+
+        config = NotificationChannelConfig.objects.filter(
+            id=id,
+            store=store
+        ).first()
+
+        if not config:
+            return CustomResponse().errorResponse(
+                description="Configuration not found"
+            )
+
+        channel = config.channel
+
+        if channel == NotificationChannel.EMAIL:
+            config.smtp_host = data.get("smtp_host", config.smtp_host)
+            config.smtp_port = data.get("smtp_port", config.smtp_port)
+            config.smtp_user = data.get("smtp_user", config.smtp_user)
+            config.smtp_password = data.get("smtp_password", config.smtp_password)
+
+        elif channel == NotificationChannel.SMS:
+            config.api_key = data.get("api_key", config.api_key)
+            config.sender_id = data.get("sender_id", config.sender_id)
+
+        elif channel == NotificationChannel.WHATSAPP:
+            config.api_key = data.get("api_key", config.api_key)
+
+        else:  # FCM / PUSH
+            config.fcm_server_key = data.get(
+                "fcm_server_key",
+                config.fcm_server_key
+            )
+
+        config.save()
+
+        return CustomResponse().successResponse(
+            data={},
+            description="Notification configuration updated"
+        )
 
 
 class NotificationTemplateConfig(APIView):
@@ -3611,6 +3691,16 @@ class NotificationTemplateConfig(APIView):
     def post(self, request):
         store = request.store
         data = request.data
+        template = NotificationTemplate.objects.filter(
+            store=store,
+            event=data.get("event"),
+            channel=data.get("channel")
+        ).exists()
+
+        if template:
+            return CustomResponse().errorResponse(
+                description="Template already exists for this event and channel"
+            )
         # todo: pre check if the record exists for store, event, channel combo
         config = NotificationTemplate()
         config.store = store
@@ -3623,6 +3713,80 @@ class NotificationTemplateConfig(APIView):
         return CustomResponse().successResponse(
             data={},
             description="Notification Channel Configured"
+        )
+
+    def get(self, request):
+        store = request.store
+        event = request.query_params.get("event")
+        channel = request.query_params.get("channel")
+
+        if not event or not channel:
+            return CustomResponse().errorResponse(
+                description="event and channel are required"
+            )
+
+        config = NotificationTemplate.objects.filter(
+            store=store,
+            event=event,
+            channel=channel
+        ).first()
+
+        if not config:
+            return CustomResponse().successResponse(
+                data={},
+                description="No template found"
+            )
+
+        response = {
+            "event": config.event,
+            "channel": config.channel,
+            "title": config.title,
+            "description": config.description,
+            "template_id": config.template_id
+        }
+
+        return CustomResponse().successResponse(
+            data=response,
+            description="Notification template fetched"
+        )
+
+    def put(self, request, id=None):
+        store = request.store
+        data = request.data
+
+        if not id:
+            return CustomResponse().errorResponse(
+                description="Template id is required"
+            )
+
+        # Fetch by ID + store
+        config = NotificationTemplate.objects.filter(
+            id=id,
+            store=store
+        ).first()
+
+        if not config:
+            return CustomResponse().errorResponse(
+                description="Template not found"
+            )
+
+        #  allowed fields
+        config.title = data.get("title", config.title)
+        config.description = data.get("description", config.description)
+        config.template_id = data.get("template_id", config.template_id)
+
+        config.save()
+
+        return CustomResponse().successResponse(
+            data={
+                "id": config.id,
+                "event": config.event,
+                "channel": config.channel,
+                "title": config.title,
+                "description": config.description,
+                "template_id": config.template_id
+            },
+            description="Notification template updated"
         )
 
 
