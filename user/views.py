@@ -26,109 +26,6 @@ from utils.user import generate_username, generate_referral_code, generate_otp, 
     send_sms_to_mobile, send_otp_email
 
 
-# class MobileSendOTPView(APIView):
-#     permission_classes = [AllowAny]
-#
-#     def post(self, request):
-#         mobile = request.data.get("mobile")
-#
-#         if not mobile:
-#             return CustomResponse().errorResponse(
-#                 description="Mobile number is required",
-#                 status=status.HTTP_400_BAD_REQUEST
-#             )
-#
-#         # Check user by mobile
-#         user = User.objects.filter(mobile=mobile).first()
-#         is_new_user = False
-#
-#         if not user:
-#             #  Create new user
-#             user = User.objects.create(
-#                 mobile=mobile,
-#             )
-#             is_new_user = True
-#
-#         #  Generate OTP
-#         # otp = str(random.randint(1000, 9999))
-#         otp = 1234
-#
-#         expires_at = timezone.now() + timedelta(minutes=5)
-#
-#         # Invalidate old OTPs
-#         UserOTP.objects.filter(mobile=mobile, is_used=False).update(is_used=True)
-#
-#         #  Save OTP
-#         UserOTP.objects.create(
-#             mobile=mobile,
-#             otp=otp,
-#             expires_at=expires_at
-#         )
-#
-#
-#         #  Generate JWT token (temporary access)
-#
-#         return CustomResponse().successResponse(
-#             description="OTP sent successfully",
-#             data={
-#                 "is_new_user": is_new_user,
-#                 "mobile": mobile,
-#                 "otp": otp,
-#             },
-#             status=status.HTTP_200_OK
-#         )
-
-
-
-# class MobileSendOTPView(APIView):
-#     permission_classes = [AllowAny]
-#
-#     def post(self, request):
-#         mobile = request.data.get("mobile")
-#
-#         if not mobile:
-#             return CustomResponse().errorResponse(
-#                 description="Mobile number is required",
-#                 status=status.HTTP_400_BAD_REQUEST
-#             )
-#
-#         # Check if user already exists
-#         user = User.objects.filter(mobile=mobile).first()
-#         is_new_user = False
-#
-#         if not user:
-#             is_new_user = True
-#
-#             # Save / update temp user
-#             TempUser.objects.update_or_create(
-#                 mobile=mobile,
-#                 defaults={}
-#             )
-#
-#         otp = generate_otp()
-#         send_otp_to_mobile(otp,mobile)
-#         expires_at = timezone.now() + timedelta(minutes=15)
-#
-#         # Invalidate old OTPs
-#         UserOTP.objects.filter(mobile=mobile, is_used=False).update(is_used=True)
-#
-#         # Save OTP
-#         UserOTP.objects.create(
-#             mobile=mobile,
-#             otp=otp,
-#             expires_at=expires_at
-#         )
-#
-#         return CustomResponse().successResponse(
-#             description="OTP sent successfully",
-#             data={
-#                 "is_new_user": is_new_user,
-#                 "mobile": mobile,
-#                 "otp": otp,
-#             },
-#             status=status.HTTP_200_OK
-#         )
-
 class MobileSendOTPView(APIView):
     permission_classes = [AllowAny]
 
@@ -150,7 +47,7 @@ class MobileSendOTPView(APIView):
             otp = 1234
         else:
             otp = generate_otp()
-            send_sms_to_mobile(otp, mobile, store, store.sms_otp_template_id)
+            send_sms_to_mobile(f"{otp}|", mobile, store, store.sms_otp_template_id)
 
         expires_at = timezone.now() + timedelta(minutes=15)
         # Invalidate old OTPs

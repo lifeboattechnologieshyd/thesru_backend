@@ -19,7 +19,7 @@ from django.conf import settings
 from db import models
 from db.models import AddressMaster, PinCode, Product, Order, OrderProducts, Payment, OrderTimeLines, \
     Banner, Category, Cart, CouponUsage, Wishlist, CouponProduct, CouponCategory, CouponTag, WebBanner, FlashSaleBanner, \
-    ProductReviews, ContactMessage, Tag, Coupons, ProductReviewMedia
+    ProductReviews, ContactMessage, Tag, Coupons, ProductReviewMedia, Store
 from enums.store import OrderStatus, PaymentStatus
 from mixins.drf_views import CustomResponse
 from utils.store import generate_order_number, time_ago
@@ -591,7 +591,7 @@ class CheckoutPreview(APIView):
                 return CustomResponse.errorResponse(str(e))
 
         # ---------- Charges (future ready) ----------
-        shipping_charge = Decimal("0.00")  # later based on pin_code
+        shipping_charge = Decimal("40.00")  # later based on pin_code
         platform_fee = Decimal("0.00")  # later config-based
 
         final_payable = (
@@ -1158,7 +1158,7 @@ class Webhook(APIView):
                             user=order.user,
                             order=order
                         )
-                    send_sms_to_mobile(order.order_number, order.user.mobile, order.store, order.store.sms_order_template_id)
+                    send_sms_to_mobile(f"{order.order_number}|", order.user.mobile, order.store, order.store.sms_order_template_id)
 
                     remove_cart_items(order.user, order.store)
                 elif event_type == "PAYMENT_FAILED_WEBHOOK":
@@ -1262,7 +1262,7 @@ class PaymentStatusAPIView(APIView):
                         user=order.user,
                         order=order
                     )
-                send_sms_to_mobile(order.order_number, order.user.mobile, order.store, order.store.sms_order_template_id)
+                send_sms_to_mobile(f"{order.order_number}|", order.user.mobile, order.store, order.store.sms_order_template_id)
                 remove_cart_items(order.user, order.store)
             elif verified_status == PaymentStatus.FAILED:
                 order.status = OrderStatus.FAILED
@@ -2250,3 +2250,7 @@ class UserCouponListAPIView(APIView):
             data=data,
             description="Active coupons fetched successfully"
         )
+
+
+
+

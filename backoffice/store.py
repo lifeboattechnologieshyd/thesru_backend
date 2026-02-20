@@ -49,7 +49,7 @@ class SendOTP(APIView):
         user = User.objects.filter(mobile=data.get("mobile"),user_role__contains=["ADMIN"], store=store).first()
         if user:
             otp = generate_otp()
-            send_sms_to_mobile(otp, data.get("mobile"), store, store.sms_otp_template_id)
+            send_sms_to_mobile(f"{otp}|", data.get("mobile"), store, store.sms_otp_template_id)
             expires_at = timezone.now() + timedelta(minutes=15)
 
             UserOTP.objects.filter(
@@ -2800,6 +2800,7 @@ class OrderListAPIView(APIView):
             shipping_slip_path = generate_shipping_invoice(order)
             order.shipping_slip = shipping_slip_path
             order.save(update_fields=["shipping_slip"])
+            send_sms_to_mobile(f"{order.order_number}|", order.user.mobile, order.store, order.store.sms_packed_template_id)
 
         # Timeline
         OrderTimeLines.objects.create(
@@ -2807,6 +2808,15 @@ class OrderListAPIView(APIView):
             status=new_status,
             remarks=remarks
         )
+        if order.status == OrderStatus.SHIPPED:
+            pass
+            # var = f"{order.order_number}| DTDC |"
+            # send_sms_to_mobile(f"{order.order_number}|", order.user.mobile, order.store,
+            #                    order.store.sms_shipped_template_id)
+        elif order.status == OrderStatus.DELIVERED:
+            send_sms_to_mobile(f"{order.order_number}|", order.user.mobile, order.store,
+                               order.store.sms_delivered_template_id)
+
 
         return CustomResponse.successResponse(
             data={},

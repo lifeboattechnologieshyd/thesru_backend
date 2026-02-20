@@ -43,4 +43,6 @@ urlpatterns = [
     path("flash/sale/banner", FlashSaleBannerListView.as_view()),
 
     path("coupons", UserCouponListAPIView.as_view()),
+
+
 ]
