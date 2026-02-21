@@ -3632,6 +3632,12 @@ class NotificationConfig(APIView):
             return CustomResponse().errorResponse(
                 description="store is required"
             )
+         # SUPERADMIN role check
+        roles = request.user.user_role or []
+        if "SUPERADMIN" not in roles:
+            return CustomResponse().errorResponse(
+                description="Access denied"
+            )
 
         configs = NotificationChannelConfig.objects.filter(
             store_id=store_id
