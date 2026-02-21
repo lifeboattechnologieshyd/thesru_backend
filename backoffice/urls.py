@@ -1,5 +1,6 @@
 from django.urls import path
 
+from backoffice.shipping import ShippinPlanCrud
 from backoffice.store import ProductAPIView, CategoriesAPIView, BannerAPIView, InventoryAPIView, \
     PinCodeAPIView, StoreAPIView, WebBannerAPIView, FlashSaleBannerAPIView, OrderStatsAPIView, \
     CartListView, OrderListAPIView, AbandonedOrderListAPIView, Login, SendOTP, TagsAPIView, AdminOrderDetailAPIView, \
@@ -69,5 +70,9 @@ urlpatterns = [
 
     path("superadmin/send-otp",SuperAdminSendOTPAPIView.as_view()),
     path("superadmin/verify-otp",SuperAdminVerifyOTPAPIView.as_view()),
+
+
+    path("shipping/plan",ShippinPlanCrud.as_view()), # create, get, edit
+    path("shipping/rule",ShippinPlanCrud.as_view()), # create, get, edit
 
 ]
