@@ -3626,8 +3626,8 @@ class NotificationConfig(APIView):
 
 
     def get(self, request):
-        store = request.store
         channel = request.query_params.get("channel")
+        store = request.query_params.get("store")
 
         if not channel:
             return CustomResponse().errorResponse(
