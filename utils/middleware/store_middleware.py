@@ -26,6 +26,7 @@ class StoreMiddleware:
             "/backoffice/notification/template/config",
             "/backoffice/superadmin/send-otp",
             "/backoffice/superadmin/verify-otp",
+            "/backoffice/notification/config/<str:id>",
         )
 
 
