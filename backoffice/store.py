@@ -3900,3 +3900,16 @@ class SuperAdminVerifyOTPAPIView(APIView):
             user_agent=request.META.get("HTTP_USER_AGENT"),
             expires_at=timezone.now() + timedelta(days=7)
         )
+
+        return CustomResponse().successResponse(
+            description="Login successful",
+            data={
+                "access_token": access,
+                "refresh_token": str(refresh),
+                "user": {
+                    "id": str(user.id),
+                    "mobile": user.mobile,
+                    "role": "SUPERADMIN"
+                }
+            }
+        )
