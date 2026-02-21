@@ -5,7 +5,7 @@ from backoffice.store import ProductAPIView, CategoriesAPIView, BannerAPIView, I
     CartListView, OrderListAPIView, AbandonedOrderListAPIView, Login, SendOTP, TagsAPIView, AdminOrderDetailAPIView, \
     AdminCreateCouponAPIView, UserAddress, UserAPIView, CreateAppVersionConfigAPI, OrderShippingSlipAPIView, \
     StoreAnalyticsAPIView, EmailSendOTPView, EmailVerifyOTPView, ClientInfo, NotificationConfig, \
-    NotificationTemplateConfig
+    NotificationTemplateConfig, SuperAdminSendOTPAPIView, SuperAdminVerifyOTPAPIView
 
 urlpatterns = [
 
@@ -65,6 +65,9 @@ urlpatterns = [
 
 
     path("notification/template/config",NotificationTemplateConfig.as_view()),
-    path("notification/template/config/<str:id>",NotificationTemplateConfig.as_view())
+    path("notification/template/config/<str:id>",NotificationTemplateConfig.as_view()),
+
+    path("superadmin/send-otp",SuperAdminSendOTPAPIView.as_view()),
+    path("superadmin/verify-otp",SuperAdminVerifyOTPAPIView.as_view()),
 
 ]

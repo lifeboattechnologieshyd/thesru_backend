@@ -3792,7 +3792,81 @@ class NotificationTemplateConfig(APIView):
 
 
 
+class SuperAdminSendOTPAPIView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        mobile = request.data.get("mobile")
+
+        if not mobile:
+            return CustomResponse().errorResponse(
+                description="Mobile number is required"
+            )
+
+        # Check SUPERADMIN
+        user = User.objects.filter(
+            mobile=mobile,
+            user_role__contains=["SUPERADMIN"]
+        ).first()
+
+        if not user:
+            return CustomResponse().errorResponse(
+                description="Access denied. Not a SuperAdmin"
+            )
+
+        # Fixed OTP
+        otp = "1234"
+
+        return CustomResponse().successResponse(
+            description="OTP sent successfully",
+            data={
+                "mobile": mobile,
+            }
+        )
 
 
+class SuperAdminVerifyOTPAPIView(APIView):
+    permission_classes = [AllowAny]
 
+    def post(self, request):
+        mobile = request.data.get("mobile")
+        otp = request.data.get("otp")
 
+        if not mobile or not otp:
+            return CustomResponse().errorResponse(
+                description="Mobile and OTP are required"
+            )
+
+        # OTP validation
+        if str(otp) != "1234":
+            return CustomResponse().errorResponse(
+                description="Invalid OTP"
+            )
+
+        # SUPERADMIN check
+        user = User.objects.filter(
+            mobile=mobile,
+            user_role__contains=["SUPERADMIN"]
+        ).first()
+
+        if not user:
+            return CustomResponse().errorResponse(
+                description="Access denied"
+            )
+
+        # Generate tokens
+        refresh = RefreshToken.for_user(user)
+        access = str(refresh.access_token)
+
+        return CustomResponse().successResponse(
+            description="Login successful",
+            data={
+                "access_token": access,
+                "refresh_token": str(refresh),
+                "user": {
+                    "id": str(user.id),
+                    "mobile": user.mobile,
+                    "role": "SUPERADMIN"
+                }
+            }
+        )
