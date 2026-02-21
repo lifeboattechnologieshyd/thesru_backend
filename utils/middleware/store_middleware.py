@@ -102,8 +102,12 @@ class StoreMiddleware:
             "/user/update-users",
 
             #  SUPERADMIN / BACKOFFICE
-            "/backoffice/superadmin/",
-            "/backoffice/notification/",
+
+            "/backoffice/superadmin/send-otp",
+            "/backoffice/superadmin/verify-otp",
+            "/backoffice/notification/config",
+            "/backoffice/notification/template/config",
+
         )
 
     def __call__(self, request):
