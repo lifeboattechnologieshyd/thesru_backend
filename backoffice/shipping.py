@@ -1,7 +1,5 @@
-from datetime import datetime
-from tkinter.font import names
 
-from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.views import APIView
 
 from db.models import ShippingPlan, ShippingRule

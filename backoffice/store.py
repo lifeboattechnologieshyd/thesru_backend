@@ -3938,3 +3938,19 @@ class SuperAdminVerifyOTPAPIView(APIView):
                 }
             }
         )
+
+
+class StoreListAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self,request):
+
+        roles = request.user.user_role or []
+        if "SUPERADMIN" not in roles:
+            return CustomResponse().errorResponse(
+                description="Access denied"
+            )
+        store = Store.objects.values("id","name","mobile","logo","address","email")
+
+        return CustomResponse.successResponse(data=list(store),description="successful")
+
