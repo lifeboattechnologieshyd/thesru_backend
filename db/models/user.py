@@ -208,7 +208,8 @@ class UserSession(AuditModel):
     store = models.ForeignKey(
         Store,
         on_delete=models.CASCADE,
-        related_name="sessions"
+        related_name="sessions",
+        null=True
     )
 
     session_token = models.CharField(max_length=500, unique=True)
