@@ -3721,10 +3721,20 @@ class NotificationTemplateConfig(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
-        store = request.store
         data = request.data
+        store_id = data.get("store")
+
+        if not store_id:
+            return CustomResponse().errorResponse(
+                description="store is required"
+            )
+        store = Store.objects.filter(id=store_id).first()
+        if not store:
+            return CustomResponse().errorResponse(
+                description="Invalid store"
+            )
         template = NotificationTemplate.objects.filter(
-            store=store,
+            store=store_id,
             event=data.get("event"),
             channel=data.get("channel")
         ).exists()
