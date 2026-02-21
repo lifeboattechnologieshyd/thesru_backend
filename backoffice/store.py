@@ -3661,7 +3661,6 @@ class NotificationConfig(APIView):
             description="Notification configuration fetched"
         )
     def put(self, request, id=None):
-        store = request.store
         data = request.data
 
         if not id:
@@ -3669,9 +3668,15 @@ class NotificationConfig(APIView):
                 description="Configuration id is required"
             )
 
-        config = NotificationChannelConfig.objects.filter(
-            id=id,
-            store=store
+        #  SUPERADMIN check (mandatory)
+        if "SUPERADMIN" not in request.user.user_role:
+            return CustomResponse().errorResponse(
+                description="Access denied"
+            )
+
+        #  Fetch config (store comes from DB)
+        config = NotificationChannelConfig.objects.select_related("store").filter(
+            id=id
         ).first()
 
         if not config:
@@ -3694,7 +3699,7 @@ class NotificationConfig(APIView):
         elif channel == NotificationChannel.WHATSAPP:
             config.api_key = data.get("api_key", config.api_key)
 
-        else:  # FCM / PUSH
+        else:  # PUSH / FCM
             config.fcm_server_key = data.get(
                 "fcm_server_key",
                 config.fcm_server_key
