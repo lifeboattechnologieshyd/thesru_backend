@@ -3581,10 +3581,10 @@ class NotificationConfig(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
-        store = request.store
+        # store = request.store
         data = request.data
         config = NotificationChannelConfig()
-        config.store = store
+        config.store = data.get("store", "")
         config.channel = data["channel"] # dropdown
         if config.channel == NotificationChannel.EMAIL:
             config.smtp_host = data.get("smtp_host", "")
