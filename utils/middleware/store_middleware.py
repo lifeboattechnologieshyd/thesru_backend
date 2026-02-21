@@ -21,7 +21,9 @@ class StoreMiddleware:
             "/backoffice/store",
             "/user/createadmin",
             "/user/admin-login",
-            "/user/update-users"
+            "/user/update-users",
+            "/backoffice/notification/config",
+            "/backoffice/notification/template/config",
         )
 
 
