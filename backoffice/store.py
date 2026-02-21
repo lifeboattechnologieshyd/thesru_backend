@@ -3581,11 +3581,30 @@ class NotificationConfig(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
-        # store = request.store
         data = request.data
+
+        store_id = data.get("store")
+        channel = data.get("channel")
+
+        if not store_id:
+            return CustomResponse().errorResponse(
+                description="store is required"
+            )
+
+        if not channel:
+            return CustomResponse().errorResponse(
+                description="channel is required"
+            )
+
+        #  Fetch Store instance
+        store = Store.objects.filter(id=store_id).first()
+        if not store:
+            return CustomResponse().errorResponse(
+                description="Invalid store"
+            )
         config = NotificationChannelConfig()
-        config.store = data.get("store", "")
-        config.channel = data["channel"] # dropdown
+        config.store = store
+        config.channel = channel # dropdown
         if config.channel == NotificationChannel.EMAIL:
             config.smtp_host = data.get("smtp_host", "")
             config.smtp_port = data.get("smtp_port", "")
@@ -3603,6 +3622,9 @@ class NotificationConfig(APIView):
             data={},
             description="Notification Channel Configured"
         )
+
+
+
     def get(self, request):
         store = request.store
         channel = request.query_params.get("channel")
