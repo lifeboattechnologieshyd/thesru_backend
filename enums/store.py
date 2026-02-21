@@ -53,3 +53,10 @@ class NotificationEvent(models.TextChoices):
     ORDER_SHIPPED = "ORDER_SHIPPED"
     ORDER_DELIVERED = "ORDER_DELIVERED"
     OTP_AUTHENTICATION = "OTP_AUTHENTICATION"
+
+
+# class ShippingType(models.TextChoices):
+#     FLAT = "FLAT", "Flat Rate"
+#     FREE_ABOVE = "FREE_ABOVE", "Free Above Amount"
+#     STATE = "STATE", "State Based"
+#     PINCODE = "PINCODE", "Pincode Based"

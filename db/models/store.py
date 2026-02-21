@@ -82,6 +82,8 @@ class Product(AuditModel):
         db_index=True,
         help_text="Product family code (same for all variants)"
     )
+    is_free_shipping = models.BooleanField(default=False)
+
     # SKU identity
     sku = models.CharField(max_length=30, unique=True)
 
@@ -776,3 +778,41 @@ class NotificationTemplate(AuditModel):
 
     def __str__(self):
         return f"{self.store.name} - {self.event} - {self.channel}"
+
+
+class ShippingPlan(AuditModel):
+    store = models.ForeignKey(
+        Store,
+        on_delete=models.CASCADE,
+        related_name="shipping_plans"
+    )
+    name = models.CharField(max_length=100)
+    flat_rate = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        null=True,
+        blank=True
+    )
+    free_above_amount = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        null=True,
+        blank=True
+    )
+    is_active = models.BooleanField(default=True)
+    class Meta:
+        db_table = "shipping_plan"
+
+
+class ShippingRule(AuditModel):
+    plan = models.ForeignKey(
+        ShippingPlan,
+        on_delete=models.CASCADE,
+        related_name="rules"
+    )
+    pincode = models.CharField(max_length=10, null=True, blank=True)
+    rate = models.DecimalField(max_digits=10, decimal_places=2)
+    class Meta:
+        db_table = "shipping_rule"
+
+
