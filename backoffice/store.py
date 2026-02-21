@@ -3624,6 +3624,7 @@ class NotificationConfig(APIView):
             )
 
         response = {
+            "id":config.id,
             "channel": config.channel,
             "smtp_host": config.smtp_host,
             "smtp_port": config.smtp_port,
