@@ -3668,13 +3668,14 @@ class NotificationConfig(APIView):
                 description="Configuration id is required"
             )
 
-        #  SUPERADMIN check (mandatory)
-        if "SUPERADMIN" not in request.user.user_role:
+        # ✅ SUPERADMIN role check
+        roles = request.user.user_role or []
+        if "SUPERADMIN" not in roles:
             return CustomResponse().errorResponse(
                 description="Access denied"
             )
 
-        #  Fetch config (store comes from DB)
+        # ✅ Fetch config → store comes from DB
         config = NotificationChannelConfig.objects.select_related("store").filter(
             id=id
         ).first()
@@ -3683,6 +3684,9 @@ class NotificationConfig(APIView):
             return CustomResponse().errorResponse(
                 description="Configuration not found"
             )
+
+        # store is SAFE here
+        store = config.store
 
         channel = config.channel
 
@@ -3699,7 +3703,7 @@ class NotificationConfig(APIView):
         elif channel == NotificationChannel.WHATSAPP:
             config.api_key = data.get("api_key", config.api_key)
 
-        else:  # PUSH / FCM
+        else:
             config.fcm_server_key = data.get(
                 "fcm_server_key",
                 config.fcm_server_key
