@@ -3,6 +3,7 @@ from urllib.parse import urlparse
 
 from django.http import JsonResponse
 from django.apps import apps
+from django.contrib.auth.models import AnonymousUser
 
 class StoreMiddleware:
     def __init__(self, get_response):
@@ -34,6 +35,13 @@ class StoreMiddleware:
         print("MIDDLEWARE PATH:", request.path)
         if any(request.path.startswith(p) for p in self.exempt_paths):
             return self.get_response(request)
+
+        user = getattr(request, "user", None)
+        if user and not isinstance(user, AnonymousUser):
+            roles = user.user_role or []
+            if "SUPERADMIN" in roles:
+                request.store = None
+                return self.get_response(request)
         request.store = None
         identifier = None
         client_type = None
