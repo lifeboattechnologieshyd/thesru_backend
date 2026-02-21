@@ -24,6 +24,8 @@ class StoreMiddleware:
             "/user/update-users",
             "/backoffice/notification/config",
             "/backoffice/notification/template/config",
+            "/backoffice/superadmin/send-otp",
+            "/backoffice/superadmin/verify-otp",
         )
 
 
