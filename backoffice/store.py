@@ -3889,15 +3889,14 @@ class SuperAdminVerifyOTPAPIView(APIView):
         refresh = RefreshToken.for_user(user)
         access = str(refresh.access_token)
 
-        return CustomResponse().successResponse(
-            description="Login successful",
-            data={
-                "access_token": access,
-                "refresh_token": str(refresh),
-                "user": {
-                    "id": str(user.id),
-                    "mobile": user.mobile,
-                    "role": "SUPERADMIN"
-                }
-            }
+        UserSession.objects.create(
+            user=user,
+            store=None,  # SUPERADMIN has no store
+            session_token=access,
+            refresh_token=str(refresh),
+            device_id=None,
+            device_type="BACKOFFICE",
+            ip_address=request.META.get("REMOTE_ADDR"),
+            user_agent=request.META.get("HTTP_USER_AGENT"),
+            expires_at=timezone.now() + timedelta(days=7)
         )
