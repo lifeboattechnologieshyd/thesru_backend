@@ -3626,40 +3626,49 @@ class NotificationConfig(APIView):
 
 
     def get(self, request):
-        channel = request.query_params.get("channel")
-        store = request.query_params.get("store")
+        store_id = request.query_params.get("store")
 
-        if not channel:
+        if not store_id:
             return CustomResponse().errorResponse(
-                description="channel is required"
+                description="store is required"
             )
 
-        config = NotificationChannelConfig.objects.filter(
-            store=store,
-            channel=channel
-        ).first()
+        configs = NotificationChannelConfig.objects.filter(
+            store_id=store_id
+        )
 
-        if not config:
+        if not configs.exists():
             return CustomResponse().successResponse(
-                data={},
+                data=[],
                 description="No configuration found"
             )
 
-        response = {
-            "id":config.id,
-            "channel": config.channel,
-            "smtp_host": config.smtp_host,
-            "smtp_port": config.smtp_port,
-            "smtp_user": config.smtp_user,
-            "api_key": config.api_key,
-            "sender_id": config.sender_id,
-            "fcm_server_key": config.fcm_server_key,
-        }
+        response = []
+
+        for config in configs:
+            response.append({
+                "id": config.id,
+                "channel": config.channel,
+
+                # EMAIL
+                "smtp_host": config.smtp_host,
+                "smtp_port": config.smtp_port,
+                "smtp_user": config.smtp_user,
+
+                # SMS / WHATSAPP
+                "api_key": config.api_key,
+                "sender_id": config.sender_id,
+
+                # FCM
+                "fcm_server_key": config.fcm_server_key,
+            })
 
         return CustomResponse().successResponse(
             data=response,
-            description="Notification configuration fetched"
+            description="Notification configurations fetched"
         )
+
+
     def put(self, request, id=None):
         data = request.data
 
