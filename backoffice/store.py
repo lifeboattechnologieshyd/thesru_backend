@@ -3641,10 +3641,13 @@ class NotificationConfig(APIView):
                 description="Access denied"
             )
 
-        # Base queryset
-        filters = {"store_id": store_id}
+        # Validate channel against choices
+        if channel and channel not in NotificationChannel.values:
+            return CustomResponse().errorResponse(
+                description=f"Invalid channel. Allowed values: {list(NotificationChannel.values)}"
+            )
 
-        # Optional channel filter
+        filters = {"store_id": store_id}
         if channel:
             filters["channel"] = channel
 
@@ -3657,7 +3660,6 @@ class NotificationConfig(APIView):
             )
 
         response = []
-
         for config in configs:
             response.append({
                 "id": config.id,
