@@ -20,7 +20,7 @@ from django.conf import settings
 from db import models
 from db.models import AddressMaster, PinCode, Product, Order, OrderProducts, Payment, OrderTimeLines, \
     Banner, Category, Cart, CouponUsage, Wishlist, CouponProduct, CouponCategory, CouponTag, WebBanner, FlashSaleBanner, \
-    ProductReviews, ContactMessage, Tag, Coupons, ProductReviewMedia
+    ProductReviews, ContactMessage, Tag, Coupons, ProductReviewMedia, Store
 from enums.store import OrderStatus, PaymentStatus, NotificationEvent
 from mixins.drf_views import CustomResponse
 from utils.notification import trigger_notification
@@ -2206,4 +2206,55 @@ class UserCouponListAPIView(APIView):
 
 
 
+
+
+from rest_framework.views import APIView
+from rest_framework.permissions import IsAuthenticated
+from django.shortcuts import get_object_or_404
+
+class TestTriggerNotificationAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        data = request.data
+
+        store_id = data.get("store_id")
+        event = data.get("event")
+        mobile = data.get("mobile")
+        email = data.get("email")
+        context = data.get("context", {})
+
+        if not store_id or not event:
+            return CustomResponse().errorResponse(
+                description="store_id and event are required"
+            )
+
+        if not context:
+            return CustomResponse().errorResponse(
+                description="context is required"
+            )
+
+
+
+        store = get_object_or_404(Store, id=store_id)
+
+        # 🔔 Trigger notification
+        trigger_notification(
+            store=store,
+            event=event,
+            context=context,
+            recipient=mobile,
+            email=email
+        )
+
+        return CustomResponse().successResponse(
+            data={
+                "store": store.name,
+                "event": event,
+                "mobile": mobile,
+                "email": email,
+                "context": context
+            },
+            description="Notification trigger executed successfully"
+        )
 
