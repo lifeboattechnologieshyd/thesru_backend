@@ -33,7 +33,7 @@ class Store(AuditModel):
     )
     address = models.CharField(max_length=100)
     email = models.CharField(max_length=100, null=True)
-    logo = models.CharField(max_length=300)
+    logo = models.CharField(max_length=300,null=True)
     gst_number = models.CharField(max_length=100,unique=True, null=True)
     client_id = models.CharField(null=False, unique=True)
     client_secret = models.CharField(null=False, unique=True)
