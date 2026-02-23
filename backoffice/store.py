@@ -1904,7 +1904,7 @@ class StoreAPIView(APIView):
     def post(self, request):
         data = request.data
         required_fields = ["name", "mobile", "email",
-                           "address", "logo","product_code",
+                           "address", "product_code",
                            "clients", "aws_bucket_name", "email_login"
                            "mobile_login", "primary_color", "secondary_color"]
         clients = request.data.get("clients")
