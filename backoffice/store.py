@@ -2,6 +2,8 @@ from datetime import timedelta
 from decimal import Decimal
 from tokenize import Double
 from unicodedata import category
+
+from django.forms import model_to_dict
 from django.utils.timezone import make_aware
 from datetime import datetime
 from django.db.models import Count, Sum, F, Q
@@ -1982,11 +1984,26 @@ class StoreAPIView(APIView):
             return CustomResponse.errorResponse(
                 description="page and page_size must be positive integers"
             )
-        queryset = Store.objects.all().order_by("-created_at")
+        queryset = Store.objects.prefetch_related("clients").all().order_by("-created_at")
         total = queryset.count()
         offset = (page - 1) * page_size
         queryset = queryset[offset: offset + page_size]
-        data = list(queryset.values())
+        data = []
+        for query in queryset:
+            client_list = []
+            for client in query.clients.all():
+                client_list.append({
+                    "id": client.id,
+                    "name": client.name,
+                    "email": client.email,
+                    "mobile": client.mobile,
+                    "is_active": client.is_active
+                })
+            resp = model_to_dict(query)
+            data.append({
+                "client": client_list,
+                "store": resp
+            })
         return CustomResponse.successResponse(
             data=data,
             total=total

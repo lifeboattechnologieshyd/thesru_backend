@@ -1,6 +1,6 @@
 from django.urls import path
 
-from backoffice.shipping import  ShippingPlanAPIView, ShippingRuleAPIView
+from backoffice.shipping import  ShippingPlanAPIView, ShippinPlanCrud
 from backoffice.store import ProductAPIView, CategoriesAPIView, BannerAPIView, InventoryAPIView, \
     PinCodeAPIView, StoreAPIView, WebBannerAPIView, FlashSaleBannerAPIView, OrderStatsAPIView, \
     CartListView, OrderListAPIView, AbandonedOrderListAPIView, Login, SendOTP, TagsAPIView, AdminOrderDetailAPIView, \
@@ -73,9 +73,7 @@ urlpatterns = [
 
 
     path("shipping/plan",ShippingPlanAPIView.as_view()),# create, get, edit
-    path("shipping/plan/<str:id>",ShippingPlanAPIView.as_view()),
 
-    path("shipping/rule",ShippingRuleAPIView.as_view()), # create, get, edit
-    path("shipping/rule/<str:id>",ShippingRuleAPIView.as_view()),
+    path("shipping/rule",ShippinPlanCrud.as_view()), # create, get, edit
 
 ]
