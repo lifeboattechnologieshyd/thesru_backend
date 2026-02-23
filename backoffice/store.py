@@ -3819,6 +3819,7 @@ class NotificationTemplateConfig(APIView):
                 "title": config.title,
                 "description": config.description,
                 "template_id": config.template_id,
+                "is_active":config.is_active
             })
 
         return CustomResponse().successResponse(
