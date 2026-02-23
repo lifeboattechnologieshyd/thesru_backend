@@ -3627,21 +3627,28 @@ class NotificationConfig(APIView):
 
     def get(self, request):
         store_id = request.query_params.get("store")
+        channel = request.query_params.get("channel")
 
         if not store_id:
             return CustomResponse().errorResponse(
                 description="store is required"
             )
-         # SUPERADMIN role check
+
+        # SUPERADMIN role check
         roles = request.user.user_role or []
         if "SUPERADMIN" not in roles:
             return CustomResponse().errorResponse(
                 description="Access denied"
             )
 
-        configs = NotificationChannelConfig.objects.filter(
-            store_id=store_id
-        )
+        # Base queryset
+        filters = {"store_id": store_id}
+
+        # Optional channel filter
+        if channel:
+            filters["channel"] = channel
+
+        configs = NotificationChannelConfig.objects.filter(**filters)
 
         if not configs.exists():
             return CustomResponse().successResponse(
@@ -3773,7 +3780,7 @@ class NotificationTemplateConfig(APIView):
         )
 
     def get(self, request):
-        store = request.store
+        store_id = request.query_params.get("store")
         event = request.query_params.get("event")
         channel = request.query_params.get("channel")
 
