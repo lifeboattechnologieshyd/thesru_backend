@@ -3786,34 +3786,44 @@ class NotificationTemplateConfig(APIView):
         event = request.query_params.get("event")
         channel = request.query_params.get("channel")
 
-        if not event or not channel:
+        if not store_id:
             return CustomResponse().errorResponse(
-                description="event and channel are required"
+                description="store is required"
             )
 
-        config = NotificationTemplate.objects.filter(
-            store=store_id,
-            event=event,
-            channel=channel
-        ).first()
+        # Base queryset
+        queryset = NotificationTemplate.objects.filter(
+            store_id=store_id
+        )
 
-        if not config:
+        # Optional filters
+        if event:
+            queryset = queryset.filter(event=event)
+
+        if channel:
+            queryset = queryset.filter(channel=channel)
+
+        if not queryset.exists():
             return CustomResponse().successResponse(
-                data={},
-                description="No template found"
+                data=[],
+                description="No templates found"
             )
 
-        response = {
-            "event": config.event,
-            "channel": config.channel,
-            "title": config.title,
-            "description": config.description,
-            "template_id": config.template_id
-        }
+        response = []
+        for config in queryset:
+            response.append({
+                "id": config.id,
+                "store_id": str(config.store_id),
+                "event": config.event,
+                "channel": config.channel,
+                "title": config.title,
+                "description": config.description,
+                "template_id": config.template_id,
+            })
 
         return CustomResponse().successResponse(
             data=response,
-            description="Notification template fetched"
+            description="Notification templates fetched"
         )
 
     def put(self, request, id=None):
