@@ -3792,7 +3792,7 @@ class NotificationTemplateConfig(APIView):
             )
 
         config = NotificationTemplate.objects.filter(
-            store=store,
+            store=store_id,
             event=event,
             channel=channel
         ).first()
