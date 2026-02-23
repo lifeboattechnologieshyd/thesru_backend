@@ -403,6 +403,7 @@ class Order(AuditModel):
     address = models.JSONField()
     mrp = models.DecimalField(decimal_places=2, max_digits=10, default=0)
     selling_price = models.DecimalField(decimal_places=2, max_digits=10, default=0)
+    shipping_charges = models.DecimalField(decimal_places=2, max_digits=10, default=0)
     coupon_discount = models.DecimalField(decimal_places=2, max_digits=10)
     amount = models.DecimalField(decimal_places=2, max_digits=10)
     wallet_paid = models.DecimalField(decimal_places=2, max_digits=10, default=0)

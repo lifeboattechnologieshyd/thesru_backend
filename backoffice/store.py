@@ -4,6 +4,8 @@ from tokenize import Double
 from unicodedata import category
 from django.utils.timezone import make_aware
 from datetime import datetime
+from django.db.models import Count, Sum, F, Q
+from datetime import datetime
 
 from django.core.files.storage import default_storage
 from django.db.models import Q, F
@@ -3975,3 +3977,112 @@ class StoreListAPIView(APIView):
 
         return CustomResponse.successResponse(data=list(store),description="successful")
 
+
+
+
+
+
+class DashboardStatsAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        # SUPERADMIN check
+        roles = request.user.user_role or []
+        if "SUPERADMIN" not in roles:
+            return CustomResponse().errorResponse(
+                description="Access denied"
+            )
+
+        store_id = request.query_params.get("store_id")
+        start_date = request.query_params.get("start_date")
+        end_date = request.query_params.get("end_date")
+
+        # ---------------- Date filter ----------------
+        date_filter = {}
+        if start_date:
+            try:
+                date_filter["created_at__date__gte"] = datetime.strptime(
+                    start_date, "%Y-%m-%d"
+                ).date()
+            except ValueError:
+                return CustomResponse().errorResponse(
+                    description="start_date must be YYYY-MM-DD"
+                )
+
+        if end_date:
+            try:
+                date_filter["created_at__date__lte"] = datetime.strptime(
+                    end_date, "%Y-%m-%d"
+                ).date()
+            except ValueError:
+                return CustomResponse().errorResponse(
+                    description="end_date must be YYYY-MM-DD"
+                )
+
+        # ---------------- Store filters ----------------
+        store_filter = {}
+        if store_id:
+            store_filter["id"] = store_id
+
+        order_store_filter = {}
+        user_store_filter = {}
+
+        if store_id:
+            order_store_filter["store_id"] = store_id
+            user_store_filter["store_id"] = store_id
+
+        # ---------------- Stores ----------------
+        store_stats = Store.objects.filter(
+            **store_filter
+        ).aggregate(
+            total_stores=Count("id"),
+            active_stores=Count("id", filter=Q(is_active=True)),
+            inactive_stores=Count("id", filter=Q(is_active=False)),
+        )
+
+        # ---------------- Orders ----------------
+        order_stats = Order.objects.filter(
+            status=OrderStatus.CREATED,
+            **order_store_filter,
+            **date_filter
+        ).aggregate(
+            total_orders=Count("id"),
+            total_revenue=Sum("amount"),
+            total_shipping_charges=Sum(
+                F("amount") - F("selling_price")
+            )
+        )
+
+        # ---------------- Users ----------------
+        user_stats = User.objects.filter(
+            **user_store_filter
+        ).aggregate(
+            total_users=Count("id")
+        )
+
+        response = {
+            # Store stats
+            "total_stores": store_stats["total_stores"],
+            "active_stores": store_stats["active_stores"],
+            "inactive_stores": store_stats["inactive_stores"],
+
+            # Order stats
+            "total_orders": order_stats["total_orders"] or 0,
+            "total_revenue": float(order_stats["total_revenue"] or 0),
+            "total_shipping_charges": float(order_stats["total_shipping_charges"] or 0),
+
+            # User stats
+            "total_users": user_stats["total_users"],
+
+            # Applied filters
+            "filters": {
+                "store_id": store_id,
+                "start_date": start_date,
+                "end_date": end_date,
+            }
+        }
+
+        return CustomResponse().successResponse(
+            data=response,
+            description="Dashboard statistics fetched successfully"
+        )
