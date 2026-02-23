@@ -34,11 +34,12 @@ from db.models import Category, Product, Banner, Inventory, PinCode, Store, WebB
     OrderTimeLines, Coupons, CouponProduct, CouponCategory, CouponTag, AddressMaster, NotificationChannelConfig, \
     NotificationTemplate
 from db.models.user import AppVersionConfig
-from enums.store import InventoryType, OrderStatus, NotificationChannel
+from enums.store import InventoryType, OrderStatus, NotificationChannel, NotificationEvent
 from mixins.drf_views import CustomResponse
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from utils.invoice_generator import generate_shipping_invoice
+from utils.notification import trigger_notification
 from utils.store import generate_lsin, generate_order_number, BO_STATUS_FLOW
 from utils.user import generate_otp, send_sms_to_mobile, send_otp_email, generate_username, generate_referral_code
 from django.db.models import Sum, F, DecimalField, ExpressionWrapper
@@ -54,9 +55,14 @@ class SendOTP(APIView):
         user = User.objects.filter(mobile=data.get("mobile"),user_role__contains=["ADMIN"], store=store).first()
         if user:
             otp = generate_otp()
-            send_sms_to_mobile(f"{otp}|", data.get("mobile"), store, store.sms_otp_template_id)
+            context = {
+                "var": f"{otp}|"
+            }
+            trigger_notification(store,
+                                 NotificationEvent.OTP_AUTHENTICATION,
+                                 context,
+                                 data.get("mobile"))
             expires_at = timezone.now() + timedelta(minutes=15)
-
             UserOTP.objects.filter(
                 store=request.store,
                 mobile=data.get("mobile"),
