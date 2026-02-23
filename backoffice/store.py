@@ -3817,7 +3817,6 @@ class NotificationTemplateConfig(APIView):
         )
 
     def put(self, request, id=None):
-        store = request.store
         data = request.data
 
         if not id:
@@ -3825,10 +3824,9 @@ class NotificationTemplateConfig(APIView):
                 description="Template id is required"
             )
 
-        # Fetch by ID + store
-        config = NotificationTemplate.objects.filter(
-            id=id,
-            store=store
+        # Fetch template by ID (store comes from DB)
+        config = NotificationTemplate.objects.select_related("store").filter(
+            id=id
         ).first()
 
         if not config:
@@ -3836,7 +3834,10 @@ class NotificationTemplateConfig(APIView):
                 description="Template not found"
             )
 
-        #  allowed fields
+        # store is SAFE if needed later
+        store = config.store
+
+        # Update allowed fields only
         config.title = data.get("title", config.title)
         config.description = data.get("description", config.description)
         config.template_id = data.get("template_id", config.template_id)
@@ -3846,15 +3847,15 @@ class NotificationTemplateConfig(APIView):
         return CustomResponse().successResponse(
             data={
                 "id": config.id,
+                "store_id": str(store.id) if store else None,
                 "event": config.event,
                 "channel": config.channel,
                 "title": config.title,
                 "description": config.description,
-                "template_id": config.template_id
+                "template_id": config.template_id,
             },
             description="Notification template updated"
         )
-
 
 
 class SuperAdminSendOTPAPIView(APIView):
