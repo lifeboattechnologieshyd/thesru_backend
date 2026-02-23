@@ -3813,7 +3813,7 @@ class NotificationTemplateConfig(APIView):
         for config in queryset:
             response.append({
                 "id": config.id,
-                "store_id": str(config.store_id),
+                "store": str(config.store_id),
                 "event": config.event,
                 "channel": config.channel,
                 "title": config.title,
