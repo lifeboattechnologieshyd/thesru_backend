@@ -1103,7 +1103,11 @@ class Webhook(APIView):
                             user=order.user,
                             order=order
                         )
-                    send_sms_to_mobile(f"{order.order_number}|", order.user.mobile, order.store, order.store.sms_order_template_id)
+                    # todo : replace this with trigger
+                    context = {
+                        "var": f"{order.order_number}|"
+                    }
+                    trigger_notification(order.store,NotificationEvent.ORDER_PLACED, context, order.user.mobile, order.user.email)
 
                     remove_cart_items(order.user, order.store)
                 elif event_type == "PAYMENT_FAILED_WEBHOOK":
@@ -1210,11 +1214,12 @@ class PaymentStatusAPIView(APIView):
                 context = {
                     "var" : f"{order.order_number}|"
                 }
+
                 trigger_notification(order.store,
                                      NotificationEvent.ORDER_PLACED,
                                      context,
                                      order.user.mobile, order.user.email)
-                # todo: send an email to admin also
+                # todo: send an email to admin also.
                 # todo: send a sms n whatsapp to admin also.
                 remove_cart_items(order.user, order.store)
             elif verified_status == PaymentStatus.FAILED:
