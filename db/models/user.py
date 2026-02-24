@@ -44,6 +44,8 @@ class Store(AuditModel):
     bo_title = models.CharField(max_length=50, null=True, blank=True)
     bo_subtitle = models.CharField(max_length=50, null=True, blank=True)
     highlights = ArrayField(models.CharField(max_length=50, ), blank=True, null=True)
+    is_active = models.BooleanField(default=True)
+
 
     class Meta:
         db_table = "store"
