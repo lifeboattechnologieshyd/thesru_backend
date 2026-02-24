@@ -4003,16 +4003,60 @@ class SuperAdminVerifyOTPAPIView(APIView):
 class StoreListAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
-    def get(self,request):
+    def get(self, request):
+        store = request.store
 
-        roles = request.user.user_role or []
-        if "SUPERADMIN" not in roles:
+        if not store:
             return CustomResponse().errorResponse(
-                description="Access denied"
+                description="Store not found"
             )
-        store = Store.objects.values("id","name","mobile","logo","address","email")
 
-        return CustomResponse.successResponse(data=list(store),description="successful")
+        data = {
+            "id": str(store.id),
+            "name": store.name,
+            "mobile": store.mobile,
+            "address": store.address,
+            "primary_color": store.primary_color,
+            "secondary_color": store.secondary_color,
+            "email": store.email,
+            "logo": store.logo,
+            "gst_number": store.gst_number,
+            "product_code": store.product_code,
+            "email_login": store.email_login,
+            "mobile_login": store.mobile_login,
+            "highlights": store.highlights,
+        }
+
+        return CustomResponse().successResponse(
+            data=data,
+            description="Store fetched successfully"
+        )
+    def put(self, request):
+        store = request.store
+        data = request.data
+
+        # Update only fields sent in request
+        for field in [
+            "name",
+            "address",
+            "primary_color",
+            "secondary_color",
+            "email",
+            "logo",
+            "bo_title",
+            "bo_subtitle",
+            "highlights",
+        ]:
+            if field in data:
+                setattr(store, field, data[field])
+
+        store.updated_by = request.user.id
+        store.save()
+
+        return CustomResponse().successResponse(
+            data={},
+            description="Store updated successfully"
+        )
 
 
 

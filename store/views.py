@@ -14,9 +14,11 @@ from django.utils.timezone import now
 from rest_framework.templatetags.rest_framework import items
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated,AllowAny
+from django.utils import timezone
 
 from django.conf import settings
 
+from config.firebase import send_push_notification
 from db import models
 from db.models import AddressMaster, PinCode, Product, Order, OrderProducts, Payment, OrderTimeLines, \
     Banner, Category, Cart, CouponUsage, Wishlist, CouponProduct, CouponCategory, CouponTag, WebBanner, FlashSaleBanner, \
@@ -1216,6 +1218,13 @@ class PaymentStatusAPIView(APIView):
                                      NotificationEvent.ORDER_PLACED,
                                      context,
                                      order.user.mobile, order.user.email)
+                send_push_notification(
+                    store=order.store,
+                    token=order.user.fcm_token,
+                    title="Order Placed",
+                    body="Your order has been placed successfully",
+                    data={"order_id": order.order_number}
+                )
                 # todo: send an email to admin also.
                 # todo: send a sms n whatsapp to admin also.
                 remove_cart_items(order.user, order.store)
@@ -2260,3 +2269,50 @@ class TestTriggerNotificationAPIView(APIView):
             description="Notification trigger executed successfully"
         )
 
+
+
+
+
+
+class FirebaseTestPushAPIView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        store = request.store
+        user = request.user
+
+
+
+        # Validate FCM token
+        fcm_token = request.data.get("fcm_token")
+        if not fcm_token:
+            return CustomResponse().errorResponse(
+                description="fcm_token is required"
+            )
+
+        try:
+            response = send_push_notification(
+                store=store,
+                token=fcm_token,
+                title="Firebase Test Notification",
+                body=" Firebase is working successfully!",
+                data={
+                    "type": "TEST",
+                    "time": str(timezone.now())
+                }
+            )
+
+            return CustomResponse().successResponse(
+                data={
+                    "firebase_response": response
+                },
+                description="Firebase push notification sent successfully"
+            )
+
+        except Exception as e:
+            return CustomResponse().errorResponse(
+                description="Firebase push failed",
+                data={
+                    "error": str(e)
+                }
+            )

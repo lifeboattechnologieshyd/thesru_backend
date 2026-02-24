@@ -6,7 +6,7 @@ from backoffice.store import ProductAPIView, CategoriesAPIView, BannerAPIView, I
     CartListView, OrderListAPIView, AbandonedOrderListAPIView, Login, SendOTP, TagsAPIView, AdminOrderDetailAPIView, \
     AdminCreateCouponAPIView, UserAddress, UserAPIView, CreateAppVersionConfigAPI, OrderShippingSlipAPIView, \
     StoreAnalyticsAPIView, EmailSendOTPView, EmailVerifyOTPView, ClientInfo, NotificationConfig, \
-    NotificationTemplateConfig, SuperAdminSendOTPAPIView, SuperAdminVerifyOTPAPIView
+    NotificationTemplateConfig, SuperAdminSendOTPAPIView, SuperAdminVerifyOTPAPIView, StoreListAPIView
 
 urlpatterns = [
 
@@ -70,6 +70,8 @@ urlpatterns = [
 
     path("superadmin/send-otp",SuperAdminSendOTPAPIView.as_view()),
     path("superadmin/verify-otp",SuperAdminVerifyOTPAPIView.as_view()),
+
+    path("get/store",StoreListAPIView.as_view()),
 
 
     path("shipping/plan",ShippingPlanAPIView.as_view()),# create, get, edit
