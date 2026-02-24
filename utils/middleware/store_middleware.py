@@ -142,11 +142,14 @@ class StoreMiddleware:
                 identifier = host.split(":")[0]
 
         # ❗ CRITICAL FIX: NEVER return None
+        # if not identifier:
+        #     return JsonResponse(
+        #         {"success": False, "message": "Store identifier missing"},
+        #         status=400
+        #     )
         if not identifier:
-            return JsonResponse(
-                {"success": False, "message": "Store identifier missing"},
-                status=400
-            )
+            request.store = None
+            return self.get_response(request)
 
         StoreClient = apps.get_model("db", "StoreClient")
 
