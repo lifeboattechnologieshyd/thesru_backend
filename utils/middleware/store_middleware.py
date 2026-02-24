@@ -107,7 +107,7 @@ class StoreMiddleware:
             "/backoffice/superadmin/verify-otp",
             "/backoffice/notification/config",
             "/backoffice/notification/template/config",
-            "/backoffice/analytics",
+            "/backoffice/dashboard",
 
         )
 
