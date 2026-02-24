@@ -25,7 +25,7 @@ from enums.store import OrderStatus, PaymentStatus, NotificationEvent
 from mixins.drf_views import CustomResponse
 from utils.notification import trigger_notification
 from utils.store import generate_order_number, time_ago
-from utils.user import send_sms_to_mobile, send_order_created_admin_email
+from utils.user import send_order_created_admin_email
 
 
 class CategoryListView(APIView):
@@ -905,10 +905,7 @@ class InitiateOrder(APIView):
                 status=OrderStatus.INITIATED,
                 created_by=user.mobile
             )
-            try:
-                send_order_created_admin_email(order)
-            except ImproperlyConfigured as e:
-                pass
+
 
             # ---------- Create Order Products ----------
             for item in products_data:
