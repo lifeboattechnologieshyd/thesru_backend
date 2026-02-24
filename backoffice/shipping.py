@@ -42,8 +42,8 @@ class ShippingPlanAPIView(APIView):
         store = request.store
         plan = ShippingPlan.objects.filter(store=store).values(
             "id", "name", "flat_rate", "free_above_amount", "is_active"
-        )
-        return CustomResponse().successResponse(data=list(plan), description="Shipping plan fetched")
+        ).first()
+        return CustomResponse().successResponse(data=plan, description="Shipping plan fetched")
 
 
 class ShippinPlanCrud(APIView):
