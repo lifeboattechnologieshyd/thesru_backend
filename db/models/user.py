@@ -256,3 +256,60 @@ class AppVersionConfig(AuditModel):
         return f"{self.os} | {self.latest_version}"
 
 
+class Visitor(AuditModel):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    visitor_id = models.CharField(
+        max_length=100,
+        db_index=True,
+        help_text="UUID for web, Device ID for mobile app"
+    )
+
+
+    # Store mapping
+    store = models.ForeignKey(
+        Store,
+        on_delete=models.CASCADE,
+        related_name="visitors"
+    )
+
+    #  Platform info
+    platform = models.CharField(
+        max_length=20,
+        choices=[
+            ("WEB", "Web"),
+            ("ANDROID", "Android"),
+            ("IOS", "iOS"),
+        ]
+    )
+
+    #  link after login
+    user = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="visits"
+    )
+
+    #  Request metadata
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+    user_agent = models.TextField(null=True, blank=True)
+
+    #  Analytics
+    visit_count = models.PositiveIntegerField(default=1)
+    first_visited_at = models.DateTimeField(auto_now_add=True)
+    last_visited_at = models.DateTimeField(auto_now=True)
+
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        db_table = "visitor"
+        unique_together = ("store", "visitor_id")
+        indexes = [
+            models.Index(fields=["visitor_id"]),
+            models.Index(fields=["platform"]),
+            models.Index(fields=["store"]),
+        ]
+
+    def __str__(self):
+        return f"{self.platform} | {self.visitor_id}"

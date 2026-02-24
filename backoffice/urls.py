@@ -79,6 +79,6 @@ urlpatterns = [
 
     path("shipping/rule",ShippinPlanCrud.as_view()), # create, get, edit
 
-    path("analytics",DashboardStatsAPIView.as_view())
+    path("analytics",DashboardStatsAPIView.as_view()),
 
 ]
