@@ -2000,9 +2000,8 @@ class StoreAPIView(APIView):
             for client in query.clients.all():
                 client_list.append({
                     "id": client.id,
-                    "name": client.name,
-                    "email": client.email,
-                    "mobile": client.mobile,
+                    "client_type": client.client_type,
+                    "identifier": client.identifier,
                     "is_active": client.is_active
                 })
             resp = model_to_dict(query)
