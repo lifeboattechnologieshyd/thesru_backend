@@ -2005,6 +2005,7 @@ class StoreAPIView(APIView):
                     "is_active": client.is_active
                 })
             resp = model_to_dict(query)
+            resp["id"] = str(query.id)
             data.append({
                 "client": client_list,
                 "store": resp
