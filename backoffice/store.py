@@ -1914,7 +1914,7 @@ class StoreAPIView(APIView):
         required_fields = ["name", "mobile", "email",
                            "address", "product_code",
                            "clients", "aws_bucket_name", "email_login"
-                           "mobile_login", "primary_color", "secondary_color"]
+                           "mobile_login", "primary_color", "secondary_color","client_id","client_secret"]
         clients = request.data.get("clients")
         for field in required_fields:
             if not data.get(field):
@@ -1941,6 +1941,10 @@ class StoreAPIView(APIView):
                 mobile_login = data.get("mobile_login"),
                 primary_color = data.get("primary_color"),
                 secondary_color = data.get("secondary_color"),
+                client_id = data.get("client_id"),
+                client_secret = data.get("client_secret"),
+
+
             )
             User.objects.create(
                 mobile=store.mobile,
