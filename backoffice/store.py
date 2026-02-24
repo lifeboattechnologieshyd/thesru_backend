@@ -41,7 +41,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from utils.invoice_generator import generate_shipping_invoice
 from utils.notification import trigger_notification
 from utils.store import generate_lsin, generate_order_number, BO_STATUS_FLOW
-from utils.user import generate_otp, send_sms_to_mobile, send_otp_email, generate_username, generate_referral_code
+from utils.user import generate_otp, send_otp_email, generate_username, generate_referral_code
 from django.db.models import Sum, F, DecimalField, ExpressionWrapper
 
 
@@ -2825,7 +2825,14 @@ class OrderListAPIView(APIView):
             shipping_slip_path = generate_shipping_invoice(order)
             order.shipping_slip = shipping_slip_path
             order.save(update_fields=["shipping_slip"])
-            send_sms_to_mobile(f"{order.order_number}|", order.user.mobile, order.store, order.store.sms_packed_template_id)
+            context = {
+                "var": f"{order.order_number}|"
+            }
+
+            trigger_notification(order.store,
+                                 NotificationEvent.ORDER_PACKED,
+                                 context,
+                                 order.user.mobile, order.user.email)
 
         # Timeline
         OrderTimeLines.objects.create(
@@ -2834,15 +2841,22 @@ class OrderListAPIView(APIView):
             remarks=remarks
         )
         if order.status == OrderStatus.SHIPPED:
+            context = {
+                "var": f"{order.order_number}|"
+            }
+            trigger_notification(order.store,
+                                 NotificationEvent.ORDER_DELIVERED,
+                                 context,
+                                 order.user.mobile, order.user.email)
             pass
-            # var = f"{order.order_number}| DTDC |"
-            # send_sms_to_mobile(f"{order.order_number}|", order.user.mobile, order.store,
-            #                    order.store.sms_shipped_template_id)
         elif order.status == OrderStatus.DELIVERED:
-            send_sms_to_mobile(f"{order.order_number}|", order.user.mobile, order.store,
-                               order.store.sms_delivered_template_id)
-
-
+            context = {
+                "var": f"{order.order_number}|"
+            }
+            trigger_notification(order.store,
+                                 NotificationEvent.ORDER_DELIVERED,
+                                 context,
+                                 order.user.mobile, order.user.email)
         return CustomResponse.successResponse(
             data={},
             description="Order Updated successfully"
