@@ -1917,7 +1917,7 @@ class StoreAPIView(APIView):
                            "mobile_login", "primary_color", "secondary_color","client_id","client_secret"]
         clients = request.data.get("clients")
         for field in required_fields:
-            if not data.get(field):
+            if field not in data:
                 return CustomResponse.errorResponse(
                     description=f"{field} is required"
                 )
