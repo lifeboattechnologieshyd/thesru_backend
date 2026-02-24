@@ -1913,7 +1913,7 @@ class StoreAPIView(APIView):
         data = request.data
         required_fields = ["name", "mobile", "email",
                            "address", "product_code",
-                           "clients", "aws_bucket_name", "email_login"
+                           "clients", "aws_bucket_name", "email_login",
                            "mobile_login", "primary_color", "secondary_color","client_id","client_secret"]
         clients = request.data.get("clients")
         for field in required_fields:
