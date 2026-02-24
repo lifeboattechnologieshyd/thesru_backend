@@ -823,6 +823,7 @@ class InitiateOrder(APIView):
         if not address:
             return CustomResponse.errorResponse("address is required")
         products_data = []
+        cart_items = []
 
         subtotal = Decimal("0.00")
         mrp_total = Decimal("0.00")
@@ -860,6 +861,7 @@ class InitiateOrder(APIView):
                         "line_total": line_subtotal,
                         "line_mrp": line_mrp
                     })
+                    cart_items.append(product)
                 price_drop_discount = mrp_total - subtotal
                 # ---------- Coupon ----------
                 coupon_discount = Decimal("0.00")
@@ -881,7 +883,7 @@ class InitiateOrder(APIView):
                         coupon_code=coupon_code
                     )
             # ---------- Charges (future ready) ----------
-            shipping_charge = Decimal("0.00")
+            shipping_charge = calculate_shipping(store, subtotal, address.get("pincode"), cart_items)
             platform_fee = Decimal("0.00")
 
             final_amount = subtotal - coupon_discount + shipping_charge + platform_fee
@@ -891,17 +893,15 @@ class InitiateOrder(APIView):
                 user=user,
                 order_number=order_number,
                 address=data.get("address"),
-
                 mrp=mrp_total,
                 selling_price=subtotal,
                 coupon_discount=coupon_discount,
                 coupon_code=coupon_code,
                 coupon=coupon,
                 amount=final_amount,
-
                 paid_online=final_amount,
                 wallet_paid=Decimal("0.00"),
-
+                shipping_charges=shipping_charge,
                 status=OrderStatus.INITIATED,
                 created_by=user.mobile
             )
