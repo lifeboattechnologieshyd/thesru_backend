@@ -846,7 +846,7 @@ class Discount(AuditModel):
     class Meta:
         db_table = "discount"
 
-class DiscountProduct(models.Model):
+class DiscountProduct(AuditModel):
     discount = models.ForeignKey(
         Discount,
         on_delete=models.CASCADE,
