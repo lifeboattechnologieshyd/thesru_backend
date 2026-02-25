@@ -4,7 +4,8 @@ from db.mixins import AuditModel
 from django.db import models
 
 from db.models import Store, User
-from enums.store import BannerScreen, InventoryType, AddressType, OrderStatus, PaymentStatus
+from enums.store import BannerScreen, InventoryType, AddressType, OrderStatus, PaymentStatus, NotificationChannel, \
+    NotificationEvent
 
 
 class Tag(AuditModel):
@@ -81,6 +82,8 @@ class Product(AuditModel):
         db_index=True,
         help_text="Product family code (same for all variants)"
     )
+    is_free_shipping = models.BooleanField(default=False)
+
     # SKU identity
     sku = models.CharField(max_length=30, unique=True)
 
@@ -400,6 +403,7 @@ class Order(AuditModel):
     address = models.JSONField()
     mrp = models.DecimalField(decimal_places=2, max_digits=10, default=0)
     selling_price = models.DecimalField(decimal_places=2, max_digits=10, default=0)
+    shipping_charges = models.DecimalField(decimal_places=2, max_digits=10, default=0)
     coupon_discount = models.DecimalField(decimal_places=2, max_digits=10)
     amount = models.DecimalField(decimal_places=2, max_digits=10)
     wallet_paid = models.DecimalField(decimal_places=2, max_digits=10, default=0)
@@ -707,3 +711,109 @@ class CouponUsage(models.Model):
             models.Index(fields=["coupon", "user"]),
             models.Index(fields=["user"]),
         ]
+
+
+class NotificationChannelConfig(AuditModel):
+
+    store = models.ForeignKey(
+        Store,
+        on_delete=models.CASCADE,
+        related_name="notification_channel_configs"
+    )
+    channel = models.CharField(
+        max_length=20,
+        choices=NotificationChannel.choices
+    )
+
+    # ---- SMS / WhatsApp ----
+    api_key = models.CharField(max_length=255, null=True, blank=True)
+    sender_id = models.CharField(max_length=100, null=True, blank=True)
+
+    # ---- Email ----
+    smtp_host = models.CharField(max_length=255, null=True, blank=True)
+    smtp_port = models.IntegerField(null=True, blank=True)
+    smtp_user = models.CharField(max_length=255, null=True, blank=True)
+    smtp_password = models.CharField(max_length=255, null=True, blank=True)
+
+    # ---- Push (Optional future use) ----
+    fcm_server_key = models.TextField(null=True, blank=True)
+
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        db_table = "notification_channel_config"
+        unique_together = ("store", "channel")
+
+    def __str__(self):
+        return f"{self.store.name} - {self.channel}"
+
+
+class NotificationTemplate(AuditModel):
+
+    store = models.ForeignKey(
+        Store,
+        on_delete=models.CASCADE,
+        related_name="notification_templates"
+    )
+
+    event = models.CharField(
+        max_length=50,
+        choices=NotificationEvent.choices
+    )
+
+    channel = models.CharField(
+        max_length=20,
+        choices=NotificationChannel.choices
+    )
+
+    # Email subject / Push title
+    title = models.CharField(max_length=255, null=True, blank=True)
+    # Main content
+    description = models.TextField(null=True)
+    template_id = models.CharField(max_length=255, null=True, blank=True)
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        db_table = "notification_template"
+        unique_together = ("store", "event", "channel")
+
+    def __str__(self):
+        return f"{self.store.name} - {self.event} - {self.channel}"
+
+
+class ShippingPlan(AuditModel):
+    store = models.ForeignKey(
+        Store,
+        on_delete=models.CASCADE,
+        related_name="shipping_plans"
+    )
+    name = models.CharField(max_length=100)
+    flat_rate = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        null=True,
+        blank=True
+    )
+    free_above_amount = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        null=True,
+        blank=True
+    )
+    is_active = models.BooleanField(default=True)
+    class Meta:
+        db_table = "shipping_plan"
+
+
+class ShippingRule(AuditModel):
+    plan = models.ForeignKey(
+        ShippingPlan,
+        on_delete=models.CASCADE,
+        related_name="rules"
+    )
+    pincode = models.CharField(max_length=10, null=True, blank=True)
+    rate = models.DecimalField(max_digits=10, decimal_places=2)
+    class Meta:
+        db_table = "shipping_rule"
+
+

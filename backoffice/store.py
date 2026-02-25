@@ -2,7 +2,11 @@ from datetime import timedelta
 from decimal import Decimal
 from tokenize import Double
 from unicodedata import category
+
+from django.forms import model_to_dict
 from django.utils.timezone import make_aware
+from datetime import datetime
+from django.db.models import Count, Sum, F, Q
 from datetime import datetime
 
 from django.core.files.storage import default_storage
@@ -27,15 +31,17 @@ from django.conf import settings
 from config.settings.common import DEBUG
 from db.models import Category, Product, Banner, Inventory, PinCode, Store, WebBanner, \
     FlashSaleBanner, Order, User, Cart, OrderProducts, UserOTP, StoreClient, UserSession, ProductMedia, Tag, \
-    OrderTimeLines, Coupons, CouponProduct, CouponCategory, CouponTag, AddressMaster
+    OrderTimeLines, Coupons, CouponProduct, CouponCategory, CouponTag, AddressMaster, NotificationChannelConfig, \
+    NotificationTemplate
 from db.models.user import AppVersionConfig
-from enums.store import InventoryType, OrderStatus
+from enums.store import InventoryType, OrderStatus, NotificationChannel, NotificationEvent
 from mixins.drf_views import CustomResponse
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from utils.invoice_generator import generate_shipping_invoice
+from utils.notification import trigger_notification
 from utils.store import generate_lsin, generate_order_number, BO_STATUS_FLOW
-from utils.user import generate_otp, send_sms_to_mobile, send_otp_email, generate_username, generate_referral_code
+from utils.user import generate_otp, send_otp_email, generate_username, generate_referral_code
 from django.db.models import Sum, F, DecimalField, ExpressionWrapper
 
 
@@ -49,9 +55,14 @@ class SendOTP(APIView):
         user = User.objects.filter(mobile=data.get("mobile"),user_role__contains=["ADMIN"], store=store).first()
         if user:
             otp = generate_otp()
-            send_sms_to_mobile(f"{otp}|", data.get("mobile"), store, store.sms_otp_template_id)
+            context = {
+                "var": f"{otp}|"
+            }
+            trigger_notification(store,
+                                 NotificationEvent.OTP_AUTHENTICATION,
+                                 context,
+                                 data.get("mobile"))
             expires_at = timezone.now() + timedelta(minutes=15)
-
             UserOTP.objects.filter(
                 store=request.store,
                 mobile=data.get("mobile"),
@@ -1900,10 +1911,13 @@ class StoreAPIView(APIView):
     # ---------------- CREATE STORE ----------------
     def post(self, request):
         data = request.data
-        required_fields = ["name", "mobile", "address", "logo","product_code"]
+        required_fields = ["name", "mobile", "email",
+                           "address", "product_code",
+                           "clients", "aws_bucket_name", "email_login",
+                           "mobile_login", "primary_color", "secondary_color","client_id","client_secret"]
         clients = request.data.get("clients")
         for field in required_fields:
-            if not data.get(field):
+            if field not in data:
                 return CustomResponse.errorResponse(
                     description=f"{field} is required"
                 )
@@ -1914,6 +1928,7 @@ class StoreAPIView(APIView):
             store = Store.objects.create(
                 name=data.get("name"),
                 mobile=data.get("mobile"),
+                email=data.get("email"),
                 address=data.get("address"),
                 logo=data.get("logo"),
                 created_by="SUPERADMIN",
@@ -1926,14 +1941,14 @@ class StoreAPIView(APIView):
                 mobile_login = data.get("mobile_login"),
                 primary_color = data.get("primary_color"),
                 secondary_color = data.get("secondary_color"),
-
-
-
+                client_id = data.get("client_id"),
+                client_secret = data.get("client_secret"),
 
 
             )
             User.objects.create(
                 mobile=store.mobile,
+                email=store.email,
                 store=store,
                 user_role=["ADMIN"],
                 username=store.mobile
@@ -1979,11 +1994,26 @@ class StoreAPIView(APIView):
             return CustomResponse.errorResponse(
                 description="page and page_size must be positive integers"
             )
-        queryset = Store.objects.all().order_by("-created_at")
+        queryset = Store.objects.prefetch_related("clients").all().order_by("-created_at")
         total = queryset.count()
         offset = (page - 1) * page_size
         queryset = queryset[offset: offset + page_size]
-        data = list(queryset.values())
+        data = []
+        for query in queryset:
+            client_list = []
+            for client in query.clients.all():
+                client_list.append({
+                    "id": client.id,
+                    "client_type": client.client_type,
+                    "identifier": client.identifier,
+                    "is_active": client.is_active
+                })
+            resp = model_to_dict(query)
+            resp["id"] = str(query.id)
+            data.append({
+                "client": client_list,
+                "store": resp
+            })
         return CustomResponse.successResponse(
             data=data,
             total=total
@@ -2800,7 +2830,14 @@ class OrderListAPIView(APIView):
             shipping_slip_path = generate_shipping_invoice(order)
             order.shipping_slip = shipping_slip_path
             order.save(update_fields=["shipping_slip"])
-            send_sms_to_mobile(f"{order.order_number}|", order.user.mobile, order.store, order.store.sms_packed_template_id)
+            context = {
+                "var": f"{order.order_number}|"
+            }
+
+            trigger_notification(order.store,
+                                 NotificationEvent.ORDER_PACKED,
+                                 context,
+                                 order.user.mobile, order.user.email)
 
         # Timeline
         OrderTimeLines.objects.create(
@@ -2809,15 +2846,22 @@ class OrderListAPIView(APIView):
             remarks=remarks
         )
         if order.status == OrderStatus.SHIPPED:
+            context = {
+                "var": f"{order.order_number}|"
+            }
+            trigger_notification(order.store,
+                                 NotificationEvent.ORDER_DELIVERED,
+                                 context,
+                                 order.user.mobile, order.user.email)
             pass
-            # var = f"{order.order_number}| DTDC |"
-            # send_sms_to_mobile(f"{order.order_number}|", order.user.mobile, order.store,
-            #                    order.store.sms_shipped_template_id)
         elif order.status == OrderStatus.DELIVERED:
-            send_sms_to_mobile(f"{order.order_number}|", order.user.mobile, order.store,
-                               order.store.sms_delivered_template_id)
-
-
+            context = {
+                "var": f"{order.order_number}|"
+            }
+            trigger_notification(order.store,
+                                 NotificationEvent.ORDER_DELIVERED,
+                                 context,
+                                 order.user.mobile, order.user.email)
         return CustomResponse.successResponse(
             data={},
             description="Order Updated successfully"
@@ -3575,3 +3619,586 @@ class ClientInfo(APIView):
         )
 
 
+class NotificationConfig(APIView):
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        data = request.data
+
+        store_id = data.get("store")
+        channel = data.get("channel")
+
+        if not store_id:
+            return CustomResponse().errorResponse(
+                description="store is required"
+            )
+
+        if not channel:
+            return CustomResponse().errorResponse(
+                description="channel is required"
+            )
+
+        #  Fetch Store instance
+        store = Store.objects.filter(id=store_id).first()
+        if not store:
+            return CustomResponse().errorResponse(
+                description="Invalid store"
+            )
+        config = NotificationChannelConfig()
+        config.store = store
+        config.channel = channel # dropdown
+        if config.channel == NotificationChannel.EMAIL:
+            config.smtp_host = data.get("smtp_host", "")
+            config.smtp_port = data.get("smtp_port", "")
+            config.smtp_user = data.get("smtp_user", "")
+            config.smtp_password = data.get("smtp_password", "")
+        elif config.channel == NotificationChannel.SMS:
+            config.api_key = data.get("api_key", "")
+            config.sender_id = data.get("sender_id", "")
+        elif config.channel == NotificationChannel.WHATSAPP:
+            config.api_key = data.get("api_key", "")
+        else:
+            config.fcm_server_key = data.get("fcm_server_key", "")
+        config.save()
+        return CustomResponse().successResponse(
+            data={},
+            description="Notification Channel Configured"
+        )
+
+
+
+    def get(self, request):
+        store_id = request.query_params.get("store")
+        channel = request.query_params.get("channel")
+
+        if not store_id:
+            return CustomResponse().errorResponse(
+                description="store is required"
+            )
+
+        # SUPERADMIN role check
+        roles = request.user.user_role or []
+        if "SUPERADMIN" not in roles:
+            return CustomResponse().errorResponse(
+                description="Access denied"
+            )
+
+        # Validate channel against choices
+        if channel and channel not in NotificationChannel.values:
+            return CustomResponse().errorResponse(
+                description=f"Invalid channel. Allowed values: {list(NotificationChannel.values)}"
+            )
+
+        filters = {"store_id": store_id}
+        if channel:
+            filters["channel"] = channel
+
+        configs = NotificationChannelConfig.objects.filter(**filters)
+
+        if not configs.exists():
+            return CustomResponse().successResponse(
+                data=[],
+                description="No configuration found"
+            )
+
+        response = []
+        for config in configs:
+            response.append({
+                "id": config.id,
+                "channel": config.channel,
+
+                # EMAIL
+                "smtp_host": config.smtp_host,
+                "smtp_port": config.smtp_port,
+                "smtp_user": config.smtp_user,
+
+                # SMS / WHATSAPP
+                "api_key": config.api_key,
+                "sender_id": config.sender_id,
+
+                # FCM
+                "fcm_server_key": config.fcm_server_key,
+            })
+
+        return CustomResponse().successResponse(
+            data=response,
+            description="Notification configurations fetched"
+        )
+
+
+    def put(self, request, id=None):
+        data = request.data
+
+        if not id:
+            return CustomResponse().errorResponse(
+                description="Configuration id is required"
+            )
+
+        #  SUPERADMIN role check
+        # roles = request.user.user_role or []
+        # if "SUPERADMIN" not in roles:
+        #     return CustomResponse().errorResponse(
+        #         description="Access denied"
+        #     )
+
+        #  Fetch config → store comes from DB
+        config = NotificationChannelConfig.objects.select_related("store").filter(
+            id=id
+        ).first()
+
+        if not config:
+            return CustomResponse().errorResponse(
+                description="Configuration not found"
+            )
+
+        # store is SAFE here
+        store = config.store
+
+        channel = config.channel
+
+        if channel == NotificationChannel.EMAIL:
+            config.smtp_host = data.get("smtp_host", config.smtp_host)
+            config.smtp_port = data.get("smtp_port", config.smtp_port)
+            config.smtp_user = data.get("smtp_user", config.smtp_user)
+            config.smtp_password = data.get("smtp_password", config.smtp_password)
+
+        elif channel == NotificationChannel.SMS:
+            config.api_key = data.get("api_key", config.api_key)
+            config.sender_id = data.get("sender_id", config.sender_id)
+
+        elif channel == NotificationChannel.WHATSAPP:
+            config.api_key = data.get("api_key", config.api_key)
+
+        else:
+            config.fcm_server_key = data.get(
+                "fcm_server_key",
+                config.fcm_server_key
+            )
+
+        config.save()
+
+        return CustomResponse().successResponse(
+            data={},
+            description="Notification configuration updated"
+        )
+
+
+class NotificationTemplateConfig(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        data = request.data
+        store_id = data.get("store")
+
+        if not store_id:
+            return CustomResponse().errorResponse(
+                description="store is required"
+            )
+        store = Store.objects.filter(id=store_id).first()
+        if not store:
+            return CustomResponse().errorResponse(
+                description="Invalid store"
+            )
+        template = NotificationTemplate.objects.filter(
+            store=store_id,
+            event=data.get("event"),
+            channel=data.get("channel")
+        ).exists()
+
+        if template:
+            return CustomResponse().errorResponse(
+                description="Template already exists for this event and channel"
+            )
+        # todo: pre check if the record exists for store, event, channel combo
+        config = NotificationTemplate()
+        config.store = store
+        config.event = data["event"]  # dropdown
+        config.channel = data["channel"]
+        config.title = data["title"]
+        config.description = data["description"]
+        config.template_id = data["template_id"]
+        config.save()
+        return CustomResponse().successResponse(
+            data={},
+            description="Notification Channel Configured"
+        )
+
+    def get(self, request):
+        store_id = request.query_params.get("store")
+        event = request.query_params.get("event")
+        channel = request.query_params.get("channel")
+
+        if not store_id:
+            return CustomResponse().errorResponse(
+                description="store is required"
+            )
+
+        # Base queryset
+        queryset = NotificationTemplate.objects.filter(
+            store_id=store_id
+        )
+
+        # Optional filters
+        if event:
+            queryset = queryset.filter(event=event)
+
+        if channel:
+            queryset = queryset.filter(channel=channel)
+
+        if not queryset.exists():
+            return CustomResponse().successResponse(
+                data=[],
+                description="No templates found"
+            )
+
+        response = []
+        for config in queryset:
+            response.append({
+                "id": config.id,
+                "store": str(config.store_id),
+                "event": config.event,
+                "channel": config.channel,
+                "title": config.title,
+                "description": config.description,
+                "template_id": config.template_id,
+                "is_active":config.is_active
+            })
+
+        return CustomResponse().successResponse(
+            data=response,
+            description="Notification templates fetched"
+        )
+
+    def put(self, request, id=None):
+        data = request.data
+
+        if not id:
+            return CustomResponse().errorResponse(
+                description="Template id is required"
+            )
+
+        # Fetch template by ID (store comes from DB)
+        config = NotificationTemplate.objects.select_related("store").filter(
+            id=id
+        ).first()
+
+        if not config:
+            return CustomResponse().errorResponse(
+                description="Template not found"
+            )
+
+        # store is SAFE if needed later
+        store = config.store
+
+        # Update allowed fields only
+        config.title = data.get("title", config.title)
+        config.description = data.get("description", config.description)
+        config.template_id = data.get("template_id", config.template_id)
+
+        config.save()
+
+        return CustomResponse().successResponse(
+            data={
+                "id": config.id,
+                "store_id": str(store.id) if store else None,
+                "event": config.event,
+                "channel": config.channel,
+                "title": config.title,
+                "description": config.description,
+                "template_id": config.template_id,
+            },
+            description="Notification template updated"
+        )
+
+
+class SuperAdminSendOTPAPIView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        mobile = request.data.get("mobile")
+
+        if not mobile:
+            return CustomResponse().errorResponse(
+                description="Mobile number is required"
+            )
+
+        # Check SUPERADMIN
+        user = User.objects.filter(
+            mobile=mobile,
+            user_role__contains=["SUPERADMIN"]
+        ).first()
+
+        if not user:
+            return CustomResponse().errorResponse(
+                description="Access denied. Not a SuperAdmin"
+            )
+
+        # Fixed OTP
+        otp = "1234"
+
+        return CustomResponse().successResponse(
+            description="OTP sent successfully",
+            data={
+                "mobile": mobile,
+            }
+        )
+
+
+class SuperAdminVerifyOTPAPIView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        mobile = request.data.get("mobile")
+        otp = request.data.get("otp")
+
+        if not mobile or not otp:
+            return CustomResponse().errorResponse(
+                description="Mobile and OTP are required"
+            )
+
+        # OTP validation
+        if str(otp) != "1234":
+            return CustomResponse().errorResponse(
+                description="Invalid OTP"
+            )
+
+        # SUPERADMIN check
+        user = User.objects.filter(
+            mobile=mobile,
+            user_role__contains=["SUPERADMIN"]
+        ).first()
+
+        if not user:
+            return CustomResponse().errorResponse(
+                description="Access denied"
+            )
+
+        # Generate tokens
+        refresh = RefreshToken.for_user(user)
+        access = str(refresh.access_token)
+
+        UserSession.objects.create(
+            user=user,
+            store=None,  # SUPERADMIN has no store
+            session_token=access,
+            refresh_token=str(refresh),
+            device_id=None,
+            device_type="BACKOFFICE",
+            ip_address=request.META.get("REMOTE_ADDR"),
+            user_agent=request.META.get("HTTP_USER_AGENT"),
+            expires_at=timezone.now() + timedelta(days=7)
+        )
+
+        return CustomResponse().successResponse(
+            description="Login successful",
+            data={
+                "access_token": access,
+                "refresh_token": str(refresh),
+                "user": {
+                    "id": str(user.id),
+                    "mobile": user.mobile,
+                    "role": "SUPERADMIN"
+                }
+            }
+        )
+
+
+class StoreListAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        store = request.store
+
+        if not store:
+            return CustomResponse().errorResponse(
+                description="Store not found"
+            )
+
+        data = {
+            "id": str(store.id),
+            "name": store.name,
+            "mobile": store.mobile,
+            "address": store.address,
+            "primary_color": store.primary_color,
+            "secondary_color": store.secondary_color,
+            "email": store.email,
+            "logo": store.logo,
+            "gst_number": store.gst_number,
+            "product_code": store.product_code,
+            "email_login": store.email_login,
+            "mobile_login": store.mobile_login,
+            "highlights": store.highlights,
+        }
+
+        return CustomResponse().successResponse(
+            data=data,
+            description="Store fetched successfully"
+        )
+    def put(self, request):
+        store = request.store
+        data = request.data
+
+        # Update only fields sent in request
+        for field in [
+            "name",
+            "address",
+            "primary_color",
+            "secondary_color",
+            "email",
+            "logo",
+            "bo_title",
+            "bo_subtitle",
+            "highlights",
+        ]:
+            if field in data:
+                setattr(store, field, data[field])
+
+        store.updated_by = request.user.id
+        store.save()
+
+        return CustomResponse().successResponse(
+            data={},
+            description="Store updated successfully"
+        )
+
+
+
+
+
+
+
+
+class DashboardStatsAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+
+        roles = request.user.user_role or []
+        if "SUPERADMIN" not in roles:
+            return CustomResponse().errorResponse(
+                description="Access denied"
+            )
+
+        store_id = request.query_params.get("store_id")
+        start_date = request.query_params.get("start_date")
+        end_date = request.query_params.get("end_date")
+
+        # ---------------- Date filter ----------------
+        date_filter = {}
+        if start_date:
+            date_filter["created_at__date__gte"] = datetime.strptime(
+                start_date, "%Y-%m-%d"
+            ).date()
+
+        if end_date:
+            date_filter["created_at__date__lte"] = datetime.strptime(
+                end_date, "%Y-%m-%d"
+            ).date()
+
+        # ---------------- Store filters ----------------
+        store_filter = {}
+        order_store_filter = {}
+        product_store_filter = {}
+        user_store_filter = {}
+
+        if store_id:
+            store_filter["id"] = store_id
+            order_store_filter["store_id"] = store_id
+            product_store_filter["store_id"] = store_id
+            user_store_filter["store_id"] = store_id
+
+        # ---------------- Store stats ----------------
+        store_stats = Store.objects.filter(**store_filter).aggregate(
+            total_stores=Count("id"),
+            active_stores=Count("id", filter=Q(is_active=True)),
+            inactive_stores=Count("id", filter=Q(is_active=False)),
+        )
+
+        # ---------------- Order stats ----------------
+        order_qs = Order.objects.filter(
+            status=OrderStatus.CREATED,
+            **order_store_filter,
+            **date_filter
+        )
+
+        order_stats = order_qs.aggregate(
+            total_orders=Count("id"),
+            total_revenue=Sum("amount"),
+            average_order_value=Avg("amount"),
+            total_shipping_charges=Sum(
+                F("amount") - F("selling_price")
+            )
+        )
+
+        # ---------------- Customers ----------------
+        total_customers = User.objects.filter(
+            **user_store_filter
+        ).count()
+
+        paid_customers = User.objects.filter(
+            orders__status=OrderStatus.CREATED,
+            **user_store_filter
+        ).distinct().count()
+
+        # ---------------- Product stats ----------------
+        total_products = Product.objects.filter(
+            **product_store_filter
+        ).count()
+
+        low_stock_products = Product.objects.filter(
+            **product_store_filter,
+            current_stock__lte=10
+        ).count()
+
+        # ---------------- Top & Least selling products ----------------
+        product_sales = (
+            OrderProducts.objects
+            .filter(
+                order__status=OrderStatus.CREATED,
+                **({"order__store_id": store_id} if store_id else {}),
+                **date_filter
+            )
+            .values("product_id", "product__name")
+            .annotate(total_qty=Sum("qty"))
+            .order_by("-total_qty")
+        )
+
+        top_selling_products = list(product_sales[:10])
+        least_selling_products = list(product_sales.order_by("total_qty")[:10])
+
+        # ---------------- Plain response ----------------
+        response = {
+            # Stores
+            "total_stores": store_stats["total_stores"],
+            "active_stores": store_stats["active_stores"],
+            "inactive_stores": store_stats["inactive_stores"],
+
+            # Orders
+            "total_orders": order_stats["total_orders"] or 0,
+            "total_revenue": float(order_stats["total_revenue"] or 0),
+            "average_order_value": float(order_stats["average_order_value"] or 0),
+            "total_shipping_charges": float(
+                order_stats["total_shipping_charges"] or 0
+            ),
+
+            # Customers
+            "total_customers": total_customers,
+            "paid_customers": paid_customers,
+
+            # Products
+            "total_products": total_products,
+            "low_stock_products": low_stock_products,
+            "top_selling_products": top_selling_products,
+            "least_selling_products": least_selling_products,
+
+            # Filters
+            "store_id": store_id,
+            "start_date": start_date,
+            "end_date": end_date,
+        }
+
+        return CustomResponse().successResponse(
+            data=response,
+            description="Dashboard statistics fetched successfully"
+        )

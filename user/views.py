@@ -15,15 +15,17 @@ import random
 
 from config.settings.common import DEBUG
 from db.models import User, UserOTP, TempUser, Store, UserSession
-from db.models.user import AppVersionConfig
+from db.models.user import AppVersionConfig, Visitor
+from enums.store import NotificationEvent
 from mixins.drf_views import CustomResponse
 from serializers.user import UserMasterSerializer
 
 from rest_framework import status
 
+from utils.notification import trigger_notification
 from utils.storage import add_unique_suffix_to_filename, sanitize_filename, StoreS3Storage
 from utils.user import generate_username, generate_referral_code, generate_otp, version_to_tuple, \
-    send_sms_to_mobile, send_otp_email
+    send_otp_email
 
 
 class MobileSendOTPView(APIView):
@@ -47,10 +49,15 @@ class MobileSendOTPView(APIView):
             otp = 1234
         else:
             otp = generate_otp()
-            send_sms_to_mobile(f"{otp}|", mobile, store, store.sms_otp_template_id)
+        context = {
+               "var": f"{otp}|"
+        }
+        trigger_notification(store,
+                            NotificationEvent.OTP_AUTHENTICATION,
+                            context,
+                            mobile)
 
         expires_at = timezone.now() + timedelta(minutes=15)
-        # Invalidate old OTPs
         UserOTP.objects.filter(
             store=request.store,
             mobile=mobile,
@@ -581,4 +588,68 @@ class EmailVerifyOTPView(APIView):
                 }
             },
             status=status.HTTP_200_OK
+        )
+
+
+class VisitorCreateAPIView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        data = request.data
+
+        visitor_id = data.get("visitor_id")   # UUID (web) or device_id (app)
+        platform = data.get("platform")       # WEB / ANDROID / IOS
+        fcm_id = data.get("fcm_id")
+        store = request.store
+        user = request.user if request.user.is_authenticated else None
+
+        if not visitor_id or not platform:
+            return CustomResponse().errorResponse(
+                description="visitor_id and platform are required"
+            )
+
+        # Get request metadata
+        ip_address = request.META.get("REMOTE_ADDR")
+        user_agent = request.META.get("HTTP_USER_AGENT")
+
+        # Create or update visitor
+        visitor, created = Visitor.objects.get_or_create(
+            store=store,
+            visitor_id=visitor_id,
+            defaults={
+                "platform": platform,
+                "user": user,
+                "fcm_id": fcm_id,
+                "ip_address": ip_address,
+                "user_agent": user_agent,
+                "visit_count": 1
+            }
+        )
+
+        if not created:
+            # Update visit count & last visit
+            visitor.visit_count += 1
+            visitor.last_visited_at = timezone.now()
+
+            if fcm_id and visitor.fcm_id != fcm_id:
+                visitor.fcm_id = fcm_id
+
+            # Attach user after login
+            if user and not visitor.user:
+                visitor.user = user
+
+            visitor.save()
+
+        return CustomResponse().successResponse(
+            data={
+                "visitor_id": visitor.visitor_id,
+                "platform": visitor.platform,
+                "fcm_id": visitor.fcm_id,
+                "visit_count": visitor.visit_count,
+                "store_id": str(visitor.store.id),
+                "user_id": str(visitor.user.id) if visitor.user else None,
+                "first_visited_at": visitor.first_visited_at,
+                "last_visited_at": visitor.last_visited_at,
+            },
+            description="Visitor tracked successfully"
         )

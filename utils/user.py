@@ -48,13 +48,13 @@ def generate_otp():
     # return "1234"
     return str(random.randint(1000, 9999))
 
-def send_sms_to_mobile(var1, mobile, store, msg):
+def send_sms_to_mobile(var1, mobile, config, msg):
     try:
         url = "https://sms.lifeboattechnologies.com/dev/bulkV2"
         params = {
-            "authorization": store.sms_auth_key,
+            "authorization": config.api_key,
             "route": "dlt",
-            "sender_id": store.sms_sender_id,      # THESRU
+            "sender_id": config.sender_id,      # THESRU
             "message": msg,  # 8764
             "variables_values": var1,
             "flash": "0",

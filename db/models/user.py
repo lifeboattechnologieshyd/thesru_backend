@@ -32,31 +32,20 @@ class Store(AuditModel):
         null=False
     )
     address = models.CharField(max_length=100)
-    logo = models.CharField(max_length=300)
+    email = models.CharField(max_length=100, null=True)
+    logo = models.CharField(max_length=300,null=True)
     gst_number = models.CharField(max_length=100,unique=True, null=True)
     client_id = models.CharField(null=False, unique=True)
     client_secret = models.CharField(null=False, unique=True)
-    webhook = models.CharField(max_length=100)
-    url = models.CharField(max_length=100)
     product_code = models.CharField(max_length=3,null=True)
-    sms_auth_key = models.CharField(max_length=300,null=True)
-    sms_sender_id = models.CharField(max_length=10,null=True)
-    sms_otp_template_id = models.CharField(max_length=50,null=True)
-    sms_order_template_id = models.CharField(max_length=50,null=True)
-    sms_packed_template_id = models.CharField(max_length=50,null=True)
-    sms_shipped_template_id = models.CharField(max_length=50,null=True)
-    sms_delivered_template_id = models.CharField(max_length=50,null=True)
-    smtp_host = models.CharField(max_length=200, null=True, blank=True)
-    smtp_port = models.PositiveIntegerField(null=True, blank=True)
-    smtp_username = models.CharField(max_length=200, null=True, blank=True)
-    smtp_password = models.CharField(max_length=200, null=True, blank=True)
-    smtp_use_tls = models.BooleanField(default=True)
     email_login = models.BooleanField(default=True)
     mobile_login = models.BooleanField(default=True)
     aws_bucket_name = models.CharField(max_length=50, null=True, blank=True)
     bo_title = models.CharField(max_length=50, null=True, blank=True)
     bo_subtitle = models.CharField(max_length=50, null=True, blank=True)
-    highlights = models.TextField(null=True, blank=True)
+    highlights = ArrayField(models.CharField(max_length=50, ), blank=True, null=True)
+    is_active = models.BooleanField(default=True)
+
 
     class Meta:
         db_table = "store"
@@ -106,6 +95,8 @@ class User(AbstractBaseUser):
         null=True
     )
     device_id = models.CharField(max_length=100, null=True)
+    fcm_id = models.CharField(max_length=500,blank=True, null=True)
+
     country = models.CharField(max_length=30,null=True)
     gender =  models.CharField(max_length=30, null=True)
     dob = models.DateField(null=True)
@@ -207,7 +198,8 @@ class UserSession(AuditModel):
     store = models.ForeignKey(
         Store,
         on_delete=models.CASCADE,
-        related_name="sessions"
+        related_name="sessions",
+        null=True
     )
 
     session_token = models.CharField(max_length=500, unique=True)
@@ -268,3 +260,64 @@ class AppVersionConfig(AuditModel):
         return f"{self.os} | {self.latest_version}"
 
 
+class Visitor(AuditModel):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    visitor_id = models.CharField(
+        max_length=100,
+        db_index=True,
+        help_text="UUID for web, Device ID for mobile app"
+    )
+
+
+    # Store mapping
+    store = models.ForeignKey(
+        Store,
+        on_delete=models.CASCADE,
+        related_name="visitors"
+    )
+
+    #  Platform info
+    platform = models.CharField(
+        max_length=20,
+        choices=[
+            ("WEB", "Web"),
+            ("ANDROID", "Android"),
+            ("IOS", "iOS"),
+        ]
+    )
+
+    #  link after login
+    user = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="visits"
+    )
+
+    #  Request metadata
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+    user_agent = models.TextField(null=True, blank=True)
+
+    #  Analytics
+    visit_count = models.PositiveIntegerField(default=1)
+    first_visited_at = models.DateTimeField(auto_now_add=True)
+    last_visited_at = models.DateTimeField(auto_now=True)
+
+    fcm_id = models.CharField(max_length=500, blank=True,null=True)
+    city = models.CharField(max_length=50, blank=True, null=True)
+    district = models.CharField(max_length=50, blank=True, null=True)
+
+
+
+    class Meta:
+        db_table = "visitor"
+        unique_together = ("store", "visitor_id")
+        indexes = [
+            models.Index(fields=["visitor_id"]),
+            models.Index(fields=["platform"]),
+            models.Index(fields=["store"]),
+        ]
+
+    def __str__(self):
+        return f"{self.platform} | {self.visitor_id}"

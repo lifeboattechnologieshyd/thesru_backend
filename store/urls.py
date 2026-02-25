@@ -4,7 +4,7 @@ from store.views import PinListView, AddressAPIView, ProductDetailAPIView, Produ
     BannerListView, CategoryListView, AddToCartAPIView, CartListAPIView, UpdateCartAPIView, RemoveFromCartAPIView, \
     AddToWishlistAPIView, WishlistListAPIView, RemoveFromWishlistAPIView, CartTotalAPIView, \
     FlashSaleBannerListView, WebBannerListView, Webhook, PaymentStatusAPIView, Reviews, ContactMessageAPIView, \
-    TagsListView, UserCouponListAPIView, CheckoutPreview
+    TagsListView, UserCouponListAPIView, CheckoutPreview, TestTriggerNotificationAPIView, FirebaseTestPushAPIView
 
 urlpatterns = [
     path("category", CategoryListView.as_view()),
@@ -43,6 +43,10 @@ urlpatterns = [
     path("flash/sale/banner", FlashSaleBannerListView.as_view()),
 
     path("coupons", UserCouponListAPIView.as_view()),
+
+    path("test",TestTriggerNotificationAPIView.as_view()),
+
+    path("push/test",FirebaseTestPushAPIView.as_view()),
 
 
 ]

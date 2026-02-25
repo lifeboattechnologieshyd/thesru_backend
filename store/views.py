@@ -11,19 +11,23 @@ from django.core.exceptions import ImproperlyConfigured
 
 from django.utils.timesince import timesince
 from django.utils.timezone import now
+from rest_framework.templatetags.rest_framework import items
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated,AllowAny
+from django.utils import timezone
 
 from django.conf import settings
 
+from config.firebase import send_push_notification
 from db import models
 from db.models import AddressMaster, PinCode, Product, Order, OrderProducts, Payment, OrderTimeLines, \
     Banner, Category, Cart, CouponUsage, Wishlist, CouponProduct, CouponCategory, CouponTag, WebBanner, FlashSaleBanner, \
     ProductReviews, ContactMessage, Tag, Coupons, ProductReviewMedia, Store
-from enums.store import OrderStatus, PaymentStatus
+from enums.store import OrderStatus, PaymentStatus, NotificationEvent
 from mixins.drf_views import CustomResponse
+from utils.notification import trigger_notification
 from utils.store import generate_order_number, time_ago
-from utils.user import send_sms_to_mobile, send_order_created_admin_email
+from utils.user import send_order_created_admin_email
 
 
 class CategoryListView(APIView):
@@ -524,6 +528,7 @@ class CheckoutPreview(APIView):
             return CustomResponse.errorResponse("Products are required")
 
         products_data = []
+        cart_items = []
 
         mrp_total = Decimal("0.00")
         subtotal = Decimal("0.00")
@@ -545,7 +550,6 @@ class CheckoutPreview(APIView):
                 return CustomResponse.errorResponse(
                     "Product not found or inactive"
                 )
-
             if product.current_stock < qty:
                 return CustomResponse.errorResponse(
                     f"{product.name} is out of stock"
@@ -563,6 +567,8 @@ class CheckoutPreview(APIView):
                 "line_mrp": line_mrp,
                 "line_subtotal": line_subtotal
             })
+            cart_items.append(product)
+
 
         price_drop_discount = mrp_total - subtotal
 
@@ -591,7 +597,7 @@ class CheckoutPreview(APIView):
                 return CustomResponse.errorResponse(str(e))
 
         # ---------- Charges (future ready) ----------
-        shipping_charge = Decimal("40.00")  # later based on pin_code
+        shipping_charge = calculate_shipping(store, subtotal, address.get("pincode"), cart_items)
         platform_fee = Decimal("0.00")  # later config-based
 
         final_payable = (
@@ -600,7 +606,6 @@ class CheckoutPreview(APIView):
                 + shipping_charge
                 + platform_fee
         )
-
         # ---------- Product response ----------
         product_response = []
         for item in products_data:
@@ -650,6 +655,35 @@ class CheckoutPreview(APIView):
             },
             description="Checkout preview calculated"
         )
+def calculate_shipping(store, cart_total, pincode=None, cart_items=None):
+    plan = store.shipping_plans.filter(is_active=True).first()
+    if not plan or not plan.is_active:
+        return 0
+    cart_items = cart_items or []
+
+    paid_items = [
+        item for item in cart_items
+        if not item.is_free_shipping
+    ]
+
+    if not paid_items:
+        return 0
+
+
+    # 1️⃣ Free above rule (highest priority)
+    if plan.free_above_amount and cart_total >= plan.free_above_amount:
+        return 0
+
+    # 2️⃣ Check PINCODE rules first
+    if pincode:
+        rule = plan.rules.filter(
+            pincode=pincode
+        ).first()
+        if rule:
+            return rule.rate
+    # 4️⃣ Default flat rate
+    return plan.flat_rate or 0
+
 
 def calculate_coupon_discount(
     store,
@@ -771,94 +805,7 @@ def calculate_coupon_discount(
 
     return discount.quantize(Decimal("0.01")), apportioned_map, coupon
 
-# def calculate_coupon_and_apportion(
-#     *,
-#     store,
-#     user,
-#     coupon_code,
-#     products_map,  # {product: qty}
-#     subtotal
-# ):
-#     coupon = Coupons.objects.filter(
-#         store=store,
-#         code=coupon_code,
-#         is_active=True,
-#         start_date__lte=now(),
-#         end_date__gte=now()
-#     ).first()
-#
-#     if not coupon:
-#         raise ValueError("Invalid or expired coupon")
-#
-#     # ---------- First order check ----------
-#     if coupon.first_order_only:
-#         if Order.objects.filter(
-#             store=store,
-#             user=user,
-#             status=OrderStatus.DELIVERED
-#         ).exists():
-#             raise ValueError("Coupon valid only on first order")
-#
-#     # ---------- Eligible products ----------
-#     eligible_items = []
-#
-#     if coupon.target_type == "ORDER":
-#         eligible_items = list(products_map.items())
-#         eligible_total = subtotal
-#
-#         if eligible_total < coupon.min_order_amount:
-#             raise ValueError("Order amount not eligible for coupon")
-#
-#     else:
-#         eligible_total = Decimal("0.00")
-#
-#         for product, qty in products_map.items():
-#             if coupon.target_type == "PRODUCT":
-#                 if not coupon.coupon_products.filter(product=product).exists():
-#                     continue
-#
-#             elif coupon.target_type == "CATEGORY":
-#                 if not product.categories.filter(
-#                     id__in=coupon.coupon_categories.values("category_id")
-#                 ).exists():
-#                     continue
-#
-#             elif coupon.target_type == "TAG":
-#                 if not product.tags.filter(
-#                     id__in=coupon.coupon_tags.values("tag_id")
-#                 ).exists():
-#                     continue
-#
-#             if coupon.min_product_amount and product.selling_price < coupon.min_product_amount:
-#                 continue
-#
-#             line_total = product.selling_price * qty
-#             eligible_items.append((product, qty))
-#             eligible_total += line_total
-#
-#         if eligible_total == 0:
-#             raise ValueError("Coupon not applicable to selected products")
-#
-#     # ---------- Calculate discount ----------
-#     if coupon.discount_type == "PERCENTAGE":
-#         total_discount = eligible_total * coupon.discount_value / 100
-#     else:
-#         total_discount = coupon.discount_value
-#
-#     if coupon.max_discount_amount:
-#         total_discount = min(total_discount, coupon.max_discount_amount)
-#
-#     total_discount = total_discount.quantize(Decimal("0.00"))
-#
-#     # ---------- Apportion discount ----------
-#     product_discount_map = {}
-#
-#     for product, qty in eligible_items:
-#         line_total = product.selling_price * qty
-#         share = (line_total / eligible_total) * total_discount
-#         product_discount_map[product.id] = share.quantize(Decimal("0.00"))
-#
-#     return coupon, total_discount, product_discount_map
+
 
 class InitiateOrder(APIView):
     permission_classes = [IsAuthenticated]
@@ -878,6 +825,7 @@ class InitiateOrder(APIView):
         if not address:
             return CustomResponse.errorResponse("address is required")
         products_data = []
+        cart_items = []
 
         subtotal = Decimal("0.00")
         mrp_total = Decimal("0.00")
@@ -915,6 +863,7 @@ class InitiateOrder(APIView):
                         "line_total": line_subtotal,
                         "line_mrp": line_mrp
                     })
+                    cart_items.append(product)
                 price_drop_discount = mrp_total - subtotal
                 # ---------- Coupon ----------
                 coupon_discount = Decimal("0.00")
@@ -936,7 +885,7 @@ class InitiateOrder(APIView):
                         coupon_code=coupon_code
                     )
             # ---------- Charges (future ready) ----------
-            shipping_charge = Decimal("0.00")
+            shipping_charge = calculate_shipping(store, subtotal, address.get("pincode"), cart_items)
             platform_fee = Decimal("0.00")
 
             final_amount = subtotal - coupon_discount + shipping_charge + platform_fee
@@ -946,24 +895,19 @@ class InitiateOrder(APIView):
                 user=user,
                 order_number=order_number,
                 address=data.get("address"),
-
                 mrp=mrp_total,
                 selling_price=subtotal,
                 coupon_discount=coupon_discount,
                 coupon_code=coupon_code,
                 coupon=coupon,
                 amount=final_amount,
-
                 paid_online=final_amount,
                 wallet_paid=Decimal("0.00"),
-
+                shipping_charges=shipping_charge,
                 status=OrderStatus.INITIATED,
                 created_by=user.mobile
             )
-            try:
-                send_order_created_admin_email(order)
-            except ImproperlyConfigured as e:
-                pass
+
 
             # ---------- Create Order Products ----------
             for item in products_data:
@@ -1158,7 +1102,18 @@ class Webhook(APIView):
                             user=order.user,
                             order=order
                         )
-                    send_sms_to_mobile(f"{order.order_number}|", order.user.mobile, order.store, order.store.sms_order_template_id)
+                    # todo : replace this with trigger
+                    context = {
+                        "var": f"{order.order_number}|"
+                    }
+                    trigger_notification(order.store,NotificationEvent.ORDER_PLACED, context, order.user.mobile, order.user.email)
+                    send_push_notification(
+                        store=order.store,
+                        token=order.user.fcm_token,
+                        title="Order Placed",
+                        body="Your order has been placed successfully",
+                        data={"order_id": order.order_number}
+                    )
 
                     remove_cart_items(order.user, order.store)
                 elif event_type == "PAYMENT_FAILED_WEBHOOK":
@@ -1262,7 +1217,23 @@ class PaymentStatusAPIView(APIView):
                         user=order.user,
                         order=order
                     )
-                send_sms_to_mobile(f"{order.order_number}|", order.user.mobile, order.store, order.store.sms_order_template_id)
+                context = {
+                    "var" : f"{order.order_number}|"
+                }
+
+                trigger_notification(order.store,
+                                     NotificationEvent.ORDER_PLACED,
+                                     context,
+                                     order.user.mobile, order.user.email)
+                send_push_notification(
+                    store=order.store,
+                    token=order.user.fcm_token,
+                    title="Order Placed",
+                    body="Your order has been placed successfully",
+                    data={"order_id": order.order_number}
+                )
+                # todo: send an email to admin also.
+                # todo: send a sms n whatsapp to admin also.
                 remove_cart_items(order.user, order.store)
             elif verified_status == PaymentStatus.FAILED:
                 order.status = OrderStatus.FAILED
@@ -2254,3 +2225,101 @@ class UserCouponListAPIView(APIView):
 
 
 
+
+from rest_framework.views import APIView
+from rest_framework.permissions import IsAuthenticated
+from django.shortcuts import get_object_or_404
+
+class TestTriggerNotificationAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        data = request.data
+
+        store_id = data.get("store_id")
+        event = data.get("event")
+        mobile = data.get("mobile")
+        email = data.get("email")
+        context = data.get("context", {})
+
+        if not store_id or not event:
+            return CustomResponse().errorResponse(
+                description="store_id and event are required"
+            )
+
+        if not context:
+            return CustomResponse().errorResponse(
+                description="context is required"
+            )
+
+
+
+        store = get_object_or_404(Store, id=store_id)
+
+        # 🔔 Trigger notification
+        trigger_notification(
+            store=store,
+            event=event,
+            context=context,
+            recipient=mobile,
+            email=email
+        )
+
+        return CustomResponse().successResponse(
+            data={
+                "store": store.name,
+                "event": event,
+                "mobile": mobile,
+                "email": email,
+                "context": context
+            },
+            description="Notification trigger executed successfully"
+        )
+
+
+
+
+
+
+class FirebaseTestPushAPIView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        store = request.store
+        user = request.user
+
+
+
+        # Validate FCM token
+        fcm_token = request.data.get("fcm_token")
+        if not fcm_token:
+            return CustomResponse().errorResponse(
+                description="fcm_token is required"
+            )
+
+        try:
+            response = send_push_notification(
+                store=store,
+                token=fcm_token,
+                title="Firebase Test Notification",
+                body=" Firebase is working successfully!",
+                data={
+                    "type": "TEST",
+                    "time": str(timezone.now())
+                }
+            )
+
+            return CustomResponse().successResponse(
+                data={
+                    "firebase_response": response
+                },
+                description="Firebase push notification sent successfully"
+            )
+
+        except Exception as e:
+            return CustomResponse().errorResponse(
+                description="Firebase push failed",
+                data={
+                    "error": str(e)
+                }
+            )
