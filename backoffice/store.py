@@ -4148,7 +4148,7 @@ class DashboardStatsAPIView(APIView):
 
         low_stock_products = Product.objects.filter(
             **product_store_filter,
-            stock__lte=10
+            current_stock__lte=10
         ).count()
 
         # ---------------- Top & Least selling products ----------------
