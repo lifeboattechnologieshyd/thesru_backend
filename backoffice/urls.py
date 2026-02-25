@@ -82,5 +82,6 @@ urlpatterns = [
     path("dashboard",DashboardStatsAPIView.as_view()),
 
     path("discount",DiscountAPIView.as_view()),
+    path("discount/<str:id>",DiscountAPIView.as_view()),
 
 ]
