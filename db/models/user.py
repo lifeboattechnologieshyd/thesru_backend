@@ -95,6 +95,8 @@ class User(AbstractBaseUser):
         null=True
     )
     device_id = models.CharField(max_length=100, null=True)
+    fcm_id = models.CharField(max_length=500,blank=True, null=True)
+
     country = models.CharField(max_length=30,null=True)
     gender =  models.CharField(max_length=30, null=True)
     dob = models.DateField(null=True)
@@ -301,6 +303,11 @@ class Visitor(AuditModel):
     visit_count = models.PositiveIntegerField(default=1)
     first_visited_at = models.DateTimeField(auto_now_add=True)
     last_visited_at = models.DateTimeField(auto_now=True)
+
+    fcm_id = models.CharField(max_length=500, blank=True,null=True)
+    city = models.CharField(max_length=50, blank=True, null=True)
+    district = models.CharField(max_length=50, blank=True, null=True)
+
 
 
     class Meta:
