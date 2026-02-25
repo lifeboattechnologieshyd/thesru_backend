@@ -4067,11 +4067,13 @@ class StoreListAPIView(APIView):
 
 
 
+
+
 class DashboardStatsAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        # SUPERADMIN check
+
         roles = request.user.user_role or []
         if "SUPERADMIN" not in roles:
             return CustomResponse().errorResponse(
@@ -4085,86 +4087,115 @@ class DashboardStatsAPIView(APIView):
         # ---------------- Date filter ----------------
         date_filter = {}
         if start_date:
-            try:
-                date_filter["created_at__date__gte"] = datetime.strptime(
-                    start_date, "%Y-%m-%d"
-                ).date()
-            except ValueError:
-                return CustomResponse().errorResponse(
-                    description="start_date must be YYYY-MM-DD"
-                )
+            date_filter["created_at__date__gte"] = datetime.strptime(
+                start_date, "%Y-%m-%d"
+            ).date()
 
         if end_date:
-            try:
-                date_filter["created_at__date__lte"] = datetime.strptime(
-                    end_date, "%Y-%m-%d"
-                ).date()
-            except ValueError:
-                return CustomResponse().errorResponse(
-                    description="end_date must be YYYY-MM-DD"
-                )
+            date_filter["created_at__date__lte"] = datetime.strptime(
+                end_date, "%Y-%m-%d"
+            ).date()
 
         # ---------------- Store filters ----------------
         store_filter = {}
-        if store_id:
-            store_filter["id"] = store_id
-
         order_store_filter = {}
+        product_store_filter = {}
         user_store_filter = {}
 
         if store_id:
+            store_filter["id"] = store_id
             order_store_filter["store_id"] = store_id
+            product_store_filter["store_id"] = store_id
             user_store_filter["store_id"] = store_id
 
-        # ---------------- Stores ----------------
-        store_stats = Store.objects.filter(
-            **store_filter
-        ).aggregate(
+        # ---------------- Store stats ----------------
+        store_stats = Store.objects.filter(**store_filter).aggregate(
             total_stores=Count("id"),
             active_stores=Count("id", filter=Q(is_active=True)),
             inactive_stores=Count("id", filter=Q(is_active=False)),
         )
 
-        # ---------------- Orders ----------------
-        order_stats = Order.objects.filter(
+        # ---------------- Order stats ----------------
+        order_qs = Order.objects.filter(
             status=OrderStatus.CREATED,
             **order_store_filter,
             **date_filter
-        ).aggregate(
+        )
+
+        order_stats = order_qs.aggregate(
             total_orders=Count("id"),
             total_revenue=Sum("amount"),
+            average_order_value=Avg("amount"),
             total_shipping_charges=Sum(
                 F("amount") - F("selling_price")
             )
         )
 
-        # ---------------- Users ----------------
-        user_stats = User.objects.filter(
+        # ---------------- Customers ----------------
+        total_customers = User.objects.filter(
             **user_store_filter
-        ).aggregate(
-            total_users=Count("id")
+        ).count()
+
+        paid_customers = User.objects.filter(
+            orders__status=OrderStatus.CREATED,
+            **user_store_filter
+        ).distinct().count()
+
+        # ---------------- Product stats ----------------
+        total_products = Product.objects.filter(
+            **product_store_filter
+        ).count()
+
+        low_stock_products = Product.objects.filter(
+            **product_store_filter,
+            stock__lte=10
+        ).count()
+
+        # ---------------- Top & Least selling products ----------------
+        product_sales = (
+            OrderProducts.objects
+            .filter(
+                order__status=OrderStatus.CREATED,
+                **({"order__store_id": store_id} if store_id else {}),
+                **date_filter
+            )
+            .values("product_id", "product__name")
+            .annotate(total_qty=Sum("qty"))
+            .order_by("-total_qty")
         )
 
+        top_selling_products = list(product_sales[:10])
+        least_selling_products = list(product_sales.order_by("total_qty")[:10])
+
+        # ---------------- Plain response ----------------
         response = {
-            # Store stats
+            # Stores
             "total_stores": store_stats["total_stores"],
             "active_stores": store_stats["active_stores"],
             "inactive_stores": store_stats["inactive_stores"],
 
-            # Order stats
+            # Orders
             "total_orders": order_stats["total_orders"] or 0,
             "total_revenue": float(order_stats["total_revenue"] or 0),
-            "total_shipping_charges": float(order_stats["total_shipping_charges"] or 0),
+            "average_order_value": float(order_stats["average_order_value"] or 0),
+            "total_shipping_charges": float(
+                order_stats["total_shipping_charges"] or 0
+            ),
 
-            # User stats
-            "total_users": user_stats["total_users"],
+            # Customers
+            "total_customers": total_customers,
+            "paid_customers": paid_customers,
 
-            # Applied filters
-            "filters": {
-                "store_id": store_id,
-                "start_date": start_date,
-                "end_date": end_date,
-            }
+            # Products
+            "total_products": total_products,
+            "low_stock_products": low_stock_products,
+            "top_selling_products": top_selling_products,
+            "least_selling_products": least_selling_products,
+
+            # Filters
+            "store_id": store_id,
+            "start_date": start_date,
+            "end_date": end_date,
         }
 
         return CustomResponse().successResponse(

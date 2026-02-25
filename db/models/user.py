@@ -302,7 +302,6 @@ class Visitor(AuditModel):
     first_visited_at = models.DateTimeField(auto_now_add=True)
     last_visited_at = models.DateTimeField(auto_now=True)
 
-    is_active = models.BooleanField(default=True)
 
     class Meta:
         db_table = "visitor"
