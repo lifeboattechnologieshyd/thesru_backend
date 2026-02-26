@@ -26,7 +26,7 @@ from db.models import AddressMaster, PinCode, Product, Order, OrderProducts, Pay
 from enums.store import OrderStatus, PaymentStatus, NotificationEvent
 from mixins.drf_views import CustomResponse
 from utils.notification import trigger_notification
-from utils.store import generate_order_number, time_ago
+from utils.store import generate_order_number, time_ago, update_stock_after_order
 from utils.user import send_order_created_admin_email
 
 
@@ -1223,6 +1223,8 @@ class Webhook(APIView):
                         body="Your order has been placed successfully",
                         data={"order_id": order.order_number}
                     )
+                    update_stock_after_order(order)
+
 
                     remove_cart_items(order.user, order.store)
                 elif event_type == "PAYMENT_FAILED_WEBHOOK":
@@ -1341,6 +1343,7 @@ class PaymentStatusAPIView(APIView):
                     body="Your order has been placed successfully",
                     data={"order_id": order.order_number}
                 )
+                update_stock_after_order(order)
                 # todo: send an email to admin also.
                 # todo: send a sms n whatsapp to admin also.
                 remove_cart_items(order.user, order.store)

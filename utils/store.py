@@ -2,8 +2,7 @@ import string
 import time
 import random
 
-from db.models import Order, StoreSequence, OrderSequence
-
+from db.models import Order, StoreSequence, OrderSequence, Product
 
 # def generate_order_id():
 #     while True:
@@ -75,3 +74,28 @@ BO_STATUS_FLOW = {
     OrderStatus.PACKED: [OrderStatus.SHIPPED],
     OrderStatus.SHIPPED: [OrderStatus.DELIVERED],
 }
+
+from django.db import transaction
+from django.db.models import F
+
+def update_stock_after_order(order):
+    """
+    Reduce stock for each product in the order
+    """
+
+    for item in order.items.select_related("product"):
+        product = item.product
+        qty = item.qty
+
+        # Safety check
+        if product.current_stock < qty:
+            raise Exception(
+                f"Insufficient stock for {product.name}"
+            )
+
+        # Atomic update (prevents race conditions)
+        Product.objects.filter(
+            id=product.id
+        ).update(
+            current_stock=F("current_stock") - qty
+        )
