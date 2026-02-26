@@ -32,7 +32,7 @@ from config.settings.common import DEBUG
 from db.models import Category, Product, Banner, Inventory, PinCode, Store, WebBanner, \
     FlashSaleBanner, Order, User, Cart, OrderProducts, UserOTP, StoreClient, UserSession, ProductMedia, Tag, \
     OrderTimeLines, Coupons, CouponProduct, CouponCategory, CouponTag, AddressMaster, NotificationChannelConfig, \
-    NotificationTemplate
+    NotificationTemplate, Discount, DiscountProduct
 from db.models.user import AppVersionConfig
 from enums.store import InventoryType, OrderStatus, NotificationChannel, NotificationEvent
 from mixins.drf_views import CustomResponse
@@ -4203,152 +4203,152 @@ class DashboardStatsAPIView(APIView):
             description="Dashboard statistics fetched successfully"
         )
 
-# class DiscountAPIView(APIView):
-#     permission_classes = [IsAuthenticated]
-#
-#     def post(self, request):
-#         store = request.store
-#         data = request.data
-#
-#         required_fields = ["name", "promo_type", "buy_qty", "get_qty", "products"]
-#         for field in required_fields:
-#             if not data.get(field):
-#                 return CustomResponse().errorResponse(
-#                     description=f"{field} is required"
-#                 )
-#
-#         discount = Discount.objects.create(
-#             store=store,
-#             name=data["name"],
-#             promo_type=data["promo_type"],
-#             buy_qty=data["buy_qty"],
-#             get_qty=data["get_qty"],
-#             is_active=data.get("is_active", True),
-#             start_date=data.get("start_date"),
-#             end_date=data.get("end_date"),
-#             created_by=request.user.id
-#         )
-#
-#         # Attach products
-#         for product_id in data["products"]:
-#             DiscountProduct.objects.create(
-#                 discount=discount,
-#                 product_id=product_id
-#             )
-#
-#         return CustomResponse().successResponse(
-#             data={"id": discount.id},
-#             description="Discount created successfully"
-#         )
-#     def get(self, request, id=None):
-#         store = request.store
-#
-#         # ---------------- SINGLE DISCOUNT ----------------
-#         if id:
-#             discount = Discount.objects.filter(
-#                 id=id,
-#                 store=store
-#             ).first()
-#
-#             if not discount:
-#                 return CustomResponse().errorResponse(
-#                     description="Discount not found"
-#                 )
-#
-#             products = DiscountProduct.objects.filter(
-#                 discount=discount
-#             ).values_list("product_id", flat=True)
-#
-#             return CustomResponse().successResponse(
-#                 data={
-#                     "id": discount.id,
-#                     "name": discount.name,
-#                     "promo_type": discount.promo_type,
-#                     "buy_qty": discount.buy_qty,
-#                     "get_qty": discount.get_qty,
-#                     "is_active": discount.is_active,
-#                     "start_date": discount.start_date,
-#                     "end_date": discount.end_date,
-#                     "products": list(products)
-#                 },
-#                 description="Discount fetched successfully"
-#             )
-#
-#         # ---------------- LIST DISCOUNTS ----------------
-#         discounts = Discount.objects.filter(
-#             store=store
-#         ).order_by("-created_at")
-#
-#         data = []
-#         for d in discounts:
-#             data.append({
-#                 "id": d.id,
-#                 "name": d.name,
-#                 "promo_type": d.promo_type,
-#                 "buy_qty": d.buy_qty,
-#                 "get_qty": d.get_qty,
-#                 "is_active": d.is_active,
-#                 "start_date": d.start_date,
-#                 "end_date": d.end_date,
-#             })
-#
-#         return CustomResponse().successResponse(
-#             data=data,
-#             description="Discount list fetched successfully"
-#         )
-#     def put(self, request, id):
-#         store = request.store
-#         data = request.data
-#
-#         discount = Discount.objects.filter(
-#             id=id,
-#             store=store
-#         ).first()
-#
-#         if not discount:
-#             return CustomResponse().errorResponse(
-#                 description="Discount not found"
-#             )
-#
-#         discount.name = data.get("name", discount.name)
-#         discount.buy_qty = data.get("buy_qty", discount.buy_qty)
-#         discount.get_qty = data.get("get_qty", discount.get_qty)
-#         discount.is_active = data.get("is_active", discount.is_active)
-#         discount.start_date = data.get("start_date", discount.start_date)
-#         discount.end_date = data.get("end_date", discount.end_date)
-#         discount.updated_by = request.user.id
-#         discount.save()
-#
-#         # Update products (replace)
-#         if "products" in data:
-#             DiscountProduct.objects.filter(discount=discount).delete()
-#             for product_id in data["products"]:
-#                 DiscountProduct.objects.create(
-#                     discount=discount,
-#                     product_id=product_id
-#                 )
-#
-#         return CustomResponse().successResponse(
-#             data={},
-#             description="Discount updated successfully"
-#         )
-#     def delete(self, request, id):
-#         store = request.store
-#
-#         discount = Discount.objects.filter(
-#             id=id,
-#             store=store
-#         ).first()
-#
-#         if not discount:
-#             return CustomResponse().errorResponse(
-#                 description="Discount not found"
-#             )
-#
-#         discount.is_active = False
-#         discount.save(update_fields=["is_active"])
-#
-#         return CustomResponse().successResponse(
-#             data={},
-#             description="Discount disabled successfully"
-#         )
+class DiscountAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        store = request.store
+        data = request.data
+
+        required_fields = ["name", "promo_type", "buy_qty", "get_qty", "products"]
+        for field in required_fields:
+            if not data.get(field):
+                return CustomResponse().errorResponse(
+                    description=f"{field} is required"
+                )
+
+        discount = Discount.objects.create(
+            store=store,
+            name=data["name"],
+            promo_type=data["promo_type"],
+            buy_qty=data["buy_qty"],
+            get_qty=data["get_qty"],
+            is_active=data.get("is_active", True),
+            start_date=data.get("start_date"),
+            end_date=data.get("end_date"),
+            created_by=request.user.id
+        )
+
+        # Attach products
+        for product_id in data["products"]:
+            DiscountProduct.objects.create(
+                discount=discount,
+                product_id=product_id
+            )
+
+        return CustomResponse().successResponse(
+            data={"id": discount.id},
+            description="Discount created successfully"
+        )
+    def get(self, request, id=None):
+        store = request.store
+
+        # ---------------- SINGLE DISCOUNT ----------------
+        if id:
+            discount = Discount.objects.filter(
+                id=id,
+                store=store
+            ).first()
+
+            if not discount:
+                return CustomResponse().errorResponse(
+                    description="Discount not found"
+                )
+
+            products = DiscountProduct.objects.filter(
+                discount=discount
+            ).values_list("product_id", flat=True)
+
+            return CustomResponse().successResponse(
+                data={
+                    "id": discount.id,
+                    "name": discount.name,
+                    "promo_type": discount.promo_type,
+                    "buy_qty": discount.buy_qty,
+                    "get_qty": discount.get_qty,
+                    "is_active": discount.is_active,
+                    "start_date": discount.start_date,
+                    "end_date": discount.end_date,
+                    "products": list(products)
+                },
+                description="Discount fetched successfully"
+            )
+
+        # ---------------- LIST DISCOUNTS ----------------
+        discounts = Discount.objects.filter(
+            store=store
+        ).order_by("-created_at")
+
+        data = []
+        for d in discounts:
+            data.append({
+                "id": d.id,
+                "name": d.name,
+                "promo_type": d.promo_type,
+                "buy_qty": d.buy_qty,
+                "get_qty": d.get_qty,
+                "is_active": d.is_active,
+                "start_date": d.start_date,
+                "end_date": d.end_date,
+            })
+
+        return CustomResponse().successResponse(
+            data=data,
+            description="Discount list fetched successfully"
+        )
+    def put(self, request, id):
+        store = request.store
+        data = request.data
+
+        discount = Discount.objects.filter(
+            id=id,
+            store=store
+        ).first()
+
+        if not discount:
+            return CustomResponse().errorResponse(
+                description="Discount not found"
+            )
+
+        discount.name = data.get("name", discount.name)
+        discount.buy_qty = data.get("buy_qty", discount.buy_qty)
+        discount.get_qty = data.get("get_qty", discount.get_qty)
+        discount.is_active = data.get("is_active", discount.is_active)
+        discount.start_date = data.get("start_date", discount.start_date)
+        discount.end_date = data.get("end_date", discount.end_date)
+        discount.updated_by = request.user.id
+        discount.save()
+
+        # Update products (replace)
+        if "products" in data:
+            DiscountProduct.objects.filter(discount=discount).delete()
+            for product_id in data["products"]:
+                DiscountProduct.objects.create(
+                    discount=discount,
+                    product_id=product_id
+                )
+
+        return CustomResponse().successResponse(
+            data={},
+            description="Discount updated successfully"
+        )
+    def delete(self, request, id):
+        store = request.store
+
+        discount = Discount.objects.filter(
+            id=id,
+            store=store
+        ).first()
+
+        if not discount:
+            return CustomResponse().errorResponse(
+                description="Discount not found"
+            )
+
+        discount.is_active = False
+        discount.save(update_fields=["is_active"])
+
+        return CustomResponse().successResponse(
+            data={},
+            description="Discount disabled successfully"
+        )
