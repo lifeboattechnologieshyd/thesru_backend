@@ -816,47 +816,51 @@ class ShippingRule(AuditModel):
     class Meta:
         db_table = "shipping_rule"
 
-
-class Discount(AuditModel):
-    PROMO_TYPE_CHOICES = [
-        ("BUY_X_GET_Y", "Buy X Get Y"),
-    ]
-
-    store = models.ForeignKey(
-        Store,
-        on_delete=models.CASCADE,
-        related_name="discounts"
-    )
-
-    name = models.CharField(max_length=100)
-
-    promo_type = models.CharField(
-        max_length=20,
-        choices=PROMO_TYPE_CHOICES
-    )
-
-    buy_qty = models.PositiveIntegerField()
-    get_qty = models.PositiveIntegerField()
-
-    is_active = models.BooleanField(default=True)
-
-    start_date = models.DateTimeField(null=True, blank=True)
-    end_date = models.DateTimeField(null=True, blank=True)
-
-    class Meta:
-        db_table = "discount"
-
-class DiscountProduct(AuditModel):
-    discount = models.ForeignKey(
-        Discount,
-        on_delete=models.CASCADE,
-        related_name="products"
-    )
-    product = models.ForeignKey(
-        Product,
-        on_delete=models.CASCADE
-    )
-
-    class Meta:
-        db_table = "discount_product"
-        unique_together = ("discount", "product")
+#
+# class Discount(AuditModel):
+#     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+#
+#     PROMO_TYPE_CHOICES = [
+#         ("BUY_X_GET_Y", "Buy X Get Y"),
+#     ]
+#
+#     store = models.ForeignKey(
+#         Store,
+#         on_delete=models.CASCADE,
+#         related_name="discounts"
+#     )
+#
+#     name = models.CharField(max_length=100)
+#
+#     promo_type = models.CharField(
+#         max_length=20,
+#         choices=PROMO_TYPE_CHOICES
+#     )
+#
+#     buy_qty = models.PositiveIntegerField()
+#     get_qty = models.PositiveIntegerField()
+#
+#     is_active = models.BooleanField(default=True)
+#
+#     start_date = models.DateTimeField(null=True, blank=True)
+#     end_date = models.DateTimeField(null=True, blank=True)
+#
+#     class Meta:
+#         db_table = "discount"
+#
+# class DiscountProduct(AuditModel):
+#     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+#
+#     discount = models.ForeignKey(
+#         Discount,
+#         on_delete=models.CASCADE,
+#         related_name="products"
+#     )
+#     product = models.ForeignKey(
+#         Product,
+#         on_delete=models.CASCADE
+#     )
+#
+#     class Meta:
+#         db_table = "discount_product"
+#         unique_together = ("discount", "product")
