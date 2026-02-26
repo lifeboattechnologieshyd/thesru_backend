@@ -573,8 +573,7 @@ class CheckoutPreview(APIView):
         price_drop_discount = mrp_total - subtotal
 
 
-        # =====================================================
-
+        # ================= BUY X GET Y =================
         free_items = []
 
         discount = Discount.objects.filter(
@@ -600,9 +599,9 @@ class CheckoutPreview(APIView):
                     eligible_qty += item["qty"]
                     eligible_products.append(item["product"])
 
-            if eligible_qty >= discount.buy_qty:
-                free_qty = (eligible_qty // discount.buy_qty) * discount.get_qty
+            free_qty = (eligible_qty // discount.buy_qty) * discount.get_qty
 
+            if free_qty > 0:
                 free_product = min(
                     eligible_products,
                     key=lambda p: p.selling_price
@@ -610,7 +609,7 @@ class CheckoutPreview(APIView):
 
                 free_items.append({
                     "product_id": str(free_product.id),
-                    "name": free_product.name,
+                    "name": f"{free_product.name} (Free)",
                     "sku": free_product.sku,
                     "qty": free_qty,
                     "mrp": str(free_product.mrp),
@@ -625,6 +624,7 @@ class CheckoutPreview(APIView):
                         for m in free_product.media.all()
                     ]
                 })
+        # =================================================
 
         # ---------- Coupon ----------
         coupon_discount = Decimal("0.00")
