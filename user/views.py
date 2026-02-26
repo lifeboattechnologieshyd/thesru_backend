@@ -465,7 +465,6 @@ class EmailSendOTPView(APIView):
         )
 
 
-
 class EmailVerifyOTPView(APIView):
     permission_classes = [AllowAny]
 
@@ -509,51 +508,33 @@ class EmailVerifyOTPView(APIView):
         otp_obj.is_used = True
         otp_obj.save(update_fields=["is_used"])
 
-        # ---------------- Check existing user ----------------
-        user = User.objects.filter(email=email,store=request.store).first()
-        is_new_user = False
-
-        # if not user:
-        #     temp_user = TempUser.objects.filter(
-        #         email=email,
-        #         store=request.store
-        #     ).first()
-        #
-        #     if not temp_user:
-        #         return CustomResponse().errorResponse(
-        #             description="Temp user not found",
-        #             status=status.HTTP_400_BAD_REQUEST
-        #         )
-
-            # Create user with STORE
-        user = User.objects.create(
-                email=email,
-                device_id=device_id,
-                store=request.store
+        # ---------------- Check or Create User ----------------
+        user, created = User.objects.get_or_create(
+            email=email,
+            store=request.store,
+            defaults={
+                "device_id": device_id,
+            }
         )
-        is_new_user = True
 
-        user.username = generate_username(user)
-        user.referral_code = generate_referral_code()
-        user.save()
+        is_new_user = created
 
-            # temp_user.delete()
-        # else:
+        # Update device_id if changed
         if device_id and user.device_id != device_id:
             user.device_id = device_id
 
+        # Ensure required fields exist
         if not user.username:
             user.username = generate_username(user)
 
         if not user.referral_code:
             user.referral_code = generate_referral_code()
 
-            # Ensure store is attached
-            if not user.store:
-                user.store = request.store
+        if not user.store:
+            user.store = request.store
 
-            user.last_login = datetime.now()
-            user.save()
+        user.last_login = timezone.now()
+        user.save()
 
         # ---------------- Tokens ----------------
         refresh = RefreshToken.for_user(user)
