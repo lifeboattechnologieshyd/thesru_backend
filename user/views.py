@@ -513,40 +513,40 @@ class EmailVerifyOTPView(APIView):
         user = User.objects.filter(email=email,store=request.store).first()
         is_new_user = False
 
-        if not user:
-            temp_user = TempUser.objects.filter(
-                email=email,
-                store=request.store
-            ).first()
-
-            if not temp_user:
-                return CustomResponse().errorResponse(
-                    description="Temp user not found",
-                    status=status.HTTP_400_BAD_REQUEST
-                )
+        # if not user:
+        #     temp_user = TempUser.objects.filter(
+        #         email=email,
+        #         store=request.store
+        #     ).first()
+        #
+        #     if not temp_user:
+        #         return CustomResponse().errorResponse(
+        #             description="Temp user not found",
+        #             status=status.HTTP_400_BAD_REQUEST
+        #         )
 
             # Create user with STORE
-            user = User.objects.create(
+        user = User.objects.create(
                 email=email,
                 device_id=device_id,
                 store=request.store
-            )
-            is_new_user = True
+        )
+        is_new_user = True
 
+        user.username = generate_username(user)
+        user.referral_code = generate_referral_code()
+        user.save()
+
+            # temp_user.delete()
+        # else:
+        if device_id and user.device_id != device_id:
+            user.device_id = device_id
+
+        if not user.username:
             user.username = generate_username(user)
+
+        if not user.referral_code:
             user.referral_code = generate_referral_code()
-            user.save()
-
-            temp_user.delete()
-        else:
-            if device_id and user.device_id != device_id:
-                user.device_id = device_id
-
-            if not user.username:
-                user.username = generate_username(user)
-
-            if not user.referral_code:
-                user.referral_code = generate_referral_code()
 
             # Ensure store is attached
             if not user.store:
