@@ -634,3 +634,19 @@ class VisitorCreateAPIView(APIView):
             },
             description="Visitor tracked successfully"
         )
+
+
+class DeleteUserAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def delete(self, request):
+        user = request.user
+
+        return CustomResponse().successResponse(
+            data={},
+            description=(
+                "You are logged out successfully. "
+                "If you do not log in again within 15 days, "
+                "your account and all associated data will be permanently deleted."
+            )
+        )
