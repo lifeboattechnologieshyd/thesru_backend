@@ -33,7 +33,7 @@ from db.models import Category, Product, Banner, Inventory, PinCode, Store, WebB
     FlashSaleBanner, Order, User, Cart, OrderProducts, UserOTP, StoreClient, UserSession, ProductMedia, Tag, \
     OrderTimeLines, Coupons, CouponProduct, CouponCategory, CouponTag, AddressMaster, NotificationChannelConfig, \
     NotificationTemplate, Discount, DiscountProduct
-from db.models.user import AppVersionConfig
+from db.models.user import AppVersionConfig, Visitor
 from enums.store import InventoryType, OrderStatus, NotificationChannel, NotificationEvent
 from mixins.drf_views import CustomResponse
 from rest_framework_simplejwt.tokens import RefreshToken
@@ -4167,6 +4167,26 @@ class DashboardStatsAPIView(APIView):
         top_selling_products = list(product_sales[:10])
         least_selling_products = list(product_sales.order_by("total_qty")[:10])
 
+        # ---------------- Visitors (Today) ----------------
+        today = timezone.now().date()
+
+        visitor_store_filter = {}
+        if store_id:
+            visitor_store_filter["store_id"] = store_id
+
+        # New visitors today
+        new_visitors_today = Visitor.objects.filter(
+            first_visited_at__date=today,
+            **visitor_store_filter
+        ).count()
+
+        # Repeated visitors today
+        repeated_visitors_today = Visitor.objects.filter(
+            last_visited_at__date=today,
+            first_visited_at__date__lt=today,
+            **visitor_store_filter
+        ).count()
+
         # ---------------- Plain response ----------------
         response = {
             # Stores
@@ -4191,6 +4211,10 @@ class DashboardStatsAPIView(APIView):
             "low_stock_products": low_stock_products,
             "top_selling_products": top_selling_products,
             "least_selling_products": least_selling_products,
+
+            # Visitors
+            "new_visitors_today": new_visitors_today,
+            "repeated_visitors_today": repeated_visitors_today,
 
             # Filters
             "store_id": store_id,
