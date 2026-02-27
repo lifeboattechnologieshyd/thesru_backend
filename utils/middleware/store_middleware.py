@@ -100,6 +100,7 @@ class StoreMiddleware:
             "/user/createadmin",
             "/user/admin-login",
             "/user/update-users",
+            "/user/delete/user"
 
             #  SUPERADMIN / BACKOFFICE
 
