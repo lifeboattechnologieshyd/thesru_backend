@@ -4499,6 +4499,7 @@ class CreateStoreSubscriptionAPIView(APIView):
 
     def post(self, request):
         store = request.store
+        user = request.user
         plan_id = request.data.get("plan_id")
 
         if not plan_id:
@@ -4512,15 +4513,16 @@ class CreateStoreSubscriptionAPIView(APIView):
         if not plan:
             return CustomResponse.errorResponse("Invalid plan")
 
-        # Create local record
-        subscription = StoreSubscription.objects.create(
-            store=store,
-            plan=plan,
-            status="INITIATED"
-        )
+        existing = StoreSubscription.objects.filter(store=store).first()
 
-        # -------- Cashfree Subscription Create --------
+        if existing and existing.status in ["ACTIVE", "INITIATED"]:
+            return CustomResponse.errorResponse(
+                "Store already has a subscription"
+            )
+
+        # ---------- Cashfree FIRST ----------
         payload = {
+            "subscription_id": f"sub_{store.id}",
             "plan_id": plan.plan_code,
             "customer_details": {
                 "customer_id": str(store.id),
@@ -4528,21 +4530,37 @@ class CreateStoreSubscriptionAPIView(APIView):
                 "customer_phone": str(store.mobile),
             },
             "subscription_meta": {
-                "store_id": str(store.id),
-                "plan_code": plan.plan_code
+                "return_url": "https://yourdomain.com/subscription/return"
             }
         }
 
-        response = cashfree_create_subscription(payload)
+        try:
+            cashfree_response = cashfree_create_subscription(store, payload)
+        except Exception as e:
+            return CustomResponse.errorResponse(
+                f"Cashfree error: {str(e)}"
+            )
 
-        subscription.cashfree_subscription_id = response["subscription_id"]
-        subscription.cashfree_session_id = response["subscription_session_id"]
-        subscription.save()
+        # ---------- SAVE / UPDATE DB ----------
+        subscription, created = StoreSubscription.objects.update_or_create(
+            store=store,
+            defaults={
+                "plan": plan,
+                "purchased_by": user,
+                "cashfree_subscription_id": cashfree_response.get(
+                    "subscription_id"
+                ),
+                "cashfree_session_id": cashfree_response.get(
+                    "subscription_session_id"
+                ),
+                "status": "INITIATED"
+            }
+        )
 
         return CustomResponse.successResponse(
             data={
                 "subscription_id": subscription.cashfree_subscription_id,
                 "payment_session_id": subscription.cashfree_session_id
             },
-            description="Subscription initiated"
+            description="Subscription initiated successfully"
         )
