@@ -108,7 +108,7 @@ def cashfree_create_subscription(store, payload):
     Creates subscription in Cashfree using STORE-based credentials
     """
 
-    url = "https://api.cashfree.com/pg/subscriptions"
+    url = "https://sandbox.cashfree.com/pg/subscriptions"
 
     headers = {
         "x-client-id": store.client_id,
