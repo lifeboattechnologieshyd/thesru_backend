@@ -109,6 +109,7 @@ class StoreMiddleware:
             "/backoffice/notification/config",
             "/backoffice/notification/template/config",
             "/backoffice/dashboard",
+            "/backoffice/plan",
 
         )
 
