@@ -1,7 +1,7 @@
 import string
 import time
 import random
-
+import requests
 from db.models import Order, StoreSequence, OrderSequence, Product
 
 # def generate_order_id():
@@ -99,3 +99,27 @@ def update_stock_after_order(order):
         ).update(
             current_stock=F("current_stock") - qty
         )
+
+
+def cashfree_create_subscription(store, payload):
+    """
+    Creates Cashfree subscription using STORE credentials
+    """
+
+    url = "https://api.cashfree.com/pg/subscriptions"
+
+    headers = {
+        "x-client-id": store.client_id,
+        "x-client-secret": store.client_secret,
+        "Content-Type": "application/json"
+    }
+
+    response = requests.post(url, json=payload, headers=headers)
+
+    # Helpful debug
+    if response.status_code != 200:
+        raise Exception(
+            f"Cashfree Error {response.status_code}: {response.text}"
+        )
+
+    return response.json()

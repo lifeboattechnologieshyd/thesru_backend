@@ -7,7 +7,7 @@ from backoffice.store import ProductAPIView, CategoriesAPIView, BannerAPIView, I
     AdminCreateCouponAPIView, UserAddress, UserAPIView, CreateAppVersionConfigAPI, OrderShippingSlipAPIView, \
     StoreAnalyticsAPIView, EmailSendOTPView, EmailVerifyOTPView, ClientInfo, NotificationConfig, \
     NotificationTemplateConfig, SuperAdminSendOTPAPIView, SuperAdminVerifyOTPAPIView, StoreListAPIView, \
-    DashboardStatsAPIView, DiscountAPIView
+    DashboardStatsAPIView, DiscountAPIView, CreateStoreSubscriptionAPIView, SubscriptionPlanAPIView
 
 urlpatterns = [
 
@@ -83,5 +83,9 @@ urlpatterns = [
 
     path("discount",DiscountAPIView.as_view()),
     path("discount/<str:id>",DiscountAPIView.as_view()),
+
+    path("plan",SubscriptionPlanAPIView.as_view()),
+
+    path("create/subscription",CreateStoreSubscriptionAPIView.as_view()),
 
 ]

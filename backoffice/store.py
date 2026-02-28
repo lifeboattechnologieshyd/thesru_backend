@@ -32,7 +32,7 @@ from config.settings.common import DEBUG
 from db.models import Category, Product, Banner, Inventory, PinCode, Store, WebBanner, \
     FlashSaleBanner, Order, User, Cart, OrderProducts, UserOTP, StoreClient, UserSession, ProductMedia, Tag, \
     OrderTimeLines, Coupons, CouponProduct, CouponCategory, CouponTag, AddressMaster, NotificationChannelConfig, \
-    NotificationTemplate, Discount, DiscountProduct
+    NotificationTemplate, Discount, DiscountProduct, StoreSubscription, SubscriptionPlan
 from db.models.user import AppVersionConfig, Visitor
 from enums.store import InventoryType, OrderStatus, NotificationChannel, NotificationEvent
 from mixins.drf_views import CustomResponse
@@ -40,7 +40,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 
 from utils.invoice_generator import generate_shipping_invoice
 from utils.notification import trigger_notification
-from utils.store import generate_lsin, generate_order_number, BO_STATUS_FLOW
+from utils.store import generate_lsin, generate_order_number, BO_STATUS_FLOW, cashfree_create_subscription
 from utils.user import generate_otp, send_otp_email, generate_username, generate_referral_code
 from django.db.models import Sum, F, DecimalField, ExpressionWrapper
 
@@ -4375,4 +4375,174 @@ class DiscountAPIView(APIView):
         return CustomResponse().successResponse(
             data={},
             description="Discount disabled successfully"
+        )
+
+class SubscriptionPlanAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+
+    def post(self, request):
+        data = request.data
+
+        required_fields = [
+            "plan_code", "name", "amount",
+            "interval_type", "interval_count"
+        ]
+
+        for field in required_fields:
+            if not data.get(field):
+                return CustomResponse.errorResponse(
+                    description=f"{field} is required"
+                )
+
+        if SubscriptionPlan.objects.filter(plan_code=data["plan_code"]).exists():
+            return CustomResponse.errorResponse(
+                description="Plan code already exists"
+            )
+
+        plan = SubscriptionPlan.objects.create(
+            plan_code=data["plan_code"],
+            name=data["name"],
+            description=data.get("description"),
+            amount=data["amount"],
+            interval_type=data["interval_type"],
+            interval_count=data.get("interval_count", 1),
+            max_products=data.get("max_products"),
+            max_orders_per_month=data.get("max_orders_per_month"),
+            enable_analytics=data.get("enable_analytics", False),
+            enable_discounts=data.get("enable_discounts", False),
+            is_active=data.get("is_active", True),
+            created_by=request.user.id
+        )
+
+        return CustomResponse.successResponse(
+            data={"id": str(plan.id)},
+            description="Subscription plan created"
+        )
+
+    def get(self, request):
+        plans = SubscriptionPlan.objects.all().order_by("-created_at")
+
+        data = []
+        for plan in plans:
+            data.append({
+                "id": str(plan.id),
+                "plan_code": plan.plan_code,
+                "name": plan.name,
+                "amount": str(plan.amount),
+                "interval": f"{plan.interval_count} {plan.interval_type}",
+                "is_active": plan.is_active,
+                "features": {
+                    "max_products": plan.max_products,
+                    "max_orders_per_month": plan.max_orders_per_month,
+                    "enable_analytics": plan.enable_analytics,
+                    "enable_discounts": plan.enable_discounts,
+                }
+            })
+
+        return CustomResponse.successResponse(
+            data=data,
+            total=len(data),
+            description="Subscription plans fetched"
+        )
+
+
+
+
+    def put(self, request, id=None):
+        data = request.data
+
+        plan = SubscriptionPlan.objects.filter(id=id).first()
+        if not plan:
+            return CustomResponse.errorResponse("Plan not found")
+
+        plan.name = data.get("name", plan.name)
+        plan.description = data.get("description", plan.description)
+        plan.amount = data.get("amount", plan.amount)
+        plan.interval_type = data.get("interval_type", plan.interval_type)
+        plan.interval_count = data.get("interval_count", plan.interval_count)
+        plan.max_products = data.get("max_products", plan.max_products)
+        plan.max_orders_per_month = data.get(
+            "max_orders_per_month",
+            plan.max_orders_per_month
+        )
+        plan.enable_analytics = data.get(
+            "enable_analytics",
+            plan.enable_analytics
+        )
+        plan.enable_discounts = data.get(
+            "enable_discounts",
+            plan.enable_discounts
+        )
+        plan.is_active = data.get("is_active", plan.is_active)
+        plan.updated_by = request.user.id
+        plan.save()
+
+        return CustomResponse.successResponse(data={},
+            description="Subscription plan updated"
+        )
+
+    def delete(self, request, id=None):
+        plan = SubscriptionPlan.objects.filter(id=id).first()
+        if not plan:
+            return CustomResponse.errorResponse("Plan not found")
+
+        plan.delete()
+
+        return CustomResponse.successResponse(data={},
+            description="Subscription plan deleted"
+        )
+
+
+class CreateStoreSubscriptionAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        store = request.store
+        plan_id = request.data.get("plan_id")
+
+        if not plan_id:
+            return CustomResponse.errorResponse("plan_id is required")
+
+        plan = SubscriptionPlan.objects.filter(
+            id=plan_id,
+            is_active=True
+        ).first()
+
+        if not plan:
+            return CustomResponse.errorResponse("Invalid plan")
+
+        # Create local record
+        subscription = StoreSubscription.objects.create(
+            store=store,
+            plan=plan,
+            status="INITIATED"
+        )
+
+        # -------- Cashfree Subscription Create --------
+        payload = {
+            "plan_id": plan.plan_code,
+            "customer_details": {
+                "customer_id": str(store.id),
+                "customer_email": store.email,
+                "customer_phone": str(store.mobile),
+            },
+            "subscription_meta": {
+                "store_id": str(store.id),
+                "plan_code": plan.plan_code
+            }
+        }
+
+        response = cashfree_create_subscription(payload)
+
+        subscription.cashfree_subscription_id = response["subscription_id"]
+        subscription.cashfree_session_id = response["subscription_session_id"]
+        subscription.save()
+
+        return CustomResponse.successResponse(
+            data={
+                "subscription_id": subscription.cashfree_subscription_id,
+                "payment_session_id": subscription.cashfree_session_id
+            },
+            description="Subscription initiated"
         )
