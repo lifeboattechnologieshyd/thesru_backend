@@ -101,7 +101,13 @@ def update_stock_after_order(order):
         )
 
 
+import requests
+
 def cashfree_create_subscription(store, payload):
+    """
+    Creates subscription in Cashfree using STORE-based credentials
+    """
+
     url = "https://api.cashfree.com/pg/subscriptions"
 
     headers = {
@@ -110,6 +116,9 @@ def cashfree_create_subscription(store, payload):
         "Content-Type": "application/json"
     }
 
+    print("CASHFREE REQUEST PAYLOAD:", payload)
+
     response = requests.post(url, json=payload, headers=headers)
     response.raise_for_status()
+
     return response.json()

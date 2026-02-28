@@ -4494,6 +4494,7 @@ class SubscriptionPlanAPIView(APIView):
         )
 
 
+
 class CreateStoreSubscriptionAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -4502,8 +4503,11 @@ class CreateStoreSubscriptionAPIView(APIView):
         user = request.user
         plan_id = request.data.get("plan_id")
 
+        # ---------------- Validation ----------------
         if not plan_id:
-            return CustomResponse.errorResponse("plan_id is required")
+            return CustomResponse.errorResponse(
+                description="plan_id is required"
+            )
 
         plan = SubscriptionPlan.objects.filter(
             id=plan_id,
@@ -4511,37 +4515,56 @@ class CreateStoreSubscriptionAPIView(APIView):
         ).first()
 
         if not plan:
-            return CustomResponse.errorResponse("Invalid plan")
+            return CustomResponse.errorResponse(
+                description="Invalid or inactive plan"
+            )
 
+        # ---------------- Check existing subscription ----------------
         existing = StoreSubscription.objects.filter(store=store).first()
 
         if existing and existing.status in ["ACTIVE", "INITIATED"]:
             return CustomResponse.errorResponse(
-                "Store already has a subscription"
+                description="Store already has an active subscription"
             )
 
-        # ---------- Cashfree FIRST ----------
+        # ---------------- Get BO return URL ----------------
+        store_client = StoreClient.objects.filter(
+            store=store,
+            client_type="BO",
+            is_active=True
+        ).first()
+
+        return_url = (
+            store_client.identifier
+            if store_client else "https://bo.thesru.com"
+        )
+
+        # ---------------- Cashfree payload ----------------
         payload = {
             "subscription_id": f"sub_{store.id}",
             "plan_id": plan.plan_code,
             "customer_details": {
                 "customer_id": str(store.id),
-                "customer_email": store.email,
+                "customer_email": store.email or "",
                 "customer_phone": str(store.mobile),
             },
             "subscription_meta": {
-                "return_url": StoreClient.identifier
+                "return_url": return_url
             }
         }
 
+        # ---------------- Create subscription in Cashfree ----------------
         try:
-            cashfree_response = cashfree_create_subscription(store, payload)
+            cashfree_response = cashfree_create_subscription(
+                store,
+                payload
+            )
         except Exception as e:
             return CustomResponse.errorResponse(
-                f"Cashfree error: {str(e)}"
+                description=f"Cashfree error: {str(e)}"
             )
 
-        # ---------- SAVE / UPDATE DB ----------
+        # ---------------- Save / Update DB ----------------
         subscription, created = StoreSubscription.objects.update_or_create(
             store=store,
             defaults={
@@ -4553,14 +4576,21 @@ class CreateStoreSubscriptionAPIView(APIView):
                 "cashfree_session_id": cashfree_response.get(
                     "subscription_session_id"
                 ),
-                "status": "INITIATED"
+                "status": "INITIATED",
+                "start_date": None,
+                "end_date": None
             }
         )
 
+        # ---------------- Response ----------------
         return CustomResponse.successResponse(
             data={
                 "subscription_id": subscription.cashfree_subscription_id,
-                "payment_session_id": subscription.cashfree_session_id
+                "payment_session_id": subscription.cashfree_session_id,
+                "plan": plan.name,
+                "amount": str(plan.amount),
+                "interval": f"{plan.interval_count} {plan.interval_type}",
+                "return_url": return_url
             },
             description="Subscription initiated successfully"
         )
