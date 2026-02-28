@@ -4530,7 +4530,7 @@ class CreateStoreSubscriptionAPIView(APIView):
                 "customer_phone": str(store.mobile),
             },
             "subscription_meta": {
-                "return_url": "https://yourdomain.com/subscription/return"
+                "return_url": StoreClient.identifier
             }
         }
 
