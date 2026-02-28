@@ -104,21 +104,22 @@ def update_stock_after_order(order):
 import requests
 
 def cashfree_create_subscription(store, payload):
-    """
-    Creates subscription in Cashfree using STORE-based credentials
-    """
-
     url = "https://sandbox.cashfree.com/pg/subscriptions"
 
     headers = {
+        "x-api-version": "2025-01-01",   # IMPORTANT
         "x-client-id": store.client_id,
         "x-client-secret": store.client_secret,
-        "Content-Type": "application/json"
+        "Content-Type": "application/json",
+        "accept": "application/json"
     }
 
-    print("CASHFREE REQUEST PAYLOAD:", payload)
-
     response = requests.post(url, json=payload, headers=headers)
-    response.raise_for_status()
+
+    print("CASHFREE STATUS:", response.status_code)
+    print("CASHFREE RESPONSE:", response.text)
+
+    if response.status_code != 200:
+        raise Exception(response.text)
 
     return response.json()
