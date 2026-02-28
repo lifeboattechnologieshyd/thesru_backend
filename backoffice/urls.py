@@ -85,6 +85,8 @@ urlpatterns = [
     path("discount/<str:id>",DiscountAPIView.as_view()),
 
     path("plan",SubscriptionPlanAPIView.as_view()),
+    path("plan/<str:id>",SubscriptionPlanAPIView.as_view()),
+
 
     path("create/subscription",CreateStoreSubscriptionAPIView.as_view()),
 
