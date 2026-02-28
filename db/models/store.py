@@ -864,3 +864,106 @@ class DiscountProduct(AuditModel):
     class Meta:
         db_table = "discount_product"
         unique_together = ("discount", "product")
+
+
+
+class SubscriptionPlan(AuditModel):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+
+
+    PLAN_TYPE_CHOICES = [
+        ("BASIC", "Basic"),
+        ("PRO", "Pro"),
+        ("ENTERPRISE", "Enterprise"),
+    ]
+
+    plan_code = models.CharField(
+        max_length=50,
+        unique=True,
+        help_text="Internal plan code"
+    )
+
+    name = models.CharField(max_length=100)
+    description = models.TextField(null=True, blank=True)
+
+    amount = models.DecimalField(
+        max_digits=10,
+        decimal_places=2
+    )
+
+    interval_type = models.CharField(
+        max_length=10,
+        choices=[
+            ("MONTH", "Monthly"),
+            ("YEAR", "Yearly"),
+        ]
+    )
+
+    interval_count = models.PositiveIntegerField(default=1)
+
+    # Feature limits
+    max_products = models.PositiveIntegerField(null=True, blank=True)
+    max_orders_per_month = models.PositiveIntegerField(null=True, blank=True)
+    enable_analytics = models.BooleanField(default=False)
+    enable_discounts = models.BooleanField(default=False)
+
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        db_table = "subscription_plan"
+
+class StoreSubscription(AuditModel):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+
+    store = models.OneToOneField(
+        Store,
+        on_delete=models.CASCADE,
+        related_name="subscription"
+    )
+
+    plan = models.ForeignKey(
+        SubscriptionPlan,
+        on_delete=models.SET_NULL,
+        null=True
+    )
+
+    purchased_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        help_text="Store admin who purchased the plan"
+    )
+
+    # Cashfree details
+    cashfree_subscription_id = models.CharField(
+        max_length=255,
+        null=True,
+        blank=True
+    )
+
+    cashfree_session_id = models.CharField(
+        max_length=255,
+        null=True,
+        blank=True
+    )
+
+    status = models.CharField(
+        max_length=20,
+        choices=[
+            ("INITIATED", "Initiated"),
+            ("ACTIVE", "Active"),
+            ("EXPIRED", "Expired"),
+            ("CANCELLED", "Cancelled"),
+        ],
+        default="INITIATED"
+    )
+
+    start_date = models.DateTimeField(null=True, blank=True)
+    end_date = models.DateTimeField(null=True, blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "store_subscription"
+
