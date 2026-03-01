@@ -67,6 +67,7 @@ class TagsListView(APIView):
             data.append({
                 "id": str(tag.id),
                 "name": tag.name,
+                "display_on_home": tag.display_on_home,
                 "slug": tag.slug,
                 "is_active": tag.is_active,
             })
