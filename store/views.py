@@ -23,7 +23,7 @@ from db import models
 from db.models import AddressMaster, PinCode, Product, Order, OrderProducts, Payment, OrderTimeLines, \
     Banner, Category, Cart, CouponUsage, Wishlist, CouponProduct, CouponCategory, CouponTag, WebBanner, FlashSaleBanner, \
     ProductReviews, ContactMessage, Tag, Coupons, ProductReviewMedia, Store, InventoryBatch, \
-    InventoryTransaction
+    InventoryTransaction, ShippingPlan
 from enums.store import OrderStatus, PaymentStatus, NotificationEvent
 from mixins.drf_views import CustomResponse
 from utils.notification import trigger_notification
@@ -43,6 +43,8 @@ class CategoryListView(APIView):
             data.append({
                 "id": str(category.id),
                 "name": category.name,
+                "priority": category.priority,
+                "category_group": category.category_group,
                 "slug": category.slug,
                 "icon": category.icon,
                 "search_tags": category.search_tags,
@@ -1488,6 +1490,7 @@ class OrderView(APIView):
                     "order_id": str(order.id),
                     "order_number": order.order_number,
                     "status": order.status,
+                    "shipping_charges": order.shipping_charges,
 
                     "coupon_discount": str(order.coupon_discount),
                     "amount": str(order.amount),
@@ -2376,3 +2379,13 @@ class FirebaseTestPushAPIView(APIView):
                     "error": str(e)
                 }
             )
+
+class ShippingDetails(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        store = request.store
+        shipping_details = ShippingPlan.objects.filter(store=store).values()
+        return CustomResponse().successResponse(
+            data=shipping_details.first(),
+        )
