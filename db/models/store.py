@@ -93,7 +93,7 @@ class Product(AuditModel):
     # Display
     name = models.CharField(max_length=150)
     colour = models.CharField(max_length=50)
-    colour_code = models.CharField(max_length=50)
+    colour_code = models.CharField(max_length=50, default="000000")
     size = models.CharField(max_length=50, null=True, blank=True)
 
     # Pricing
