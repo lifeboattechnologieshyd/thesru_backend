@@ -1,7 +1,5 @@
 from datetime import timedelta
 from decimal import Decimal
-from tokenize import Double
-from unicodedata import category
 
 from django.forms import model_to_dict
 from django.utils.timezone import make_aware
@@ -23,24 +21,21 @@ from django.db.models import Count, Sum
 from django.core.files.storage import default_storage
 
 from rest_framework.permissions import IsAuthenticated, AllowAny
-from urllib3 import request
 
-from config import settings
-from django.conf import settings
 
 from config.settings.common import DEBUG
-from db.models import Category, Product, Banner, Inventory, PinCode, Store, WebBanner, \
+from db.models import Category, Product, Banner, PinCode, Store, WebBanner, \
     FlashSaleBanner, Order, User, Cart, OrderProducts, UserOTP, StoreClient, UserSession, ProductMedia, Tag, \
     OrderTimeLines, Coupons, CouponProduct, CouponCategory, CouponTag, AddressMaster, NotificationChannelConfig, \
-    NotificationTemplate, Discount, DiscountProduct, StoreSubscription, SubscriptionPlan
-from db.models.user import AppVersionConfig, Visitor
+    NotificationTemplate
+from db.models.user import AppVersionConfig
 from enums.store import InventoryType, OrderStatus, NotificationChannel, NotificationEvent
 from mixins.drf_views import CustomResponse
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from utils.invoice_generator import generate_shipping_invoice
 from utils.notification import trigger_notification
-from utils.store import generate_lsin, generate_order_number, BO_STATUS_FLOW, cashfree_create_subscription
+from utils.store import generate_lsin, generate_order_number, BO_STATUS_FLOW
 from utils.user import generate_otp, send_otp_email, generate_username, generate_referral_code
 from django.db.models import Sum, F, DecimalField, ExpressionWrapper
 
@@ -451,6 +446,7 @@ class ProductAPIView(APIView):
             size=data.get("size"),
             colour=data.get("colour"),
             mrp=data["mrp"],
+            is_free_shipping=data.get("is_free_shipping", False),
             group_code=data["group_code"],
             selling_price=data["selling_price"],
             description=data["description"],
@@ -562,7 +558,7 @@ class ProductAPIView(APIView):
                 "lsin": product.lsin,
                 "group_code": product.group_code,
                 "sku": product.sku,
-
+                "is_free_shipping": product.is_free_shipping,
                 "name": product.name,
                 "colour": product.colour,
                 "size": product.size,
@@ -626,7 +622,7 @@ class ProductAPIView(APIView):
 
         # ------------------ Update product fields ------------------
         updatable_fields = [
-            "name", "size", "colour", "mrp",
+            "name", "size", "colour", "mrp", "is_free_shipping",
             "selling_price", "gst_percentage", "description",
             "gst_amount", "current_stock", "is_active","group_code"
         ]
@@ -1082,7 +1078,7 @@ class CategoriesAPIView(APIView):
         store = request.store
 
         # 1. Required fields
-        required_fields = ["name", "slug", "icon"]
+        required_fields = ["name", "slug", "icon", "priority"]
         for field in required_fields:
             if not data.get(field):
                 return CustomResponse.errorResponse(
@@ -1091,6 +1087,8 @@ class CategoriesAPIView(APIView):
 
         name = data.get("name").strip()
         icon = data.get("icon")
+        priority = data.get("priority", 1)
+        category_group = data.get("category_group", "HOME")
         slug = data.get("slug").strip().lower()
         parent_id = data.get("parent_id")
 
@@ -1120,6 +1118,8 @@ class CategoriesAPIView(APIView):
             name=name,
             slug=slug,
             parent=parent,
+            priority=priority,
+            category_group=category_group,
             icon=icon,
             is_active=data.get("is_active", True),
             created_by=request.user.mobile
@@ -1162,6 +1162,8 @@ class CategoriesAPIView(APIView):
                 "search_tags": cat.search_tags,
                 "is_active": cat.is_active,
                 "slug": cat.slug,
+                "category_group": cat.category_group,
+                "priority": cat.priority,
                 "parent_id": str(cat.parent_id) if cat.parent_id else None,
                 "parent_name": cat.parent.name if cat.parent else None,
                 "created_at": cat.created_at
@@ -1185,7 +1187,6 @@ class CategoriesAPIView(APIView):
             return CustomResponse.errorResponse(
                 description="Category not found"
             )
-
         if "name" in data:
             name = data.get("name")
             if not name:
@@ -1193,16 +1194,13 @@ class CategoriesAPIView(APIView):
                     description="name cannot be empty"
                 )
             category.name = name.strip()
-
         if "slug" in data:
             slug = data.get("slug")
             if not slug:
                 return CustomResponse.errorResponse(
                     description="slug cannot be empty"
                 )
-
             slug = slug.strip().lower()
-
             if Category.objects.filter(
                     store=store,
                     slug=slug
@@ -1212,16 +1210,16 @@ class CategoriesAPIView(APIView):
                 )
 
             category.slug = slug
-
         if "icon" in data:
             category.icon = data.get("icon")
-
+        if "priority" in data:
+            category.priority = data.get("priority")
+        if "category_group" in data:
+            category.category_group = data.get("category_group")
         if "is_active" in data:
             category.is_active = bool(data.get("is_active"))
-
         if "parent_id" in data:
             parent_id = data.get("parent_id")
-
             if parent_id:
                 try:
                     parent = Category.objects.get(
@@ -1567,234 +1565,6 @@ class BannerAPIView(APIView):
 
 
 
-class InventoryAPIView(APIView):
-    permission_classes = [IsAuthenticated]
-
-    def post(self, request):
-        data = request.data
-        store = request.store
-
-
-        required_fields = [
-            "product_id", "sku", "type", "quantity"
-        ]
-        for field in required_fields:
-            if not data.get(field):
-                return CustomResponse().errorResponse(
-                    description=f"{field} is required"
-                )
-
-        product_id = data.get("product_id")
-        sku = data.get("sku")
-        inv_type = data.get("type")
-        quantity = int(data.get("quantity"))
-
-        if quantity <= 0:
-            return CustomResponse().errorResponse(
-                description="Quantity must be greater than zero"
-            )
-
-        # Get last stock
-        last_inventory = (
-            Inventory.objects
-            .filter(product_id=product_id)
-            .order_by("-created_at")
-            .first()
-        )
-
-        quantity_before = last_inventory.quantity_after if last_inventory else 0
-
-        # Decide stock movement
-        if inv_type in [
-            InventoryType.PURCHASE,
-            InventoryType.SaleReturn,
-        ]:
-            quantity_after = quantity_before + quantity
-
-        elif inv_type in [
-            InventoryType.SELL,
-            InventoryType.PurchaseReturn,
-        ]:
-            if quantity > quantity_before:
-                return CustomResponse().errorResponse(
-                    description="Insufficient stock"
-                )
-            quantity_after = quantity_before - quantity
-        else:
-            return CustomResponse().errorResponse(
-                description="Invalid inventory type"
-            )
-        #  Price calculations
-        purchase_price = data.get("purchase_price")
-        sale_price = data.get("sale_price")
-
-        purchase_rate = 0
-        sale_rate = 0
-
-        # PURCHASE & PURCHASE_RETURN
-        if inv_type in [InventoryType.PURCHASE, InventoryType.PurchaseReturn]:
-            if not purchase_price:
-                return CustomResponse().errorResponse(
-                    description="purchase_price is required for purchase"
-                )
-
-            purchase_price = float(purchase_price)
-            purchase_rate = round(purchase_price / quantity, 2)
-
-        # SELL & SALE_RETURN
-        elif inv_type in [InventoryType.SELL, InventoryType.SaleReturn]:
-            if not sale_price:
-                return CustomResponse().errorResponse(
-                    description="sale_price is required for sale"
-                )
-
-            sale_price = float(sale_price)
-            sale_rate = round(sale_price / quantity, 2)
-
-        #   set defaults
-        purchase_price = purchase_price or 0
-        sale_price = sale_price or 0
-        purchase_rate = purchase_rate or 0
-        sale_rate = sale_rate or 0
-
-        # 4️⃣ Save inventory atomically
-        with transaction.atomic():
-            inventory = Inventory.objects.create(
-                store_id=store.id,
-                product_id=product_id,
-                sku=sku,
-                type=inv_type,
-                date=data.get("date") or timezone.now(),
-                user=request.user.id,
-                quantity=quantity,
-                quantity_before=quantity_before,
-                quantity_after=quantity_after,
-
-                purchase_rate_per_item=purchase_rate,
-                purchase_price=purchase_price,
-
-                sale_rate_per_item=sale_rate,
-                sale_price=sale_price,
-
-                gst_input=data.get("gst_input", 0),
-                gst_output=data.get("gst_output", 0),
-                remarks=data.get("remarks"),
-            )
-
-
-        return CustomResponse().successResponse(
-            description="Inventory updated successfully",
-            data={
-                "inventory_id": str(inventory.id),
-                "quantity_before": quantity_before,
-                "quantity_after": quantity_after,
-                "type": inv_type,
-                "purchase_rate_per_item":purchase_rate,
-                "purchase_price":purchase_price,
-            }
-        )
-    def get(self, request, id=None):
-        queryset = Inventory.objects.all()
-
-        # ---------- SINGLE INVENTORY ----------
-        if id:
-            inv = queryset.filter(id=id).first()
-            if not inv:
-                return CustomResponse().errorResponse(
-                    description="Inventory not found"
-                )
-
-            return CustomResponse().successResponse(
-                data={
-                    "id": str(inv.id),
-                    "product_id": str(inv.product_id),
-                    "sku": inv.sku,
-                    "type": inv.type,
-                    "quantity": inv.quantity,
-                    "quantity_before": inv.quantity_before,
-                    "quantity_after": inv.quantity_after,
-                    "purchase_price": inv.purchase_price,
-                    "sale_price": inv.sale_price,
-                    "created_at": inv.created_at,
-                },
-                total=1
-            )
-
-        # ---------- PAGINATION ----------
-        page = int(request.query_params.get("page", 1))
-        page_size = int(request.query_params.get("page_size", 10))
-
-        if page < 1 or page_size < 1:
-            return CustomResponse().errorResponse(
-                description="page and page_size must be positive integers"
-            )
-
-        queryset = queryset.order_by("-created_at")
-
-        total = queryset.count()
-        offset = (page - 1) * page_size
-        queryset = queryset[offset: offset + page_size]
-
-        # ---------- LIST INVENTORY ----------
-        data = []
-        for inv in queryset:
-            data.append({
-                "id": str(inv.id),
-                "product_id": str(inv.product_id),
-                "type": inv.type,
-                "quantity": inv.quantity,
-                "quantity_after": inv.quantity_after,
-                "created_at": inv.created_at,
-            })
-
-        return CustomResponse().successResponse(
-            data=data,
-            total=total
-        )
-
-
-
-    def put(self, request,id=None):
-        if not id:
-            return CustomResponse().errorResponse(
-                description="Inventory id is required"
-            )
-
-        inventory = Inventory.objects.filter(id=id).first()
-        if not inventory:
-            return CustomResponse().errorResponse(
-                description="Inventory not found"
-            )
-
-        editable_fields = ["remarks"]
-
-        for field in editable_fields:
-            if field in request.data:
-                setattr(inventory, field, request.data.get(field))
-
-        inventory.save()
-
-        return CustomResponse().successResponse(
-            data={},description="Inventory updated successfully"
-        )
-
-    def delete(self, request,id=None):
-        if not id:
-            return CustomResponse().errorResponse(
-                description="Inventory id is required"
-            )
-
-        inventory = Inventory.objects.filter(id=id).first()
-        if not inventory:
-            return CustomResponse().errorResponse(
-                description="Inventory not found"
-            )
-
-        inventory.delete()
-
-        return CustomResponse().successResponse(data={},
-            description="Inventory deleted successfully"
-        )
 
 class PinCodeAPIView(APIView):
     permission_classes = [IsAuthenticated]
@@ -4225,372 +3995,4 @@ class DashboardStatsAPIView(APIView):
         return CustomResponse().successResponse(
             data=response,
             description="Dashboard statistics fetched successfully"
-        )
-
-class DiscountAPIView(APIView):
-    permission_classes = [IsAuthenticated]
-
-    def post(self, request):
-        store = request.store
-        data = request.data
-
-        required_fields = ["name", "promo_type", "buy_qty", "get_qty", "products"]
-        for field in required_fields:
-            if not data.get(field):
-                return CustomResponse().errorResponse(
-                    description=f"{field} is required"
-                )
-
-        discount = Discount.objects.create(
-            store=store,
-            name=data["name"],
-            promo_type=data["promo_type"],
-            buy_qty=data["buy_qty"],
-            get_qty=data["get_qty"],
-            is_active=data.get("is_active", True),
-            start_date=data.get("start_date"),
-            end_date=data.get("end_date"),
-            created_by=request.user.id
-        )
-
-        # Attach products
-        for product_id in data["products"]:
-            DiscountProduct.objects.create(
-                discount=discount,
-                product_id=product_id
-            )
-
-        return CustomResponse().successResponse(
-            data={"id": discount.id},
-            description="Discount created successfully"
-        )
-    def get(self, request, id=None):
-        store = request.store
-
-        # ---------------- SINGLE DISCOUNT ----------------
-        if id:
-            discount = Discount.objects.filter(
-                id=id,
-                store=store
-            ).first()
-
-            if not discount:
-                return CustomResponse().errorResponse(
-                    description="Discount not found"
-                )
-
-            products = DiscountProduct.objects.filter(
-                discount=discount
-            ).values_list("product_id", flat=True)
-
-            return CustomResponse().successResponse(
-                data={
-                    "id": discount.id,
-                    "name": discount.name,
-                    "promo_type": discount.promo_type,
-                    "buy_qty": discount.buy_qty,
-                    "get_qty": discount.get_qty,
-                    "is_active": discount.is_active,
-                    "start_date": discount.start_date,
-                    "end_date": discount.end_date,
-                    "products": list(products)
-                },
-                description="Discount fetched successfully"
-            )
-
-        # ---------------- LIST DISCOUNTS ----------------
-        discounts = Discount.objects.filter(
-            store=store
-        ).order_by("-created_at")
-
-        data = []
-        for d in discounts:
-            data.append({
-                "id": d.id,
-                "name": d.name,
-                "promo_type": d.promo_type,
-                "buy_qty": d.buy_qty,
-                "get_qty": d.get_qty,
-                "is_active": d.is_active,
-                "start_date": d.start_date,
-                "end_date": d.end_date,
-            })
-
-        return CustomResponse().successResponse(
-            data=data,
-            description="Discount list fetched successfully"
-        )
-    def put(self, request, id):
-        store = request.store
-        data = request.data
-
-        discount = Discount.objects.filter(
-            id=id,
-            store=store
-        ).first()
-
-        if not discount:
-            return CustomResponse().errorResponse(
-                description="Discount not found"
-            )
-
-        discount.name = data.get("name", discount.name)
-        discount.buy_qty = data.get("buy_qty", discount.buy_qty)
-        discount.get_qty = data.get("get_qty", discount.get_qty)
-        discount.is_active = data.get("is_active", discount.is_active)
-        discount.start_date = data.get("start_date", discount.start_date)
-        discount.end_date = data.get("end_date", discount.end_date)
-        discount.updated_by = request.user.id
-        discount.save()
-
-        # Update products (replace)
-        if "products" in data:
-            DiscountProduct.objects.filter(discount=discount).delete()
-            for product_id in data["products"]:
-                DiscountProduct.objects.create(
-                    discount=discount,
-                    product_id=product_id
-                )
-
-        return CustomResponse().successResponse(
-            data={},
-            description="Discount updated successfully"
-        )
-    def delete(self, request, id):
-        store = request.store
-
-        discount = Discount.objects.filter(
-            id=id,
-            store=store
-        ).first()
-
-        if not discount:
-            return CustomResponse().errorResponse(
-                description="Discount not found"
-            )
-
-        discount.is_active = False
-        discount.save(update_fields=["is_active"])
-
-        return CustomResponse().successResponse(
-            data={},
-            description="Discount disabled successfully"
-        )
-
-class SubscriptionPlanAPIView(APIView):
-    permission_classes = [IsAuthenticated]
-
-
-    def post(self, request):
-        data = request.data
-
-        required_fields = [
-            "plan_code", "name", "amount",
-            "interval_type", "interval_count"
-        ]
-
-        for field in required_fields:
-            if not data.get(field):
-                return CustomResponse.errorResponse(
-                    description=f"{field} is required"
-                )
-
-        if SubscriptionPlan.objects.filter(plan_code=data["plan_code"]).exists():
-            return CustomResponse.errorResponse(
-                description="Plan code already exists"
-            )
-
-        plan = SubscriptionPlan.objects.create(
-            plan_code=data["plan_code"],
-            name=data["name"],
-            description=data.get("description"),
-            amount=data["amount"],
-            interval_type=data["interval_type"],
-            interval_count=data.get("interval_count", 1),
-            max_products=data.get("max_products"),
-            max_orders_per_month=data.get("max_orders_per_month"),
-            enable_analytics=data.get("enable_analytics", False),
-            enable_discounts=data.get("enable_discounts", False),
-            is_active=data.get("is_active", True),
-            created_by=request.user.id
-        )
-
-        return CustomResponse.successResponse(
-            data={"id": str(plan.id)},
-            description="Subscription plan created"
-        )
-
-    def get(self, request):
-        plans = SubscriptionPlan.objects.all().order_by("-created_at")
-
-        data = []
-        for plan in plans:
-            data.append({
-                "id": str(plan.id),
-                "plan_code": plan.plan_code,
-                "name": plan.name,
-                "amount": str(plan.amount),
-                "interval": f"{plan.interval_count} {plan.interval_type}",
-                "is_active": plan.is_active,
-                "features": {
-                    "max_products": plan.max_products,
-                    "max_orders_per_month": plan.max_orders_per_month,
-                    "enable_analytics": plan.enable_analytics,
-                    "enable_discounts": plan.enable_discounts,
-                }
-            })
-
-        return CustomResponse.successResponse(
-            data=data,
-            total=len(data),
-            description="Subscription plans fetched"
-        )
-
-
-
-
-    def put(self, request, id=None):
-        data = request.data
-
-        plan = SubscriptionPlan.objects.filter(id=id).first()
-        if not plan:
-            return CustomResponse.errorResponse("Plan not found")
-
-        plan.name = data.get("name", plan.name)
-        plan.description = data.get("description", plan.description)
-        plan.amount = data.get("amount", plan.amount)
-        plan.interval_type = data.get("interval_type", plan.interval_type)
-        plan.interval_count = data.get("interval_count", plan.interval_count)
-        plan.max_products = data.get("max_products", plan.max_products)
-        plan.max_orders_per_month = data.get(
-            "max_orders_per_month",
-            plan.max_orders_per_month
-        )
-        plan.enable_analytics = data.get(
-            "enable_analytics",
-            plan.enable_analytics
-        )
-        plan.enable_discounts = data.get(
-            "enable_discounts",
-            plan.enable_discounts
-        )
-        plan.is_active = data.get("is_active", plan.is_active)
-        plan.updated_by = request.user.id
-        plan.save()
-
-        return CustomResponse.successResponse(data={},
-            description="Subscription plan updated"
-        )
-
-    def delete(self, request, id=None):
-        plan = SubscriptionPlan.objects.filter(id=id).first()
-        if not plan:
-            return CustomResponse.errorResponse("Plan not found")
-
-        plan.delete()
-
-        return CustomResponse.successResponse(data={},
-            description="Subscription plan deleted"
-        )
-
-
-
-class CreateStoreSubscriptionAPIView(APIView):
-    permission_classes = [IsAuthenticated]
-
-    def post(self, request):
-        store = request.store
-        user = request.user
-        plan_id = request.data.get("plan_id")
-
-        # ---------------- Validation ----------------
-        if not plan_id:
-            return CustomResponse.errorResponse(
-                description="plan_id is required"
-            )
-
-        plan = SubscriptionPlan.objects.filter(
-            id=plan_id,
-            is_active=True
-        ).first()
-
-        if not plan:
-            return CustomResponse.errorResponse(
-                description="Invalid or inactive plan"
-            )
-
-        # ---------------- Check existing subscription ----------------
-        existing = StoreSubscription.objects.filter(store=store).first()
-
-        if existing and existing.status in ["ACTIVE", "INITIATED"]:
-            return CustomResponse.errorResponse(
-                description="Store already has an active subscription"
-            )
-
-        # ---------------- Get BO return URL ----------------
-        store_client = StoreClient.objects.filter(
-            store=store,
-            client_type="BO",
-            is_active=True
-        ).first()
-
-        return_url = (
-            store_client.identifier
-            if store_client else "https://bo.thesru.com"
-        )
-
-        # ---------------- Cashfree payload ----------------
-        payload = {
-            "subscription_id": f"sub_{store.id}",
-            "plan_id": plan.plan_code,
-            "customer_details": {
-                "customer_id": str(store.id),
-                "customer_email": store.email or "",
-                "customer_phone": str(store.mobile),
-            },
-            "subscription_meta": {
-                "return_url": return_url
-            }
-        }
-
-        # ---------------- Create subscription in Cashfree ----------------
-        try:
-            cashfree_response = cashfree_create_subscription(
-                store,
-                payload
-            )
-        except Exception as e:
-            return CustomResponse.errorResponse(
-                description=f"Cashfree error: {str(e)}"
-            )
-
-        # ---------------- Save / Update DB ----------------
-        subscription, created = StoreSubscription.objects.update_or_create(
-            store=store,
-            defaults={
-                "plan": plan,
-                "purchased_by": user,
-                "cashfree_subscription_id": cashfree_response.get(
-                    "subscription_id"
-                ),
-                "cashfree_session_id": cashfree_response.get(
-                    "subscription_session_id"
-                ),
-                "status": "INITIATED",
-                "start_date": None,
-                "end_date": None
-            }
-        )
-
-        # ---------------- Response ----------------
-        return CustomResponse.successResponse(
-            data={
-                "subscription_id": subscription.cashfree_subscription_id,
-                "payment_session_id": subscription.cashfree_session_id,
-                "plan": plan.name,
-                "amount": str(plan.amount),
-                "interval": f"{plan.interval_count} {plan.interval_type}",
-                "return_url": return_url
-            },
-            description="Subscription initiated successfully"
         )

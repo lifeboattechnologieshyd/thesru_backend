@@ -15,6 +15,7 @@ class Tag(AuditModel):
         on_delete=models.CASCADE,
         related_name="tags"
     )
+    display_on_home = models.BooleanField(default=True)
     name = models.CharField(max_length=50)
     slug = models.SlugField(max_length=60)
     is_active = models.BooleanField(default=True)
@@ -38,7 +39,9 @@ class Category(AuditModel):
         related_name="children",
         on_delete=models.CASCADE
     )
+    priority = models.PositiveIntegerField(default=1)
     name = models.CharField(max_length=50)
+    category_group = models.CharField(max_length=50, default="HOME")
     slug = models.SlugField(max_length=60)
     icon = models.CharField(max_length=255, null=True)
     search_tags = ArrayField(models.CharField(max_length=50),null=True)
@@ -46,7 +49,7 @@ class Category(AuditModel):
 
     class Meta:
         db_table = "categories"
-        ordering = ["-created_at"]
+        ordering = ["priority", "-created_at"]
         constraints = [
             models.UniqueConstraint(
                 fields=["store", "name"],
@@ -167,30 +170,38 @@ class ProductMedia(AuditModel):
         ordering = ["position"]
 
 
-class Inventory(AuditModel):
+class InventoryBatch(AuditModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    store_id = models.UUIDField()
-    product_id = models.UUIDField()
-    sku = models.CharField(max_length=20)
-    type = models.CharField(max_length=20,choices=InventoryType.choices)
-    date = models.DateTimeField()
-    user = models.UUIDField()
-    quantity = models.PositiveIntegerField(default=0)
-    quantity_before = models.PositiveIntegerField(default=0)
-    quantity_after = models.PositiveIntegerField(default=0)
-    purchase_rate_per_item = models.DecimalField(decimal_places=2,max_digits=10)
-    purchase_price = models.DecimalField(decimal_places=2,max_digits=10)
-    sale_rate_per_item = models.DecimalField(decimal_places=2,max_digits=10)
-    sale_price = models.DecimalField(decimal_places=2,max_digits=10)
-    gst_input = models.DecimalField(decimal_places=2,max_digits=10)
-    gst_output = models.DecimalField(decimal_places=2,max_digits=10)
-    remarks = models.CharField(max_length=100,null=True)
+    store = models.ForeignKey(Store, on_delete=models.CASCADE)
+    product = models.ForeignKey(Product, on_delete=models.CASCADE)
+    input_quantity = models.PositiveIntegerField()
+    remaining_quantity = models.PositiveIntegerField()
+    cost_per_unit = models.DecimalField(max_digits=10, decimal_places=2)
+    # sell_price = models.DecimalField(max_digits=10, decimal_places=2)
+
 
     class Meta:
-        db_table = "inventory"
+        db_table = "inventory_batch"
         ordering = ["-created_at"]
 
+class InventoryTransaction(AuditModel):
 
+    TRANSACTION_TYPES = (
+        ('IN', 'Stock In'),
+        ('OUT', 'Stock Out'),
+        ('RETURN', 'Return'),
+        ('DAMAGE', 'Damage'),
+    )
+
+    store = models.ForeignKey(Store, on_delete=models.CASCADE)
+    product = models.ForeignKey(Product, on_delete=models.CASCADE)
+    batch = models.ForeignKey(InventoryBatch, on_delete=models.CASCADE, null=True, blank=True)
+
+    transaction_type = models.CharField(max_length=10, choices=TRANSACTION_TYPES)
+
+    quantity = models.IntegerField()
+    cost_price = models.DecimalField(max_digits=10, decimal_places=2)
+    selling_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
 
 class Banner(AuditModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -436,6 +447,8 @@ class OrderProducts(AuditModel):
     qty = models.PositiveIntegerField(default=0)
     mrp = models.DecimalField(decimal_places=2, max_digits=10)
     selling_price = models.DecimalField(decimal_places=2, max_digits=10)
+    cost_price = models.DecimalField(decimal_places=2, max_digits=10, default=0)
+    gross_profit = models.DecimalField(decimal_places=2, max_digits=10, default=0)
     apportioned_discount = models.DecimalField(decimal_places=2, max_digits=10)
     apportioned_wallet = models.DecimalField(decimal_places=2, max_digits=10)
     apportioned_online = models.DecimalField(decimal_places=2, max_digits=10)
@@ -815,155 +828,3 @@ class ShippingRule(AuditModel):
     rate = models.DecimalField(max_digits=10, decimal_places=2)
     class Meta:
         db_table = "shipping_rule"
-
-
-class Discount(AuditModel):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-
-    PROMO_TYPE_CHOICES = [
-        ("BUY_X_GET_Y", "Buy X Get Y"),
-    ]
-
-    store = models.ForeignKey(
-        Store,
-        on_delete=models.CASCADE,
-        related_name="discounts"
-    )
-
-    name = models.CharField(max_length=100)
-
-    promo_type = models.CharField(
-        max_length=20,
-        choices=PROMO_TYPE_CHOICES
-    )
-
-    buy_qty = models.PositiveIntegerField()
-    get_qty = models.PositiveIntegerField()
-
-    is_active = models.BooleanField(default=True)
-
-    start_date = models.DateTimeField(null=True, blank=True)
-    end_date = models.DateTimeField(null=True, blank=True)
-
-    class Meta:
-        db_table = "discount"
-
-class DiscountProduct(AuditModel):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-
-    discount = models.ForeignKey(
-        Discount,
-        on_delete=models.CASCADE,
-        related_name="products"
-    )
-    product = models.ForeignKey(
-        Product,
-        on_delete=models.CASCADE
-    )
-
-    class Meta:
-        db_table = "discount_product"
-        unique_together = ("discount", "product")
-
-
-
-class SubscriptionPlan(AuditModel):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-
-
-    PLAN_TYPE_CHOICES = [
-        ("BASIC", "Basic"),
-        ("PRO", "Pro"),
-        ("ENTERPRISE", "Enterprise"),
-    ]
-
-    plan_code = models.CharField(
-        max_length=50,
-        unique=True,
-        help_text="Internal plan code"
-    )
-
-    name = models.CharField(max_length=100)
-    description = models.TextField(null=True, blank=True)
-
-    amount = models.DecimalField(
-        max_digits=10,
-        decimal_places=2
-    )
-
-    interval_type = models.CharField(
-        max_length=10,
-        choices=[
-            ("MONTH", "Monthly"),
-            ("YEAR", "Yearly"),
-        ]
-    )
-
-    interval_count = models.PositiveIntegerField(default=1)
-
-    # Feature limits
-    max_products = models.PositiveIntegerField(null=True, blank=True)
-    max_orders_per_month = models.PositiveIntegerField(null=True, blank=True)
-    enable_analytics = models.BooleanField(default=False)
-    enable_discounts = models.BooleanField(default=False)
-
-    is_active = models.BooleanField(default=True)
-
-    class Meta:
-        db_table = "subscription_plan"
-
-class StoreSubscription(AuditModel):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-
-    store = models.OneToOneField(
-        Store,
-        on_delete=models.CASCADE,
-        related_name="subscription"
-    )
-
-    plan = models.ForeignKey(
-        SubscriptionPlan,
-        on_delete=models.SET_NULL,
-        null=True
-    )
-
-    purchased_by = models.ForeignKey(
-        User,
-        on_delete=models.SET_NULL,
-        null=True,
-        help_text="Store admin who purchased the plan"
-    )
-
-    # Cashfree details
-    cashfree_subscription_id = models.CharField(
-        max_length=255,
-        null=True,
-        blank=True
-    )
-
-    cashfree_session_id = models.CharField(
-        max_length=255,
-        null=True,
-        blank=True
-    )
-
-    status = models.CharField(
-        max_length=20,
-        choices=[
-            ("INITIATED", "Initiated"),
-            ("ACTIVE", "Active"),
-            ("EXPIRED", "Expired"),
-            ("CANCELLED", "Cancelled"),
-        ],
-        default="INITIATED"
-    )
-
-    start_date = models.DateTimeField(null=True, blank=True)
-    end_date = models.DateTimeField(null=True, blank=True)
-
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-
-    class Meta:
-        db_table = "store_subscription"
-

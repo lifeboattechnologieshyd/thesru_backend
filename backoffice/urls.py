@@ -1,15 +1,20 @@
 from django.urls import path
 
+from backoffice.inventory import StockInAPIView
 from backoffice.shipping import  ShippingPlanAPIView, ShippinPlanCrud
-from backoffice.store import ProductAPIView, CategoriesAPIView, BannerAPIView, InventoryAPIView, \
+from backoffice.store import ProductAPIView, CategoriesAPIView, BannerAPIView, \
     PinCodeAPIView, StoreAPIView, WebBannerAPIView, FlashSaleBannerAPIView, OrderStatsAPIView, \
     CartListView, OrderListAPIView, AbandonedOrderListAPIView, Login, SendOTP, TagsAPIView, AdminOrderDetailAPIView, \
     AdminCreateCouponAPIView, UserAddress, UserAPIView, CreateAppVersionConfigAPI, OrderShippingSlipAPIView, \
     StoreAnalyticsAPIView, EmailSendOTPView, EmailVerifyOTPView, ClientInfo, NotificationConfig, \
     NotificationTemplateConfig, SuperAdminSendOTPAPIView, SuperAdminVerifyOTPAPIView, StoreListAPIView, \
-    DashboardStatsAPIView, DiscountAPIView, CreateStoreSubscriptionAPIView, SubscriptionPlanAPIView
+    DashboardStatsAPIView
 
 urlpatterns = [
+
+    #####################################
+    ## User Authentication API's       ##
+    #####################################
 
     path("send-otp",SendOTP.as_view()),
     path("verify-otp",Login.as_view()),
@@ -17,8 +22,16 @@ urlpatterns = [
     path("email-send-otp",EmailSendOTPView.as_view()),
     path("email-verify-otp",EmailVerifyOTPView.as_view()),
 
+    #####################################
+    ## User Search & Address API's     ##
+    #####################################
+
     path("user/search",UserAPIView.as_view()),
     path("user/address",UserAddress.as_view()),
+
+    #####################################
+    ## Store  API's                    ##
+    #####################################
 
     path("store", StoreAPIView.as_view()),
     path("store/<str:id>", StoreAPIView.as_view()),
@@ -38,8 +51,6 @@ urlpatterns = [
     path("banner",BannerAPIView.as_view()),
     path("banner/<str:id>",BannerAPIView.as_view()),
 
-    path("inventory",InventoryAPIView.as_view()),
-    path("inventory/<str:id>",InventoryAPIView.as_view()),
 
     path("pin",PinCodeAPIView.as_view()),
     path("pin/<str:id>",PinCodeAPIView.as_view()),
@@ -81,13 +92,10 @@ urlpatterns = [
 
     path("dashboard",DashboardStatsAPIView.as_view()),
 
-    path("discount",DiscountAPIView.as_view()),
-    path("discount/<str:id>",DiscountAPIView.as_view()),
 
-    path("plan",SubscriptionPlanAPIView.as_view()),
-    path("plan/<str:id>",SubscriptionPlanAPIView.as_view()),
-
-
-    path("create/subscription",CreateStoreSubscriptionAPIView.as_view()),
+    #####################################
+    ## stock related apis -- INVENTORY ##
+    #####################################
+    path("stock-in",StockInAPIView.as_view()),
 
 ]

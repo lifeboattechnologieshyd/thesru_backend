@@ -22,7 +22,8 @@ from config.firebase import send_push_notification
 from db import models
 from db.models import AddressMaster, PinCode, Product, Order, OrderProducts, Payment, OrderTimeLines, \
     Banner, Category, Cart, CouponUsage, Wishlist, CouponProduct, CouponCategory, CouponTag, WebBanner, FlashSaleBanner, \
-    ProductReviews, ContactMessage, Tag, Coupons, ProductReviewMedia, Store, Discount, DiscountProduct
+    ProductReviews, ContactMessage, Tag, Coupons, ProductReviewMedia, Store, InventoryBatch, \
+    InventoryTransaction
 from enums.store import OrderStatus, PaymentStatus, NotificationEvent
 from mixins.drf_views import CustomResponse
 from utils.notification import trigger_notification
@@ -1148,6 +1149,56 @@ def initiateOrder(user, amount, order, store):
 
 SYSTEM_UPDATED_BY = "CASHFREE_WEBHOOK"
 
+def deduct_stock_fifo(product, quantity):
+
+    batches = InventoryBatch.objects.select_for_update().filter(
+        product=product,
+        remaining_quantity__gt=0
+    ).order_by("created_at")
+
+    qty_to_deduct = quantity
+    total_profit = 0
+    deduction_details = []
+
+    for batch in batches:
+        if qty_to_deduct <= 0:
+            break
+
+        deduct_qty = min(batch.remaining_quantity, qty_to_deduct)
+
+        profit_per_unit = batch.sell_price - batch.cost_per_unit
+        total_profit += profit_per_unit * deduct_qty
+
+        # Reduce stock
+        batch.remaining_quantity -= deduct_qty
+        batch.save()
+
+        # Ledger entry
+        InventoryTransaction.objects.create(
+            store=product.store,
+            product=product,
+            batch=batch,
+            transaction_type='OUT',
+            quantity=deduct_qty,
+            cost_price=batch.cost_per_unit,
+            selling_price=batch.sell_price
+        )
+
+        deduction_details.append({
+            "batch_id": batch.id,
+            "deducted": deduct_qty,
+            "cost_price": batch.cost_per_unit,
+            "sell_price": batch.sell_price
+        })
+
+        qty_to_deduct -= deduct_qty
+
+    if qty_to_deduct > 0:
+        raise Exception("Insufficient stock")
+
+    return total_profit, deduction_details
+
+
 def remove_cart_items(user, store):
     Cart.objects.filter(user=user, store=store).delete()
 
@@ -1157,41 +1208,45 @@ class Webhook(APIView):
     def post(self, request):
         try:
             data = request.data
-
             event_type = data.get("type")
             order_id = data.get("data", {}).get("order", {}).get("order_id")
             order_amount = data.get("data", {}).get("order", {}).get("order_amount")
-
             print("Webhook received:", data)
-
             # Cashfree test webhook may not have real order_id
             if not order_id:
                 print("Webhook test / invalid payload")
                 return CustomResponse().successResponse(data={},
                     description="Webhook received"
                 )
-            order = Order.objects.filter(order_number=order_id).first()
-            if not order:
-                return CustomResponse().successResponse(data={},
+            with transaction.atomic():
+
+                order = Order.objects.select_for_update().filter(order_number=order_id).first()
+                if not order:
+                    return CustomResponse().successResponse(data={},
                                                         description="No Order Found with Order Number"
                                                         )
 
-            payment = Payment.objects.filter(order=order).first()
-
-            # If no DB records → still return 200
-            if not payment:
-                print("Order/Payment not found for order_id:", order_id)
-                return CustomResponse().successResponse(data={},
-                    description="Webhook received"
-                )
-
-            with transaction.atomic():
+                payment = Payment.objects.filter(order=order).first()
+                # If no DB records → still return 200
+                if not payment:
+                    print("Order/Payment not found for order_id:", order_id)
+                    return CustomResponse().successResponse(data={},
+                        description="Webhook received"
+                    )
+                if payment.status != PaymentStatus.INITIATED:
+                    return CustomResponse().successResponse(
+                        data={
+                            "order_number": order.order_number,
+                            "final_payment_status": order.status,
+                        },
+                        description="Payment status verified with Cashfree and updated"
+                    )
 
                 if event_type == "PAYMENT_SUCCESS_WEBHOOK":
+                    update_stock_after_order(order)
                     payment.status = PaymentStatus.COMPLETED
                     payment.updated_by = event_type
                     payment.save(update_fields=["status", "updated_by"])
-
                     order.status = OrderStatus.CREATED
                     order.paid_online = order_amount
                     order.updated_by = event_type
@@ -1223,9 +1278,6 @@ class Webhook(APIView):
                         body="Your order has been placed successfully",
                         data={"order_id": order.order_number}
                     )
-                    update_stock_after_order(order)
-
-
                     remove_cart_items(order.user, order.store)
                 elif event_type == "PAYMENT_FAILED_WEBHOOK":
                     payment.status = PaymentStatus.FAILED
@@ -1241,7 +1293,6 @@ class Webhook(APIView):
                         status=OrderStatus.FAILED,
                         remarks="Order Failed"
                     )
-
                 elif event_type == "PAYMENT_USER_DROPPED_WEBHOOK":
                     payment.status = PaymentStatus.CANCELLED
                     payment.updated_by = event_type
@@ -1257,7 +1308,6 @@ class Webhook(APIView):
                     )
                 else:
                     print("Unhandled webhook type:", event_type)
-
             return CustomResponse().successResponse(data={},
                 description="Webhook processed"
             )

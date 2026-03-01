@@ -1,8 +1,8 @@
 import string
 import time
 import random
-import requests
-from db.models import Order, StoreSequence, OrderSequence, Product
+
+from db.models import Order, StoreSequence, OrderSequence, Product, InventoryBatch, InventoryTransaction
 
 # def generate_order_id():
 #     while True:
@@ -87,39 +87,45 @@ def update_stock_after_order(order):
         product = item.product
         qty = item.qty
 
-        # Safety check
-        if product.current_stock < qty:
-            raise Exception(
-                f"Insufficient stock for {product.name}"
-            )
-
-        # Atomic update (prevents race conditions)
-        Product.objects.filter(
-            id=product.id
+        # Atomic decrement
+        updated = Product.objects.filter(
+            id=product.id,
+            current_stock__gte=qty
         ).update(
             current_stock=F("current_stock") - qty
         )
+        if updated == 0:
+            raise Exception(f"Insufficient stock for {product.name}")
 
+        # stockout from inventory also.
+        batches = InventoryBatch.objects.select_for_update().filter(
+            product=product,
+            remaining_quantity__gt=0
+        ).order_by("created_at")
+        qty_to_deduct = qty
+        total_cost = 0
+        for batch in batches:
+            if qty_to_deduct <= 0:
+                break
+            deduct_qty = min(batch.remaining_quantity, qty_to_deduct)
+            total_cost += batch.cost_per_unit * deduct_qty
+            batch.remaining_quantity -= deduct_qty
+            batch.save(update_fields=["remaining_quantity"])
 
-import requests
-
-def cashfree_create_subscription(store, payload):
-    url = "https://sandbox.cashfree.com/pg/subscriptions"
-
-    headers = {
-        "x-api-version": "2025-01-01",   # IMPORTANT
-        "x-client-id": store.client_id,
-        "x-client-secret": store.client_secret,
-        "Content-Type": "application/json",
-        "accept": "application/json"
-    }
-
-    response = requests.post(url, json=payload, headers=headers)
-
-    print("CASHFREE STATUS:", response.status_code)
-    print("CASHFREE RESPONSE:", response.text)
-
-    if response.status_code != 200:
-        raise Exception(response.text)
-
-    return response.json()
+            InventoryTransaction.objects.create(
+                store=product.store,
+                product=product,
+                batch=batch,
+                transaction_type="OUT",
+                quantity=deduct_qty,
+                cost_price=batch.cost_per_unit,
+                selling_price=item.selling_price
+            )
+            qty_to_deduct -= deduct_qty
+        if qty_to_deduct > 0:
+            raise Exception(f"Insufficient stock for {product.name}")
+        cost_price_at_sale = total_cost / qty
+        gross_profit = (item.selling_price * qty) - total_cost
+        item.cost_price = cost_price_at_sale
+        item.gross_profit = gross_profit
+        item.save(update_fields=["cost_price", "gross_profit"])
