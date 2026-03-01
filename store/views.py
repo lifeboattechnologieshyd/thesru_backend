@@ -2384,7 +2384,7 @@ class FirebaseTestPushAPIView(APIView):
 class ShippingDetails(APIView):
     permission_classes = [AllowAny]
 
-    def post(self, request):
+    def get(self, request):
         store = request.store
         shipping_details = ShippingPlan.objects.filter(store=store).values()
         return CustomResponse().successResponse(
