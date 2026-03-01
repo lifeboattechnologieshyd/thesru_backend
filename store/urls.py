@@ -49,7 +49,7 @@ urlpatterns = [
 
     path("push/test",FirebaseTestPushAPIView.as_view()),
 
-    path("store/shipping/details",ShippingDetails.as_view()),
+    path("shipping/details",ShippingDetails.as_view()),
 
 
 ]
