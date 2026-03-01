@@ -93,32 +93,29 @@ class Product(AuditModel):
     # Display
     name = models.CharField(max_length=150)
     colour = models.CharField(max_length=50)
+    colour_code = models.CharField(max_length=50)
     size = models.CharField(max_length=50, null=True, blank=True)
 
     # Pricing
     mrp = models.DecimalField(max_digits=10, decimal_places=2)
     selling_price = models.DecimalField(max_digits=10, decimal_places=2)
-
     gst_percentage = models.DecimalField(
         max_digits=5, decimal_places=2, null=True, blank=True
     )
     gst_amount = models.DecimalField(
         max_digits=10, decimal_places=2, null=True, blank=True
     )
-
-    # Inventory
-    current_stock = models.PositiveIntegerField(default=0)
+    current_stock = models.PositiveIntegerField(default=0) # not editable from user actions.
 
     # Discovery / PDP
     description = models.TextField(null=True, blank=True)
+    care = models.TextField(null=True, blank=True)
     highlights = models.TextField(null=True, blank=True)
-
     categories = models.ManyToManyField(
         Category,
         related_name="display_products",
         blank=True
     )
-
     tags = models.ManyToManyField(
         Tag,
         related_name="display_products",

@@ -572,61 +572,6 @@ class CheckoutPreview(APIView):
 
 
         price_drop_discount = mrp_total - subtotal
-
-
-        # ================= BUY X GET Y =================
-        free_items = []
-
-        discount = Discount.objects.filter(
-            store=store,
-            promo_type="BUY_X_GET_Y",
-            is_active=True,
-            start_date__lte=timezone.now(),
-            end_date__gte=timezone.now()
-        ).first()
-
-        if discount:
-            eligible_product_ids = list(
-                DiscountProduct.objects.filter(
-                    discount=discount
-                ).values_list("product_id", flat=True)
-            )
-
-            eligible_qty = 0
-            eligible_products = []
-
-            for item in products_data:
-                if item["product"].id in eligible_product_ids:
-                    eligible_qty += item["qty"]
-                    eligible_products.append(item["product"])
-
-            free_qty = (eligible_qty // discount.buy_qty) * discount.get_qty
-
-            if free_qty > 0:
-                free_product = min(
-                    eligible_products,
-                    key=lambda p: p.selling_price
-                )
-
-                free_items.append({
-                    "product_id": str(free_product.id),
-                    "name": f"{free_product.name} (Free)",
-                    "sku": free_product.sku,
-                    "qty": free_qty,
-                    "mrp": str(free_product.mrp),
-                    "selling_price": "0.00",
-                    "line_mrp": str(free_product.mrp * free_qty),
-                    "line_subtotal": "0.00",
-                    "coupon_discount": "0.00",
-                    "payable": "0.00",
-                    "is_free": True,
-                    "media": [
-                        {"url": m.url, "type": m.media_type}
-                        for m in free_product.media.all()
-                    ]
-                })
-        # =================================================
-
         # ---------- Coupon ----------
         coupon_discount = Decimal("0.00")
         apportioned_map = {}
@@ -662,59 +607,6 @@ class CheckoutPreview(APIView):
                 + platform_fee
         )
 
-        # =====================================================
-
-        free_items = []
-
-        discount = Discount.objects.filter(
-            store=store,
-            promo_type="BUY_X_GET_Y",
-            is_active=True,
-            start_date__lte=timezone.now(),
-            end_date__gte=timezone.now()
-        ).first()
-
-        if discount:
-            eligible_product_ids = list(
-                DiscountProduct.objects.filter(
-                    discount=discount
-                ).values_list("product_id", flat=True)
-            )
-
-            eligible_qty = 0
-            eligible_products = []
-
-            for item in products_data:
-                if item["product"].id in eligible_product_ids:
-                    eligible_qty += item["qty"]
-                    eligible_products.append(item["product"])
-
-            if eligible_qty >= discount.buy_qty:
-                free_qty = (eligible_qty // discount.buy_qty) * discount.get_qty
-
-                # choose cheapest product as free
-                free_product = min(
-                    eligible_products,
-                    key=lambda p: p.selling_price
-                )
-
-                free_items.append({
-                    "product_id": str(free_product.id),
-                    "name": free_product.name,
-                    "sku": free_product.sku,
-                    "qty": free_qty,
-                    "mrp": str(free_product.mrp),
-                    "selling_price": "0.00",
-                    "line_mrp": str(free_product.mrp * free_qty),
-                    "line_subtotal": "0.00",
-                    "coupon_discount": "0.00",
-                    "payable": "0.00",
-                    "is_free": True,
-                    "media": [
-                        {"url": m.url, "type": m.media_type}
-                        for m in free_product.media.all()
-                    ]
-                })
         # ---------- Product response ----------
         product_response = []
         for item in products_data:
@@ -741,7 +633,6 @@ class CheckoutPreview(APIView):
                     for m in product.media.all()
                 ]
             })
-        product_response.extend(free_items)
         coupon_details = None
         if coupon:
             coupon_details = {
