@@ -1316,6 +1316,7 @@ class TagsAPIView(APIView):
             store=store,
             name=data["name"].strip(),
             slug=slug,
+            display_on_home=data.get("display_on_home", False),
             is_active=data.get("is_active", True),
             created_by=request.user.mobile
         )
@@ -1357,13 +1358,10 @@ class TagsAPIView(APIView):
     def put(self, request, id=None):
         store = request.store
         data = request.data
-
         if not id:
             return CustomResponse.errorResponse(
                 description="Tag id is required"
             )
-
-        # 1. Fetch tag (store-safe)
         try:
             tag = Tag.objects.get(id=id, store=store)
         except Tag.DoesNotExist:
@@ -1427,6 +1425,8 @@ class TagsAPIView(APIView):
         # 4. is_active update
         if "is_active" in data:
             tag.is_active = bool(data.get("is_active"))
+        if "display_on_home" in data:
+            tag.display_on_home = bool(data.get("display_on_home"))
 
         # 5. Audit
         tag.updated_by = request.user.mobile
@@ -1618,13 +1618,29 @@ class PinCodeAPIView(APIView):
         # ---------- PAGINATION ----------
         page = int(request.query_params.get("page", 1))
         page_size = int(request.query_params.get("page_size", 10))
+        state = request.query_params.get("state", None)
+        district = request.query_params.get("district", None)
+        pincode = request.query_params.get("pincode", None)
 
         if page < 1 or page_size < 1:
             return CustomResponse.errorResponse(
                 description="page and page_size must be positive integers"
             )
+        if pincode:
+            queryset = PinCode.objects.filter(pin=pincode).first()
+            if queryset:
+                data = list(queryset.values())
+                return CustomResponse.successResponse(
+                    data=data,
+                    total=queryset.count()
+                )
+        queryset = PinCode.objects.all()
+        if state:
+            queryset = queryset.filter(state=state)
+        if district:
+            queryset = queryset.filter(district=district)
 
-        queryset = PinCode.objects.all().order_by("-created_at")
+        queryset = queryset.order_by("-created_at")
 
         total = queryset.count()
         offset = (page - 1) * page_size

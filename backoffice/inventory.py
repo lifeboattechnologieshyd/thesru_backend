@@ -64,6 +64,20 @@ class StockInAPIView(APIView):
         )
         return CustomResponse().successResponse(data={}, description="Stock added successfully")
 
+    def get(self,request):
+        queryset = InventoryBatch.objects.all().order_by("-created_at")
+        page = request.GET.get("page", 1)
+        page_size = request.GET.get("page_size", 10)
+        offset = (page - 1) * page_size
+        queryset = queryset[offset: offset + page_size]
+        data = list(queryset.values())
+        return CustomResponse.successResponse(
+            data=data,
+            total=queryset.count()
+        )
+
+
+
 
 
 

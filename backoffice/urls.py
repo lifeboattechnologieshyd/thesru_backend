@@ -44,6 +44,7 @@ urlpatterns = [
     path("category/<str:id>",CategoriesAPIView.as_view()),
 
     path("tag",TagsAPIView.as_view()),
+    path("tag/<str:id>",TagsAPIView.as_view()),
 
     path("appversion",CreateAppVersionConfigAPI.as_view()),
     path("appversion/<str:id>",CreateAppVersionConfigAPI.as_view()),
