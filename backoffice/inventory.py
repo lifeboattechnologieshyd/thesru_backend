@@ -66,8 +66,8 @@ class StockInAPIView(APIView):
 
     def get(self,request):
         queryset = InventoryBatch.objects.all().order_by("-created_at")
-        page = request.GET.get("page", 1)
-        page_size = request.GET.get("page_size", 10)
+        page = int(request.GET.get("page", 1))
+        page_size = int(request.GET.get("page_size", 10))
         offset = (page - 1) * page_size
         queryset = queryset[offset: offset + page_size]
         data = list(queryset.values())
@@ -75,6 +75,7 @@ class StockInAPIView(APIView):
             data=data,
             total=queryset.count()
         )
+
 
 
 

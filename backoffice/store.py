@@ -1,6 +1,7 @@
 from datetime import timedelta
 from decimal import Decimal
 
+from django.db.models.functions import Coalesce
 from django.forms import model_to_dict
 from django.utils.timezone import make_aware
 from datetime import datetime
@@ -1686,9 +1687,33 @@ class PinCodeAPIView(APIView):
 
 
 
+class PinCodeStatesAPIView(APIView):
+
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        states = (
+            PinCode.objects
+            .values_list("state", flat=True)
+            .distinct()
+            .order_by("state")
+        )
+        return CustomResponse.successResponse(data=list(states),
+                                              description="pincode deleted successfully")
 
 
+class PinCodeDistrictAPIView(APIView):
+    permission_classes = [AllowAny]
 
+    def get(self, request):
+        states = (
+            PinCode.objects
+            .values_list("district", flat=True)
+            .distinct()
+            .order_by("district")
+        )
+        return CustomResponse.successResponse(data=list(states),
+                                              description="pincode deleted successfully")
 
 
 class StoreAPIView(APIView):
@@ -3235,7 +3260,12 @@ class StoreAnalyticsAPIView(APIView):
                 })
 
 
+        # GROSS SALES AND PROFITS
+        queryset = OrderProducts.objects.filter(created_at__date__range=[from_date, to_date])
 
+        result = queryset.aggregate(
+            gross_profit=Coalesce(Sum("gross_profit"), 0)
+        )
 
 
         # -------------------------
@@ -3246,6 +3276,7 @@ class StoreAnalyticsAPIView(APIView):
             "total_orders": total_orders,
             "total_customers": total_customers,
             "total_products": total_products,
+            "gross_profit": float(result["gross_profit"]),
 
             "order_status_counts": order_status_counts,
 
