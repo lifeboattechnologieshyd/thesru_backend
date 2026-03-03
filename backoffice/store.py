@@ -3264,7 +3264,9 @@ class StoreAnalyticsAPIView(APIView):
         queryset = OrderProducts.objects.filter(created_at__date__range=[from_date, to_date])
 
         result = queryset.aggregate(
-            gross_profit=Coalesce(Sum("gross_profit"), 0)
+            gross_profit=Coalesce(Sum("gross_profit"), 0,
+                                  output_field=DecimalField()
+)
         )
 
 
