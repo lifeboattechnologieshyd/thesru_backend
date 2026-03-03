@@ -46,7 +46,6 @@ class StockInAPIView(APIView):
             input_quantity=quantity,
             remaining_quantity=quantity,
             cost_per_unit=cost_per_unit,
-            sell_price=sell_price
         )
 
         # ---- Create Ledger Entry ----
