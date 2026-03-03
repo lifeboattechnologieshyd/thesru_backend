@@ -8,7 +8,7 @@ from backoffice.store import ProductAPIView, CategoriesAPIView, BannerAPIView, \
     AdminCreateCouponAPIView, UserAddress, UserAPIView, CreateAppVersionConfigAPI, OrderShippingSlipAPIView, \
     StoreAnalyticsAPIView, EmailSendOTPView, EmailVerifyOTPView, ClientInfo, NotificationConfig, \
     NotificationTemplateConfig, SuperAdminSendOTPAPIView, SuperAdminVerifyOTPAPIView, StoreListAPIView, \
-    DashboardStatsAPIView, PinCodeStatesAPIView
+    DashboardStatsAPIView, PinCodeStatesAPIView, PinCodeDistrictAPIView
 
 urlpatterns = [
 
@@ -56,8 +56,8 @@ urlpatterns = [
     path("pin",PinCodeAPIView.as_view()),
     path("pin/<str:id>",PinCodeAPIView.as_view()),
 
-    path("pin/states",PinCodeStatesAPIView.as_view()),
-    path("pin/districts",PinCodeStatesAPIView.as_view()),
+    path("states",PinCodeStatesAPIView.as_view()),
+    path("districts",PinCodeDistrictAPIView.as_view()),
 
     path("webbanner",WebBannerAPIView.as_view()),
     path("webbanner/<str:id>",WebBannerAPIView.as_view()),
