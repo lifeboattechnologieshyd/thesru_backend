@@ -2,8 +2,7 @@ import string
 import time
 import random
 
-from db.models import Order, StoreSequence, OrderSequence
-
+from db.models import Order, StoreSequence, OrderSequence, Product, InventoryBatch, InventoryTransaction
 
 # def generate_order_id():
 #     while True:
@@ -75,3 +74,58 @@ BO_STATUS_FLOW = {
     OrderStatus.PACKED: [OrderStatus.SHIPPED],
     OrderStatus.SHIPPED: [OrderStatus.DELIVERED],
 }
+
+from django.db import transaction
+from django.db.models import F
+
+def update_stock_after_order(order):
+    """
+    Reduce stock for each product in the order
+    """
+
+    for item in order.items.select_related("product"):
+        product = item.product
+        qty = item.qty
+
+        # Atomic decrement
+        updated = Product.objects.filter(
+            id=product.id,
+            current_stock__gte=qty
+        ).update(
+            current_stock=F("current_stock") - qty
+        )
+        if updated == 0:
+            raise Exception(f"Insufficient stock for {product.name}")
+
+        # stockout from inventory also.
+        batches = InventoryBatch.objects.select_for_update().filter(
+            product=product,
+            remaining_quantity__gt=0
+        ).order_by("created_at")
+        qty_to_deduct = qty
+        total_cost = 0
+        for batch in batches:
+            if qty_to_deduct <= 0:
+                break
+            deduct_qty = min(batch.remaining_quantity, qty_to_deduct)
+            total_cost += batch.cost_per_unit * deduct_qty
+            batch.remaining_quantity -= deduct_qty
+            batch.save(update_fields=["remaining_quantity"])
+
+            InventoryTransaction.objects.create(
+                store=product.store,
+                product=product,
+                batch=batch,
+                transaction_type="OUT",
+                quantity=deduct_qty,
+                cost_price=batch.cost_per_unit,
+                selling_price=item.selling_price
+            )
+            qty_to_deduct -= deduct_qty
+        if qty_to_deduct > 0:
+            raise Exception(f"Insufficient stock for {product.name}")
+        cost_price_at_sale = total_cost / qty
+        gross_profit = (item.selling_price * qty) - total_cost
+        item.cost_price = cost_price_at_sale
+        item.gross_profit = gross_profit
+        item.save(update_fields=["cost_price", "gross_profit"])

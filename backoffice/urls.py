@@ -1,15 +1,20 @@
 from django.urls import path
 
+from backoffice.inventory import StockInAPIView
 from backoffice.shipping import  ShippingPlanAPIView, ShippinPlanCrud
-from backoffice.store import ProductAPIView, CategoriesAPIView, BannerAPIView, InventoryAPIView, \
+from backoffice.store import ProductAPIView, CategoriesAPIView, BannerAPIView, \
     PinCodeAPIView, StoreAPIView, WebBannerAPIView, FlashSaleBannerAPIView, OrderStatsAPIView, \
     CartListView, OrderListAPIView, AbandonedOrderListAPIView, Login, SendOTP, TagsAPIView, AdminOrderDetailAPIView, \
     AdminCreateCouponAPIView, UserAddress, UserAPIView, CreateAppVersionConfigAPI, OrderShippingSlipAPIView, \
     StoreAnalyticsAPIView, EmailSendOTPView, EmailVerifyOTPView, ClientInfo, NotificationConfig, \
     NotificationTemplateConfig, SuperAdminSendOTPAPIView, SuperAdminVerifyOTPAPIView, StoreListAPIView, \
-    DashboardStatsAPIView
+    DashboardStatsAPIView, PinCodeStatesAPIView, PinCodeDistrictAPIView
 
 urlpatterns = [
+
+    #####################################
+    ## User Authentication API's       ##
+    #####################################
 
     path("send-otp",SendOTP.as_view()),
     path("verify-otp",Login.as_view()),
@@ -17,8 +22,16 @@ urlpatterns = [
     path("email-send-otp",EmailSendOTPView.as_view()),
     path("email-verify-otp",EmailVerifyOTPView.as_view()),
 
+    #####################################
+    ## User Search & Address API's     ##
+    #####################################
+
     path("user/search",UserAPIView.as_view()),
     path("user/address",UserAddress.as_view()),
+
+    #####################################
+    ## Store  API's                    ##
+    #####################################
 
     path("store", StoreAPIView.as_view()),
     path("store/<str:id>", StoreAPIView.as_view()),
@@ -31,6 +44,7 @@ urlpatterns = [
     path("category/<str:id>",CategoriesAPIView.as_view()),
 
     path("tag",TagsAPIView.as_view()),
+    path("tag/<str:id>",TagsAPIView.as_view()),
 
     path("appversion",CreateAppVersionConfigAPI.as_view()),
     path("appversion/<str:id>",CreateAppVersionConfigAPI.as_view()),
@@ -38,11 +52,12 @@ urlpatterns = [
     path("banner",BannerAPIView.as_view()),
     path("banner/<str:id>",BannerAPIView.as_view()),
 
-    path("inventory",InventoryAPIView.as_view()),
-    path("inventory/<str:id>",InventoryAPIView.as_view()),
 
     path("pin",PinCodeAPIView.as_view()),
     path("pin/<str:id>",PinCodeAPIView.as_view()),
+
+    path("states",PinCodeStatesAPIView.as_view()),
+    path("districts",PinCodeDistrictAPIView.as_view()),
 
     path("webbanner",WebBannerAPIView.as_view()),
     path("webbanner/<str:id>",WebBannerAPIView.as_view()),
@@ -79,6 +94,13 @@ urlpatterns = [
 
     path("shipping/rule",ShippinPlanCrud.as_view()), # create, get, edit
 
+    ## SUPER ADMIN
     path("dashboard",DashboardStatsAPIView.as_view()),
+
+
+    #####################################
+    ## stock related apis -- INVENTORY ##
+    #####################################
+    path("stock-in",StockInAPIView.as_view()),
 
 ]

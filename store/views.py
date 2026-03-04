@@ -22,11 +22,12 @@ from config.firebase import send_push_notification
 from db import models
 from db.models import AddressMaster, PinCode, Product, Order, OrderProducts, Payment, OrderTimeLines, \
     Banner, Category, Cart, CouponUsage, Wishlist, CouponProduct, CouponCategory, CouponTag, WebBanner, FlashSaleBanner, \
-    ProductReviews, ContactMessage, Tag, Coupons, ProductReviewMedia, Store
+    ProductReviews, ContactMessage, Tag, Coupons, ProductReviewMedia, Store, InventoryBatch, \
+    InventoryTransaction, ShippingPlan
 from enums.store import OrderStatus, PaymentStatus, NotificationEvent
 from mixins.drf_views import CustomResponse
 from utils.notification import trigger_notification
-from utils.store import generate_order_number, time_ago
+from utils.store import generate_order_number, time_ago, update_stock_after_order
 from utils.user import send_order_created_admin_email
 
 
@@ -42,6 +43,8 @@ class CategoryListView(APIView):
             data.append({
                 "id": str(category.id),
                 "name": category.name,
+                "priority": category.priority,
+                "category_group": category.category_group,
                 "slug": category.slug,
                 "icon": category.icon,
                 "search_tags": category.search_tags,
@@ -64,6 +67,7 @@ class TagsListView(APIView):
             data.append({
                 "id": str(tag.id),
                 "name": tag.name,
+                "display_on_home": tag.display_on_home,
                 "slug": tag.slug,
                 "is_active": tag.is_active,
             })
@@ -571,7 +575,6 @@ class CheckoutPreview(APIView):
 
 
         price_drop_discount = mrp_total - subtotal
-
         # ---------- Coupon ----------
         coupon_discount = Decimal("0.00")
         apportioned_map = {}
@@ -606,6 +609,7 @@ class CheckoutPreview(APIView):
                 + shipping_charge
                 + platform_fee
         )
+
         # ---------- Product response ----------
         product_response = []
         for item in products_data:
@@ -1039,6 +1043,56 @@ def initiateOrder(user, amount, order, store):
 
 SYSTEM_UPDATED_BY = "CASHFREE_WEBHOOK"
 
+def deduct_stock_fifo(product, quantity):
+
+    batches = InventoryBatch.objects.select_for_update().filter(
+        product=product,
+        remaining_quantity__gt=0
+    ).order_by("created_at")
+
+    qty_to_deduct = quantity
+    total_profit = 0
+    deduction_details = []
+
+    for batch in batches:
+        if qty_to_deduct <= 0:
+            break
+
+        deduct_qty = min(batch.remaining_quantity, qty_to_deduct)
+
+        profit_per_unit = batch.sell_price - batch.cost_per_unit
+        total_profit += profit_per_unit * deduct_qty
+
+        # Reduce stock
+        batch.remaining_quantity -= deduct_qty
+        batch.save()
+
+        # Ledger entry
+        InventoryTransaction.objects.create(
+            store=product.store,
+            product=product,
+            batch=batch,
+            transaction_type='OUT',
+            quantity=deduct_qty,
+            cost_price=batch.cost_per_unit,
+            selling_price=batch.sell_price
+        )
+
+        deduction_details.append({
+            "batch_id": batch.id,
+            "deducted": deduct_qty,
+            "cost_price": batch.cost_per_unit,
+            "sell_price": batch.sell_price
+        })
+
+        qty_to_deduct -= deduct_qty
+
+    if qty_to_deduct > 0:
+        raise Exception("Insufficient stock")
+
+    return total_profit, deduction_details
+
+
 def remove_cart_items(user, store):
     Cart.objects.filter(user=user, store=store).delete()
 
@@ -1048,41 +1102,45 @@ class Webhook(APIView):
     def post(self, request):
         try:
             data = request.data
-
             event_type = data.get("type")
             order_id = data.get("data", {}).get("order", {}).get("order_id")
             order_amount = data.get("data", {}).get("order", {}).get("order_amount")
-
             print("Webhook received:", data)
-
             # Cashfree test webhook may not have real order_id
             if not order_id:
                 print("Webhook test / invalid payload")
                 return CustomResponse().successResponse(data={},
                     description="Webhook received"
                 )
-            order = Order.objects.filter(order_number=order_id).first()
-            if not order:
-                return CustomResponse().successResponse(data={},
+            with transaction.atomic():
+
+                order = Order.objects.select_for_update().filter(order_number=order_id).first()
+                if not order:
+                    return CustomResponse().successResponse(data={},
                                                         description="No Order Found with Order Number"
                                                         )
 
-            payment = Payment.objects.filter(order=order).first()
-
-            # If no DB records → still return 200
-            if not payment:
-                print("Order/Payment not found for order_id:", order_id)
-                return CustomResponse().successResponse(data={},
-                    description="Webhook received"
-                )
-
-            with transaction.atomic():
+                payment = Payment.objects.filter(order=order).first()
+                # If no DB records → still return 200
+                if not payment:
+                    print("Order/Payment not found for order_id:", order_id)
+                    return CustomResponse().successResponse(data={},
+                        description="Webhook received"
+                    )
+                if payment.status != PaymentStatus.INITIATED:
+                    return CustomResponse().successResponse(
+                        data={
+                            "order_number": order.order_number,
+                            "final_payment_status": order.status,
+                        },
+                        description="Payment status verified with Cashfree and updated"
+                    )
 
                 if event_type == "PAYMENT_SUCCESS_WEBHOOK":
+                    update_stock_after_order(order)
                     payment.status = PaymentStatus.COMPLETED
                     payment.updated_by = event_type
                     payment.save(update_fields=["status", "updated_by"])
-
                     order.status = OrderStatus.CREATED
                     order.paid_online = order_amount
                     order.updated_by = event_type
@@ -1107,14 +1165,13 @@ class Webhook(APIView):
                         "var": f"{order.order_number}|"
                     }
                     trigger_notification(order.store,NotificationEvent.ORDER_PLACED, context, order.user.mobile, order.user.email)
-                    send_push_notification(
-                        store=order.store,
-                        token=order.user.fcm_token,
-                        title="Order Placed",
-                        body="Your order has been placed successfully",
-                        data={"order_id": order.order_number}
-                    )
-
+                    # send_push_notification(
+                    #     store=order.store,
+                    #     token=order.user.fcm_token,
+                    #     title="Order Placed",
+                    #     body="Your order has been placed successfully",
+                    #     data={"order_id": order.order_number}
+                    # )
                     remove_cart_items(order.user, order.store)
                 elif event_type == "PAYMENT_FAILED_WEBHOOK":
                     payment.status = PaymentStatus.FAILED
@@ -1130,7 +1187,6 @@ class Webhook(APIView):
                         status=OrderStatus.FAILED,
                         remarks="Order Failed"
                     )
-
                 elif event_type == "PAYMENT_USER_DROPPED_WEBHOOK":
                     payment.status = PaymentStatus.CANCELLED
                     payment.updated_by = event_type
@@ -1146,7 +1202,6 @@ class Webhook(APIView):
                     )
                 else:
                     print("Unhandled webhook type:", event_type)
-
             return CustomResponse().successResponse(data={},
                 description="Webhook processed"
             )
@@ -1161,7 +1216,7 @@ class PaymentStatusAPIView(APIView):
 
     def post(self, request):
         data = request.data
-
+        print("Payment Status api payload received:", data)
         order_number = data.get("order_number")
         cf_order_id = data.get("cf_order_id")
 
@@ -1232,6 +1287,7 @@ class PaymentStatusAPIView(APIView):
                     body="Your order has been placed successfully",
                     data={"order_id": order.order_number}
                 )
+                update_stock_after_order(order)
                 # todo: send an email to admin also.
                 # todo: send a sms n whatsapp to admin also.
                 remove_cart_items(order.user, order.store)
@@ -1435,6 +1491,7 @@ class OrderView(APIView):
                     "order_id": str(order.id),
                     "order_number": order.order_number,
                     "status": order.status,
+                    "shipping_charges": order.shipping_charges,
 
                     "coupon_discount": str(order.coupon_discount),
                     "amount": str(order.amount),
@@ -2323,3 +2380,13 @@ class FirebaseTestPushAPIView(APIView):
                     "error": str(e)
                 }
             )
+
+class ShippingDetails(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        store = request.store
+        shipping_details = ShippingPlan.objects.filter(store=store).values()
+        return CustomResponse().successResponse(
+            data=shipping_details.first(),
+        )

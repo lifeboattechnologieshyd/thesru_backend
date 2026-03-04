@@ -100,6 +100,7 @@ class StoreMiddleware:
             "/user/createadmin",
             "/user/admin-login",
             "/user/update-users",
+            "/user/delete/user",
 
             #  SUPERADMIN / BACKOFFICE
 
@@ -108,6 +109,7 @@ class StoreMiddleware:
             "/backoffice/notification/config",
             "/backoffice/notification/template/config",
             "/backoffice/dashboard",
+            "/backoffice/plan",
 
         )
 

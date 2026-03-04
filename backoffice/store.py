@@ -1,8 +1,7 @@
 from datetime import timedelta
 from decimal import Decimal
-from tokenize import Double
-from unicodedata import category
 
+from django.db.models.functions import Coalesce
 from django.forms import model_to_dict
 from django.utils.timezone import make_aware
 from datetime import datetime
@@ -23,13 +22,10 @@ from django.db.models import Count, Sum
 from django.core.files.storage import default_storage
 
 from rest_framework.permissions import IsAuthenticated, AllowAny
-from urllib3 import request
 
-from config import settings
-from django.conf import settings
 
 from config.settings.common import DEBUG
-from db.models import Category, Product, Banner, Inventory, PinCode, Store, WebBanner, \
+from db.models import Category, Product, Banner, PinCode, Store, WebBanner, \
     FlashSaleBanner, Order, User, Cart, OrderProducts, UserOTP, StoreClient, UserSession, ProductMedia, Tag, \
     OrderTimeLines, Coupons, CouponProduct, CouponCategory, CouponTag, AddressMaster, NotificationChannelConfig, \
     NotificationTemplate
@@ -451,6 +447,7 @@ class ProductAPIView(APIView):
             size=data.get("size"),
             colour=data.get("colour"),
             mrp=data["mrp"],
+            is_free_shipping=data.get("is_free_shipping", False),
             group_code=data["group_code"],
             selling_price=data["selling_price"],
             description=data["description"],
@@ -562,7 +559,7 @@ class ProductAPIView(APIView):
                 "lsin": product.lsin,
                 "group_code": product.group_code,
                 "sku": product.sku,
-
+                "is_free_shipping": product.is_free_shipping,
                 "name": product.name,
                 "colour": product.colour,
                 "size": product.size,
@@ -626,7 +623,7 @@ class ProductAPIView(APIView):
 
         # ------------------ Update product fields ------------------
         updatable_fields = [
-            "name", "size", "colour", "mrp",
+            "name", "size", "colour", "mrp", "is_free_shipping",
             "selling_price", "gst_percentage", "description",
             "gst_amount", "current_stock", "is_active","group_code"
         ]
@@ -1082,7 +1079,7 @@ class CategoriesAPIView(APIView):
         store = request.store
 
         # 1. Required fields
-        required_fields = ["name", "slug", "icon"]
+        required_fields = ["name", "slug", "icon", "priority"]
         for field in required_fields:
             if not data.get(field):
                 return CustomResponse.errorResponse(
@@ -1091,6 +1088,8 @@ class CategoriesAPIView(APIView):
 
         name = data.get("name").strip()
         icon = data.get("icon")
+        priority = data.get("priority", 1)
+        category_group = data.get("category_group", "HOME")
         slug = data.get("slug").strip().lower()
         parent_id = data.get("parent_id")
 
@@ -1120,6 +1119,8 @@ class CategoriesAPIView(APIView):
             name=name,
             slug=slug,
             parent=parent,
+            priority=priority,
+            category_group=category_group,
             icon=icon,
             is_active=data.get("is_active", True),
             created_by=request.user.mobile
@@ -1162,6 +1163,8 @@ class CategoriesAPIView(APIView):
                 "search_tags": cat.search_tags,
                 "is_active": cat.is_active,
                 "slug": cat.slug,
+                "category_group": cat.category_group,
+                "priority": cat.priority,
                 "parent_id": str(cat.parent_id) if cat.parent_id else None,
                 "parent_name": cat.parent.name if cat.parent else None,
                 "created_at": cat.created_at
@@ -1185,7 +1188,6 @@ class CategoriesAPIView(APIView):
             return CustomResponse.errorResponse(
                 description="Category not found"
             )
-
         if "name" in data:
             name = data.get("name")
             if not name:
@@ -1193,16 +1195,13 @@ class CategoriesAPIView(APIView):
                     description="name cannot be empty"
                 )
             category.name = name.strip()
-
         if "slug" in data:
             slug = data.get("slug")
             if not slug:
                 return CustomResponse.errorResponse(
                     description="slug cannot be empty"
                 )
-
             slug = slug.strip().lower()
-
             if Category.objects.filter(
                     store=store,
                     slug=slug
@@ -1212,16 +1211,16 @@ class CategoriesAPIView(APIView):
                 )
 
             category.slug = slug
-
         if "icon" in data:
             category.icon = data.get("icon")
-
+        if "priority" in data:
+            category.priority = data.get("priority")
+        if "category_group" in data:
+            category.category_group = data.get("category_group")
         if "is_active" in data:
             category.is_active = bool(data.get("is_active"))
-
         if "parent_id" in data:
             parent_id = data.get("parent_id")
-
             if parent_id:
                 try:
                     parent = Category.objects.get(
@@ -1318,6 +1317,7 @@ class TagsAPIView(APIView):
             store=store,
             name=data["name"].strip(),
             slug=slug,
+            display_on_home=data.get("display_on_home", False),
             is_active=data.get("is_active", True),
             created_by=request.user.mobile
         )
@@ -1359,13 +1359,10 @@ class TagsAPIView(APIView):
     def put(self, request, id=None):
         store = request.store
         data = request.data
-
         if not id:
             return CustomResponse.errorResponse(
                 description="Tag id is required"
             )
-
-        # 1. Fetch tag (store-safe)
         try:
             tag = Tag.objects.get(id=id, store=store)
         except Tag.DoesNotExist:
@@ -1429,6 +1426,8 @@ class TagsAPIView(APIView):
         # 4. is_active update
         if "is_active" in data:
             tag.is_active = bool(data.get("is_active"))
+        if "display_on_home" in data:
+            tag.display_on_home = bool(data.get("display_on_home"))
 
         # 5. Audit
         tag.updated_by = request.user.mobile
@@ -1567,234 +1566,6 @@ class BannerAPIView(APIView):
 
 
 
-class InventoryAPIView(APIView):
-    permission_classes = [IsAuthenticated]
-
-    def post(self, request):
-        data = request.data
-        store = request.store
-
-
-        required_fields = [
-            "product_id", "sku", "type", "quantity"
-        ]
-        for field in required_fields:
-            if not data.get(field):
-                return CustomResponse().errorResponse(
-                    description=f"{field} is required"
-                )
-
-        product_id = data.get("product_id")
-        sku = data.get("sku")
-        inv_type = data.get("type")
-        quantity = int(data.get("quantity"))
-
-        if quantity <= 0:
-            return CustomResponse().errorResponse(
-                description="Quantity must be greater than zero"
-            )
-
-        # Get last stock
-        last_inventory = (
-            Inventory.objects
-            .filter(product_id=product_id)
-            .order_by("-created_at")
-            .first()
-        )
-
-        quantity_before = last_inventory.quantity_after if last_inventory else 0
-
-        # Decide stock movement
-        if inv_type in [
-            InventoryType.PURCHASE,
-            InventoryType.SaleReturn,
-        ]:
-            quantity_after = quantity_before + quantity
-
-        elif inv_type in [
-            InventoryType.SELL,
-            InventoryType.PurchaseReturn,
-        ]:
-            if quantity > quantity_before:
-                return CustomResponse().errorResponse(
-                    description="Insufficient stock"
-                )
-            quantity_after = quantity_before - quantity
-        else:
-            return CustomResponse().errorResponse(
-                description="Invalid inventory type"
-            )
-        #  Price calculations
-        purchase_price = data.get("purchase_price")
-        sale_price = data.get("sale_price")
-
-        purchase_rate = 0
-        sale_rate = 0
-
-        # PURCHASE & PURCHASE_RETURN
-        if inv_type in [InventoryType.PURCHASE, InventoryType.PurchaseReturn]:
-            if not purchase_price:
-                return CustomResponse().errorResponse(
-                    description="purchase_price is required for purchase"
-                )
-
-            purchase_price = float(purchase_price)
-            purchase_rate = round(purchase_price / quantity, 2)
-
-        # SELL & SALE_RETURN
-        elif inv_type in [InventoryType.SELL, InventoryType.SaleReturn]:
-            if not sale_price:
-                return CustomResponse().errorResponse(
-                    description="sale_price is required for sale"
-                )
-
-            sale_price = float(sale_price)
-            sale_rate = round(sale_price / quantity, 2)
-
-        #   set defaults
-        purchase_price = purchase_price or 0
-        sale_price = sale_price or 0
-        purchase_rate = purchase_rate or 0
-        sale_rate = sale_rate or 0
-
-        # 4️⃣ Save inventory atomically
-        with transaction.atomic():
-            inventory = Inventory.objects.create(
-                store_id=store.id,
-                product_id=product_id,
-                sku=sku,
-                type=inv_type,
-                date=data.get("date") or timezone.now(),
-                user=request.user.id,
-                quantity=quantity,
-                quantity_before=quantity_before,
-                quantity_after=quantity_after,
-
-                purchase_rate_per_item=purchase_rate,
-                purchase_price=purchase_price,
-
-                sale_rate_per_item=sale_rate,
-                sale_price=sale_price,
-
-                gst_input=data.get("gst_input", 0),
-                gst_output=data.get("gst_output", 0),
-                remarks=data.get("remarks"),
-            )
-
-
-        return CustomResponse().successResponse(
-            description="Inventory updated successfully",
-            data={
-                "inventory_id": str(inventory.id),
-                "quantity_before": quantity_before,
-                "quantity_after": quantity_after,
-                "type": inv_type,
-                "purchase_rate_per_item":purchase_rate,
-                "purchase_price":purchase_price,
-            }
-        )
-    def get(self, request, id=None):
-        queryset = Inventory.objects.all()
-
-        # ---------- SINGLE INVENTORY ----------
-        if id:
-            inv = queryset.filter(id=id).first()
-            if not inv:
-                return CustomResponse().errorResponse(
-                    description="Inventory not found"
-                )
-
-            return CustomResponse().successResponse(
-                data={
-                    "id": str(inv.id),
-                    "product_id": str(inv.product_id),
-                    "sku": inv.sku,
-                    "type": inv.type,
-                    "quantity": inv.quantity,
-                    "quantity_before": inv.quantity_before,
-                    "quantity_after": inv.quantity_after,
-                    "purchase_price": inv.purchase_price,
-                    "sale_price": inv.sale_price,
-                    "created_at": inv.created_at,
-                },
-                total=1
-            )
-
-        # ---------- PAGINATION ----------
-        page = int(request.query_params.get("page", 1))
-        page_size = int(request.query_params.get("page_size", 10))
-
-        if page < 1 or page_size < 1:
-            return CustomResponse().errorResponse(
-                description="page and page_size must be positive integers"
-            )
-
-        queryset = queryset.order_by("-created_at")
-
-        total = queryset.count()
-        offset = (page - 1) * page_size
-        queryset = queryset[offset: offset + page_size]
-
-        # ---------- LIST INVENTORY ----------
-        data = []
-        for inv in queryset:
-            data.append({
-                "id": str(inv.id),
-                "product_id": str(inv.product_id),
-                "type": inv.type,
-                "quantity": inv.quantity,
-                "quantity_after": inv.quantity_after,
-                "created_at": inv.created_at,
-            })
-
-        return CustomResponse().successResponse(
-            data=data,
-            total=total
-        )
-
-
-
-    def put(self, request,id=None):
-        if not id:
-            return CustomResponse().errorResponse(
-                description="Inventory id is required"
-            )
-
-        inventory = Inventory.objects.filter(id=id).first()
-        if not inventory:
-            return CustomResponse().errorResponse(
-                description="Inventory not found"
-            )
-
-        editable_fields = ["remarks"]
-
-        for field in editable_fields:
-            if field in request.data:
-                setattr(inventory, field, request.data.get(field))
-
-        inventory.save()
-
-        return CustomResponse().successResponse(
-            data={},description="Inventory updated successfully"
-        )
-
-    def delete(self, request,id=None):
-        if not id:
-            return CustomResponse().errorResponse(
-                description="Inventory id is required"
-            )
-
-        inventory = Inventory.objects.filter(id=id).first()
-        if not inventory:
-            return CustomResponse().errorResponse(
-                description="Inventory not found"
-            )
-
-        inventory.delete()
-
-        return CustomResponse().successResponse(data={},
-            description="Inventory deleted successfully"
-        )
 
 class PinCodeAPIView(APIView):
     permission_classes = [IsAuthenticated]
@@ -1848,13 +1619,29 @@ class PinCodeAPIView(APIView):
         # ---------- PAGINATION ----------
         page = int(request.query_params.get("page", 1))
         page_size = int(request.query_params.get("page_size", 10))
+        state = request.query_params.get("state", None)
+        district = request.query_params.get("district", None)
+        pincode = request.query_params.get("pincode", None)
 
         if page < 1 or page_size < 1:
             return CustomResponse.errorResponse(
                 description="page and page_size must be positive integers"
             )
+        if pincode:
+            queryset = PinCode.objects.filter(pin=pincode).first()
+            if queryset:
+                data = list(queryset.values())
+                return CustomResponse.successResponse(
+                    data=data,
+                    total=queryset.count()
+                )
+        queryset = PinCode.objects.all()
+        if state:
+            queryset = queryset.filter(state=state)
+        if district:
+            queryset = queryset.filter(district=district)
 
-        queryset = PinCode.objects.all().order_by("-created_at")
+        queryset = queryset.order_by("-created_at")
 
         total = queryset.count()
         offset = (page - 1) * page_size
@@ -1900,9 +1687,33 @@ class PinCodeAPIView(APIView):
 
 
 
+class PinCodeStatesAPIView(APIView):
+
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        states = (
+            PinCode.objects
+            .values_list("state", flat=True)
+            .distinct()
+            .order_by("state")
+        )
+        return CustomResponse.successResponse(data=list(states),
+                                              description="pincode deleted successfully")
 
 
+class PinCodeDistrictAPIView(APIView):
+    permission_classes = [AllowAny]
 
+    def get(self, request):
+        states = (
+            PinCode.objects
+            .values_list("district", flat=True)
+            .distinct()
+            .order_by("district")
+        )
+        return CustomResponse.successResponse(data=list(states),
+                                              description="pincode deleted successfully")
 
 
 class StoreAPIView(APIView):
@@ -3449,7 +3260,14 @@ class StoreAnalyticsAPIView(APIView):
                 })
 
 
+        # GROSS SALES AND PROFITS
+        queryset = OrderProducts.objects.filter(created_at__date__range=[from_date, to_date])
 
+        result = queryset.aggregate(
+            gross_profit=Coalesce(Sum("gross_profit"), 0,
+                                  output_field=DecimalField()
+)
+        )
 
 
         # -------------------------
@@ -3460,6 +3278,7 @@ class StoreAnalyticsAPIView(APIView):
             "total_orders": total_orders,
             "total_customers": total_customers,
             "total_products": total_products,
+            "gross_profit": float(result["gross_profit"]),
 
             "order_status_counts": order_status_counts,
 
@@ -4167,6 +3986,26 @@ class DashboardStatsAPIView(APIView):
         top_selling_products = list(product_sales[:10])
         least_selling_products = list(product_sales.order_by("total_qty")[:10])
 
+        # ---------------- Visitors (Today) ----------------
+        today = timezone.now().date()
+
+        visitor_store_filter = {}
+        if store_id:
+            visitor_store_filter["store_id"] = store_id
+
+        # New visitors today
+        new_visitors_today = Visitor.objects.filter(
+            first_visited_at__date=today,
+            **visitor_store_filter
+        ).count()
+
+        # Repeated visitors today
+        repeated_visitors_today = Visitor.objects.filter(
+            last_visited_at__date=today,
+            first_visited_at__date__lt=today,
+            **visitor_store_filter
+        ).count()
+
         # ---------------- Plain response ----------------
         response = {
             # Stores
@@ -4191,6 +4030,10 @@ class DashboardStatsAPIView(APIView):
             "low_stock_products": low_stock_products,
             "top_selling_products": top_selling_products,
             "least_selling_products": least_selling_products,
+
+            # Visitors
+            "new_visitors_today": new_visitors_today,
+            "repeated_visitors_today": repeated_visitors_today,
 
             # Filters
             "store_id": store_id,

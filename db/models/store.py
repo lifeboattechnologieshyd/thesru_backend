@@ -15,6 +15,7 @@ class Tag(AuditModel):
         on_delete=models.CASCADE,
         related_name="tags"
     )
+    display_on_home = models.BooleanField(default=True)
     name = models.CharField(max_length=50)
     slug = models.SlugField(max_length=60)
     is_active = models.BooleanField(default=True)
@@ -38,7 +39,9 @@ class Category(AuditModel):
         related_name="children",
         on_delete=models.CASCADE
     )
+    priority = models.PositiveIntegerField(default=1)
     name = models.CharField(max_length=50)
+    category_group = models.CharField(max_length=50, default="HOME")
     slug = models.SlugField(max_length=60)
     icon = models.CharField(max_length=255, null=True)
     search_tags = ArrayField(models.CharField(max_length=50),null=True)
@@ -46,7 +49,7 @@ class Category(AuditModel):
 
     class Meta:
         db_table = "categories"
-        ordering = ["-created_at"]
+        ordering = ["priority", "-created_at"]
         constraints = [
             models.UniqueConstraint(
                 fields=["store", "name"],
@@ -90,32 +93,29 @@ class Product(AuditModel):
     # Display
     name = models.CharField(max_length=150)
     colour = models.CharField(max_length=50)
+    colour_code = models.CharField(max_length=50, default="000000")
     size = models.CharField(max_length=50, null=True, blank=True)
 
     # Pricing
     mrp = models.DecimalField(max_digits=10, decimal_places=2)
     selling_price = models.DecimalField(max_digits=10, decimal_places=2)
-
     gst_percentage = models.DecimalField(
         max_digits=5, decimal_places=2, null=True, blank=True
     )
     gst_amount = models.DecimalField(
         max_digits=10, decimal_places=2, null=True, blank=True
     )
-
-    # Inventory
-    current_stock = models.PositiveIntegerField(default=0)
+    current_stock = models.PositiveIntegerField(default=0) # not editable from user actions.
 
     # Discovery / PDP
     description = models.TextField(null=True, blank=True)
+    care = models.TextField(null=True, blank=True)
     highlights = models.TextField(null=True, blank=True)
-
     categories = models.ManyToManyField(
         Category,
         related_name="display_products",
         blank=True
     )
-
     tags = models.ManyToManyField(
         Tag,
         related_name="display_products",
@@ -167,30 +167,38 @@ class ProductMedia(AuditModel):
         ordering = ["position"]
 
 
-class Inventory(AuditModel):
+class InventoryBatch(AuditModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    store_id = models.UUIDField()
-    product_id = models.UUIDField()
-    sku = models.CharField(max_length=20)
-    type = models.CharField(max_length=20,choices=InventoryType.choices)
-    date = models.DateTimeField()
-    user = models.UUIDField()
-    quantity = models.PositiveIntegerField(default=0)
-    quantity_before = models.PositiveIntegerField(default=0)
-    quantity_after = models.PositiveIntegerField(default=0)
-    purchase_rate_per_item = models.DecimalField(decimal_places=2,max_digits=10)
-    purchase_price = models.DecimalField(decimal_places=2,max_digits=10)
-    sale_rate_per_item = models.DecimalField(decimal_places=2,max_digits=10)
-    sale_price = models.DecimalField(decimal_places=2,max_digits=10)
-    gst_input = models.DecimalField(decimal_places=2,max_digits=10)
-    gst_output = models.DecimalField(decimal_places=2,max_digits=10)
-    remarks = models.CharField(max_length=100,null=True)
+    store = models.ForeignKey(Store, on_delete=models.CASCADE)
+    product = models.ForeignKey(Product, on_delete=models.CASCADE)
+    input_quantity = models.PositiveIntegerField()
+    remaining_quantity = models.PositiveIntegerField()
+    cost_per_unit = models.DecimalField(max_digits=10, decimal_places=2)
+    # sell_price = models.DecimalField(max_digits=10, decimal_places=2)
+
 
     class Meta:
-        db_table = "inventory"
+        db_table = "inventory_batch"
         ordering = ["-created_at"]
 
+class InventoryTransaction(AuditModel):
 
+    TRANSACTION_TYPES = (
+        ('IN', 'Stock In'),
+        ('OUT', 'Stock Out'),
+        ('RETURN', 'Return'),
+        ('DAMAGE', 'Damage'),
+    )
+
+    store = models.ForeignKey(Store, on_delete=models.CASCADE)
+    product = models.ForeignKey(Product, on_delete=models.CASCADE)
+    batch = models.ForeignKey(InventoryBatch, on_delete=models.CASCADE, null=True, blank=True)
+
+    transaction_type = models.CharField(max_length=10, choices=TRANSACTION_TYPES)
+
+    quantity = models.IntegerField()
+    cost_price = models.DecimalField(max_digits=10, decimal_places=2)
+    selling_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
 
 class Banner(AuditModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -436,6 +444,8 @@ class OrderProducts(AuditModel):
     qty = models.PositiveIntegerField(default=0)
     mrp = models.DecimalField(decimal_places=2, max_digits=10)
     selling_price = models.DecimalField(decimal_places=2, max_digits=10)
+    cost_price = models.DecimalField(decimal_places=2, max_digits=10, default=0)
+    gross_profit = models.DecimalField(decimal_places=2, max_digits=10, default=0)
     apportioned_discount = models.DecimalField(decimal_places=2, max_digits=10)
     apportioned_wallet = models.DecimalField(decimal_places=2, max_digits=10)
     apportioned_online = models.DecimalField(decimal_places=2, max_digits=10)
@@ -815,5 +825,3 @@ class ShippingRule(AuditModel):
     rate = models.DecimalField(max_digits=10, decimal_places=2)
     class Meta:
         db_table = "shipping_rule"
-
-

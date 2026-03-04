@@ -4,7 +4,8 @@ from store.views import PinListView, AddressAPIView, ProductDetailAPIView, Produ
     BannerListView, CategoryListView, AddToCartAPIView, CartListAPIView, UpdateCartAPIView, RemoveFromCartAPIView, \
     AddToWishlistAPIView, WishlistListAPIView, RemoveFromWishlistAPIView, CartTotalAPIView, \
     FlashSaleBannerListView, WebBannerListView, Webhook, PaymentStatusAPIView, Reviews, ContactMessageAPIView, \
-    TagsListView, UserCouponListAPIView, CheckoutPreview, TestTriggerNotificationAPIView, FirebaseTestPushAPIView
+    TagsListView, UserCouponListAPIView, CheckoutPreview, TestTriggerNotificationAPIView, FirebaseTestPushAPIView, \
+    ShippingDetails
 
 urlpatterns = [
     path("category", CategoryListView.as_view()),
@@ -47,6 +48,8 @@ urlpatterns = [
     path("test",TestTriggerNotificationAPIView.as_view()),
 
     path("push/test",FirebaseTestPushAPIView.as_view()),
+
+    path("shipping/details",ShippingDetails.as_view()),
 
 
 ]
