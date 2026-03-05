@@ -88,8 +88,6 @@ class StockInAPIView(APIView):
         for batch in queryset:
             data.append({
                 "id": batch.id,
-                "quantity": batch.quantity,
-                "created_at": batch.created_at,
                 "input_quantity": batch.input_quantity,
                 "remaining_quantity": batch.remaining_quantity,
                 "cost_per_unit": batch.cost_per_unit,
