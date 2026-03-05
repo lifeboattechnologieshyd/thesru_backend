@@ -1329,7 +1329,7 @@ def map_cashfree_status(cf_status):
     return mapping.get(cf_status, PaymentStatus.PENDING)
 
 def fetch_cashfree_payment_status(order_number, cashfree):
-    url = f"{cashfree.url}/{order_number}"
+    url = f"{settings.CASHFREE_URL}/{order_number}"
 
     headers = {
         "x-api-version": settings.CASHFREE_API_VERSION,
