@@ -86,6 +86,8 @@ def update_stock_after_order(order):
     for item in order.items.select_related("product"):
         product = item.product
         qty = item.qty
+        print(product.id)
+        print(qty)
 
         # Atomic decrement
         updated = Product.objects.filter(
