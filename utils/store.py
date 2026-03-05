@@ -89,13 +89,19 @@ def update_stock_after_order(order):
         print(product.id)
         print(qty)
 
-        # Atomic decrement
+        db_product = Product.objects.get(id=product.id)
+
+        print("DB Stock:", db_product.current_stock)
+        print("Qty:", qty)
+
         updated = Product.objects.filter(
             id=product.id,
             current_stock__gte=qty
         ).update(
             current_stock=F("current_stock") - qty
         )
+
+        print("Updated rows:", updated)
         if updated == 0:
             raise Exception(f"Insufficient stock for {product.name}")
 
