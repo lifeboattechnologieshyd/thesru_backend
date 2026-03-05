@@ -1257,6 +1257,7 @@ class PaymentStatusAPIView(APIView):
             payment.save(update_fields=["status"])
 
             if verified_status == PaymentStatus.COMPLETED:
+                update_stock_after_order(order)
                 order.status = OrderStatus.CREATED
                 order.paid_online = payment.amount
                 order.updated_by = "PAYMENT STATUS BY FE"
@@ -1280,14 +1281,13 @@ class PaymentStatusAPIView(APIView):
                                      NotificationEvent.ORDER_PLACED,
                                      context,
                                      order.user.mobile, order.user.email)
-                send_push_notification(
-                    store=order.store,
-                    token=order.user.fcm_token,
-                    title="Order Placed",
-                    body="Your order has been placed successfully",
-                    data={"order_id": order.order_number}
-                )
-                update_stock_after_order(order)
+                # send_push_notification(
+                #     store=order.store,
+                #     token=order.user.fcm_token,
+                #     title="Order Placed",
+                #     body="Your order has been placed successfully",
+                #     data={"order_id": order.order_number}
+                # )
                 # todo: send an email to admin also.
                 # todo: send a sms n whatsapp to admin also.
                 remove_cart_items(order.user, order.store)
