@@ -1116,6 +1116,7 @@ class Webhook(APIView):
 
                 order = Order.objects.select_for_update().filter(order_number=order_id).first()
                 if not order:
+                    print("No Order Found with Order Number")
                     return CustomResponse().successResponse(data={},
                                                         description="No Order Found with Order Number"
                                                         )
@@ -1128,6 +1129,8 @@ class Webhook(APIView):
                         description="Webhook received"
                     )
                 if payment.status != PaymentStatus.INITIATED:
+                    print("Payment status verified with Cashfree and updated Already")
+
                     return CustomResponse().successResponse(
                         data={
                             "order_number": order.order_number,
@@ -1202,6 +1205,7 @@ class Webhook(APIView):
                     )
                 else:
                     print("Unhandled webhook type:", event_type)
+            print("Webhook Processed")
             return CustomResponse().successResponse(data={},
                 description="Webhook processed"
             )
@@ -1310,7 +1314,7 @@ class PaymentStatusAPIView(APIView):
                     status=OrderStatus.CANCELLED,
                     remarks="Order Cancelled"
                 )
-
+        print("Payment Status api response")
         return CustomResponse().successResponse(
             data={
                 "order_number": order_number,
