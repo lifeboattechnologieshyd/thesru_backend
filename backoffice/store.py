@@ -1603,19 +1603,6 @@ class PinCodeAPIView(APIView):
 
 
     def get(self, request, id=None):
-        # ---------- SINGLE PINCODE ----------
-        if id:
-            pin = PinCode.objects.filter(id=id).values().first()
-            if not pin:
-                return CustomResponse.errorResponse(
-                    description="pincode id required"
-                )
-
-            return CustomResponse.successResponse(
-                data=[pin],
-                total=1
-            )
-
         # ---------- PAGINATION ----------
         page = int(request.query_params.get("page", 1))
         page_size = int(request.query_params.get("page_size", 10))
@@ -1633,6 +1620,10 @@ class PinCodeAPIView(APIView):
                 data = list(queryset.values())
                 return CustomResponse.successResponse(
                     data=data,
+                    total=queryset.count()
+                )
+            return CustomResponse.successResponse(
+                    data={},
                     total=queryset.count()
                 )
         queryset = PinCode.objects.all()
