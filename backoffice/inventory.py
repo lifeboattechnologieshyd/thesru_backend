@@ -64,15 +64,47 @@ class StockInAPIView(APIView):
         return CustomResponse().successResponse(data={}, description="Stock added successfully")
 
     def get(self,request):
-        queryset = InventoryBatch.objects.all().order_by("-created_at")
+        # queryset = InventoryBatch.objects.all().order_by("-created_at")
+        # page = int(request.GET.get("page", 1))
+        # page_size = int(request.GET.get("page_size", 10))
+        # offset = (page - 1) * page_size
+        # queryset = queryset[offset: offset + page_size]
+        # data = list(queryset.values())
+        # return CustomResponse.successResponse(
+        #     data=data,
+        #     total=queryset.count()
+        # )
+        queryset = InventoryBatch.objects.select_related("product").order_by("-created_at")
+
         page = int(request.GET.get("page", 1))
         page_size = int(request.GET.get("page_size", 10))
         offset = (page - 1) * page_size
+
+        total = queryset.count()
         queryset = queryset[offset: offset + page_size]
-        data = list(queryset.values())
+
+        data = []
+
+        for batch in queryset:
+            data.append({
+                "id": batch.id,
+                "quantity": batch.quantity,
+                "created_at": batch.created_at,
+                "input_quantity": batch.input_quantity,
+                "remaining_quantity": batch.remaining_quantity,
+                "cost_per_unit": batch.cost_per_unit,
+                "product": {
+                    "id": batch.product.id,
+                    "name": batch.product.name,
+                    "color": batch.product.colour,
+                    "size": batch.product.size,
+                    "current_stock": batch.product.current_stock
+                }
+            })
+
         return CustomResponse.successResponse(
             data=data,
-            total=queryset.count()
+            total=total
         )
 
 

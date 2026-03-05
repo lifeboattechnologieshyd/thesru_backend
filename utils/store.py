@@ -86,13 +86,6 @@ def update_stock_after_order(order):
     for item in order.items.select_related("product"):
         product = item.product
         qty = item.qty
-        print(product.id)
-        print(qty)
-
-        db_product = Product.objects.get(id=product.id)
-
-        print("DB Stock:", db_product.current_stock)
-        print("Qty:", qty)
 
         updated = Product.objects.filter(
             id=product.id,
@@ -101,7 +94,6 @@ def update_stock_after_order(order):
             current_stock=F("current_stock") - qty
         )
 
-        print("Updated rows:", updated)
         if updated == 0:
             raise Exception(f"Insufficient stock for {product.name}")
 
