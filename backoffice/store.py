@@ -29,7 +29,7 @@ from db.models import Category, Product, Banner, PinCode, Store, WebBanner, \
     FlashSaleBanner, Order, User, Cart, OrderProducts, UserOTP, StoreClient, UserSession, ProductMedia, Tag, \
     OrderTimeLines, Coupons, CouponProduct, CouponCategory, CouponTag, AddressMaster, NotificationChannelConfig, \
     NotificationTemplate
-from db.models.user import AppVersionConfig
+from db.models.user import AppVersionConfig, Visitor
 from enums.store import InventoryType, OrderStatus, NotificationChannel, NotificationEvent
 from mixins.drf_views import CustomResponse
 from rest_framework_simplejwt.tokens import RefreshToken
