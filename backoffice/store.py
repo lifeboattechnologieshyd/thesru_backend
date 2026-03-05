@@ -1079,7 +1079,7 @@ class CategoriesAPIView(APIView):
         store = request.store
 
         # 1. Required fields
-        required_fields = ["name", "slug", "icon", "priority"]
+        required_fields = ["name", "slug", "icon"]
         for field in required_fields:
             if not data.get(field):
                 return CustomResponse.errorResponse(
