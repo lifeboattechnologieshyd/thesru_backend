@@ -2186,7 +2186,8 @@ class OrderStatsAPIView(APIView):
             }
 
             # -------- amount Stats --------
-            revenue = queryset.aggregate(
+            amount_stats = queryset.filter(status__in=['CREATED', 'PACKED', 'SHIPPED', 'DELIVERED'])
+            revenue = amount_stats.aggregate(
                 total_amount=Sum("amount"),
                 paid_online=Sum("paid_online"),
                 cash_on_delivery=Sum("cash_on_delivery"),

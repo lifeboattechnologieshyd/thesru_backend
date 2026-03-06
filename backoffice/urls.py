@@ -9,6 +9,7 @@ from backoffice.store import ProductAPIView, CategoriesAPIView, BannerAPIView, \
     StoreAnalyticsAPIView, EmailSendOTPView, EmailVerifyOTPView, ClientInfo, NotificationConfig, \
     NotificationTemplateConfig, SuperAdminSendOTPAPIView, SuperAdminVerifyOTPAPIView, StoreListAPIView, \
     DashboardStatsAPIView, PinCodeStatesAPIView, PinCodeDistrictAPIView
+from backoffice.subscriptions import CreateSubscriptionPlanAPI
 
 urlpatterns = [
 
@@ -96,6 +97,7 @@ urlpatterns = [
 
     ## SUPER ADMIN
     path("dashboard",DashboardStatsAPIView.as_view()),
+    path("subscription/plan",CreateSubscriptionPlanAPI.as_view()),
 
 
     #####################################

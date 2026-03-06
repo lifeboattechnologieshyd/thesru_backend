@@ -179,11 +179,13 @@ STATIC_URL = f"https://{AWS_S3_BUCKET}.s3.{AWS_S3_REGION_NAME}.amazonaws.com/sta
 #############################
 MEDIA_URL = f"https://{AWS_S3_BUCKET}.s3.{AWS_S3_REGION_NAME}.amazonaws.com/"
 
+CASHFREE_PLAN_URL = "https://sandbox.cashfree.com/pg/plans"
+CASHFREE_SUBSCRIPTION_URL = "https://sandbox.cashfree.com/pg/subscriptions"
 
 CASHFREE_URL = "https://sandbox.cashfree.com/pg/orders"
 CASHFREE_API_VERSION = "2025-01-01"
-# CASHFREE_CLIENT_ID = os.getenv("CASHFREE_CLIENT_ID")
-# CASHFREE_CLIENT_SECRET = os.getenv("CASHFREE_CLIENT_SECRET")
+CASHFREE_APP_ID = os.environ.get("CASHFREE_APP_ID")
+CASHFREE_SECRET_KEY = os.environ.get("CASHFREE_SECRET_KEY")
 CASHFREE_WEBHOOK = "https://dev-api.sru.ai/store/paymentWebhook"
 
 SIMPLE_JWT = {
