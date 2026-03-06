@@ -2652,7 +2652,7 @@ class OrderListAPIView(APIView):
                 "var": f"{order.order_number}|"
             }
             trigger_notification(order.store,
-                                 NotificationEvent.ORDER_DELIVERED,
+                                 NotificationEvent.ORDER_SHIPPED,
                                  context,
                                  order.user.mobile, order.user.email)
             pass
