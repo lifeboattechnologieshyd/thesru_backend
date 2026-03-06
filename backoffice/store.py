@@ -414,7 +414,6 @@ class ProductAPIView(APIView):
             "group_code",
             "description",
             "selling_price",
-            "current_stock"
         ]
 
         for field in required_fields:
@@ -2418,7 +2417,7 @@ class OrderListAPIView(APIView):
 
         page = int(request.query_params.get("page", 1))
         page_size = int(request.query_params.get("page_size", 20))
-        status_filter = request.query_params.get("status")
+        status_filter = request.query_params.get(" ")
         search = request.query_params.get("search")
 
         queryset = Order.objects.filter(
