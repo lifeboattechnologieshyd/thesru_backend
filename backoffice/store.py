@@ -2417,7 +2417,7 @@ class OrderListAPIView(APIView):
 
         page = int(request.query_params.get("page", 1))
         page_size = int(request.query_params.get("page_size", 20))
-        status_filter = request.query_params.get(" ")
+        status_filter = request.query_params.get("status")
         search = request.query_params.get("search")
 
         queryset = Order.objects.filter(
@@ -2427,13 +2427,9 @@ class OrderListAPIView(APIView):
         # ---- status filter ----
         if status_filter:
             status_filter = status_filter.upper()
-            if status_filter not in self.STATUS_FILTER_MAP:
-                return CustomResponse.errorResponse("Invalid status filter")
-
             queryset = queryset.filter(
-                status__in=self.STATUS_FILTER_MAP[status_filter]
+                status__in=status_filter
             )
-
         # ---- search by order number ----
         if search:
             queryset = queryset.filter(
