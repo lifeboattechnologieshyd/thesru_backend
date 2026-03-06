@@ -1168,13 +1168,6 @@ class Webhook(APIView):
                         "var": f"{order.order_number}|"
                     }
                     trigger_notification(order.store,NotificationEvent.ORDER_PLACED, context, order.user.mobile, order.user.email)
-                    # send_push_notification(
-                    #     store=order.store,
-                    #     token=order.user.fcm_token,
-                    #     title="Order Placed",
-                    #     body="Your order has been placed successfully",
-                    #     data={"order_id": order.order_number}
-                    # )
                     remove_cart_items(order.user, order.store)
                 elif event_type == "PAYMENT_FAILED_WEBHOOK":
                     payment.status = PaymentStatus.FAILED
