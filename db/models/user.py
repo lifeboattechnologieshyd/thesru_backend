@@ -323,3 +323,119 @@ class Visitor(AuditModel):
         return f"{self.platform} | {self.visitor_id}"
 
 
+class SubscriptionPlan(AuditModel):
+    PLAN_TYPE_CHOICES = (
+        ("monthly", "Monthly"),
+        ("yearly", "Yearly"),
+    )
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    name = models.CharField(max_length=100)
+    # Example: Basic, Pro, Advanced
+    code = models.CharField(max_length=50, unique=True)
+    # Example: BASIC, PRO, ADVANCED
+    description = models.TextField(blank=True, null=True)
+    amount = models.DecimalField(max_digits=10, decimal_places=2)
+    # 2000, 4000 etc
+    billing_cycle = models.CharField(
+        max_length=10,
+        choices=PLAN_TYPE_CHOICES,
+        default="monthly"
+    )
+    cashfree_plan_id = models.CharField(
+        max_length=100,
+        blank=True,
+        null=True
+    )
+    features = models.JSONField(default=dict, blank=True)
+    # plan id returned by Cashfree
+    trial_days = models.IntegerField(default=0)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    class Meta:
+        db_table = "subscription_plans"
+        ordering = ["amount"]
+
+    def __str__(self):
+        return f"{self.name} - ₹{self.amount}"
+
+
+class StoreSubscription(AuditModel):
+
+    STATUS_CHOICES = (
+        ("pending", "Pending"),
+        ("active", "Active"),
+        ("past_due", "Past Due"),
+        ("cancelled", "Cancelled"),
+        ("expired", "Expired"),
+    )
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    store = models.ForeignKey(
+        "Store",
+        on_delete=models.CASCADE,
+        related_name="subscriptions"
+    )
+    plan = models.ForeignKey(
+        SubscriptionPlan,
+        on_delete=models.PROTECT
+    )
+    cashfree_subscription_id = models.CharField(
+        max_length=120,
+        blank=True,
+        null=True
+    )
+    status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default="pending"
+    )
+    start_date = models.DateTimeField(null=True, blank=True)
+    next_billing_date = models.DateTimeField(null=True, blank=True)
+    cancel_at_period_end = models.BooleanField(default=False)
+
+    class Meta:
+        db_table = "store_subscriptions"
+
+class SubscriptionPayment(AuditModel):
+
+    PAYMENT_STATUS = (
+        ("success", "Success"),
+        ("failed", "Failed"),
+        ("pending", "Pending"),
+    )
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+
+    subscription = models.ForeignKey(
+        StoreSubscription,
+        on_delete=models.CASCADE,
+        related_name="payments"
+    )
+
+    amount = models.DecimalField(max_digits=10, decimal_places=2)
+
+    cashfree_payment_id = models.CharField(
+        max_length=120,
+        blank=True,
+        null=True
+    )
+
+    status = models.CharField(
+        max_length=20,
+        choices=PAYMENT_STATUS
+    )
+
+    payment_date = models.DateTimeField(null=True, blank=True)
+    class Meta:
+        db_table = "subscription_payments"
+
+class WebhookLog(AuditModel):
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    event_type = models.CharField(max_length=100)
+    payload = models.JSONField()
+    processed = models.BooleanField(default=False)
+
+    class Meta:
+        db_table = "webhook_logs"
