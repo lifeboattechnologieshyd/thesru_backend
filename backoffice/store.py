@@ -2428,7 +2428,7 @@ class OrderListAPIView(APIView):
         if status_filter:
             status_filter = status_filter.upper()
             queryset = queryset.filter(
-                status__in=status_filter
+                status=status_filter
             )
         # ---- search by order number ----
         if search:
