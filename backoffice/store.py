@@ -452,7 +452,7 @@ class ProductAPIView(APIView):
             description=data["description"],
             gst_percentage=gst_percentage,
             gst_amount=gst_amount,
-            current_stock=data["current_stock"],
+            current_stock=data.get("current_stock",0),
             is_active=data.get("is_active", True),
             created_by=request.user.mobile
         )
