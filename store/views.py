@@ -49,7 +49,7 @@ class IshuCategories(APIView):
         )
         data = []
         for parent in parents:
-            children = parent.subcategories.filter(
+            children = parent.children.filter(
                 is_active=True
             ).order_by('priority')
             data.append({
