@@ -5,10 +5,11 @@ from store.views import PinListView, AddressAPIView, ProductDetailAPIView, Produ
     AddToWishlistAPIView, WishlistListAPIView, RemoveFromWishlistAPIView, CartTotalAPIView, \
     FlashSaleBannerListView, WebBannerListView, Webhook, PaymentStatusAPIView, Reviews, ContactMessageAPIView, \
     TagsListView, UserCouponListAPIView, CheckoutPreview, TestTriggerNotificationAPIView, FirebaseTestPushAPIView, \
-    ShippingDetails
+    ShippingDetails, IshuCategories
 
 urlpatterns = [
     path("category", CategoryListView.as_view()),
+    path("v2/category", IshuCategories.as_view()),
     path("tags", TagsListView.as_view()),
 
     path("products", ProductListAPIView.as_view()),

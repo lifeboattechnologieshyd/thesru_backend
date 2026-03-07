@@ -108,13 +108,11 @@ class CreateSubscriptionAPI(APIView):
             return CustomResponse.errorResponse(
                 description="Invalid plan"
             )
-
         subscription = StoreSubscription.objects.create(
             store=store,
             plan=plan,
             status="pending"
         )
-
         # Cashfree API call (example)
         payload = {
             "subscription_id": str(subscription.id),
@@ -126,21 +124,19 @@ class CreateSubscriptionAPI(APIView):
             }
         }
         # these are lifeboat client-id and client secret
-
         headers = {
             "x-api-version": "2025-01-01",
             "x-client-id": settings.CASHFREE_APP_ID,
             "x-client-secret": settings.CASHFREE_SECRET_KEY,
             "Content-Type": "application/json"
         }
-
         response = requests.post(
-            "https://api.cashfree.com/pg/subscriptions",
+            settings.CASHFREE_SUBSCRIPTION_URL,
             json=payload,
             headers=headers
         )
         data = response.json()
-        subscription.cashfree_subscription_id = data.get("subscription_id")
+        subscription.cashfree_subscription_id = data.get("subscription_session_id")
         subscription.save()
         return CustomResponse.successResponse(
             data={
