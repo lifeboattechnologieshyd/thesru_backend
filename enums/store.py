@@ -53,6 +53,7 @@ class NotificationEvent(models.TextChoices):
     ORDER_SHIPPED = "ORDER_SHIPPED"
     ORDER_DELIVERED = "ORDER_DELIVERED"
     OTP_AUTHENTICATION = "OTP_AUTHENTICATION"
+    ADMIN_ORDER_RECEIVED = "ADMIN_ORDER_RECEIVED"
 
 
 # class ShippingType(models.TextChoices):

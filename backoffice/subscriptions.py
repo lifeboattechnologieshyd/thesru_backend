@@ -102,7 +102,6 @@ class CreateSubscriptionAPI(APIView):
             return CustomResponse.errorResponse(
                 description="plan_id is required"
             )
-
         try:
             plan = SubscriptionPlan.objects.get(id=plan_id)
         except SubscriptionPlan.DoesNotExist:
