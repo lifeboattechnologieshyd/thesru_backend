@@ -31,6 +31,51 @@ from utils.store import generate_order_number, time_ago, update_stock_after_orde
 from utils.user import send_order_created_admin_email
 
 
+class IshuCategories(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        store = request.store
+        filters = {
+            'parent__isnull': True,
+            'is_active': True,
+            'store': store
+        }
+        parents = (
+            Category.objects
+            .filter(**filters)
+            .prefetch_related('children')
+            .order_by('priority')
+        )
+        data = []
+        for parent in parents:
+            children = parent.children.filter(
+                is_active=True
+            ).order_by('priority')
+            data.append({
+                "id": str(parent.id),
+                "name": parent.name,
+                "priority": parent.priority,
+                "category_group": parent.category_group,
+                "slug": parent.slug,
+                "icon": parent.icon,
+                "search_tags": parent.search_tags,
+                "is_active": parent.is_active,
+                "children": [
+                    {
+                        "id": str(child.id),
+                        "name": child.name,
+                        "icon": child.icon,
+                        "priority": child.priority
+                    }
+                    for child in children
+                ]
+            })
+        return CustomResponse().successResponse(
+            data=data,
+            total=len(data)
+        )
+
 class CategoryListView(APIView):
     permission_classes = [AllowAny]
 
