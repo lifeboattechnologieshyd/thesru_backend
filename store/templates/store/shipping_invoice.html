@@ -1,370 +1,3 @@
-
-
-<!--<!DOCTYPE html>-->
-<!--<html>-->
-<!--<head>-->
-<!--  <meta charset="UTF-8">-->
-<!--  <title>Shipping Invoice</title>-->
-
-<!--  <link href="https://fonts.googleapis.com/css2?family=Libre+Barcode+128&display=swap" rel="stylesheet">-->
-
-<!--  <style>-->
-<!--    @page { size: A4; margin: 10mm; }-->
-
-<!--    body {-->
-<!--      font-family: Arial, sans-serif;-->
-<!--      font-size: 12px;-->
-<!--      margin: 0;-->
-<!--    }-->
-
-<!--    .page {-->
-<!--      border: 2px solid #000;-->
-<!--      padding: 8px;-->
-<!--    }-->
-
-<!--    .divider {-->
-<!--      border-bottom: 1px solid #000;-->
-<!--      margin: 6px -8px;-->
-<!--    }-->
-
-<!--    .row {-->
-<!--      display: flex;-->
-<!--      justify-content: space-between;-->
-<!--    }-->
-
-<!--    .left { width: 65%; line-height: 1.4; }-->
-<!--    .right { width: 33%; text-align: right; line-height: 1.4; }-->
-
-<!--    .title {-->
-<!--      font-weight: bold;-->
-<!--      margin-bottom: 4px;-->
-<!--    }-->
-
-<!--    .barcode {-->
-<!--      font-family: 'Libre Barcode 128', cursive;-->
-<!--      font-size: 48px;-->
-<!--      line-height: 1;-->
-<!--      margin-top: 6px;-->
-<!--    }-->
-
-<!--    table {-->
-<!--      width: 100%;-->
-<!--      border-collapse: collapse;-->
-<!--      margin-top: 6px;-->
-<!--    }-->
-
-<!--    th, td {-->
-<!--      border-bottom: 1px solid #000;-->
-<!--      padding: 6px;-->
-<!--      text-align: left;-->
-<!--    }-->
-
-<!--    th { font-weight: bold; }-->
-
-<!--    .totals {-->
-<!--      display: flex;-->
-<!--      justify-content: space-between;-->
-<!--      margin-top: 6px;-->
-<!--    }-->
-
-<!--    .totals-right {-->
-<!--      font-weight: bold;-->
-<!--      text-align: right;-->
-<!--    }-->
-<!--  </style>-->
-<!--</head>-->
-
-<!--<body>-->
-<!--<div class="page">-->
-
-<!--  &lt;!&ndash; SHIP TO + LOGO &ndash;&gt;-->
-<!--  <div class="row">-->
-<!--    <div class="left">-->
-<!--      <div class="title">Ship To</div>-->
-<!--      {{ order.user.full_name }}<br>-->
-<!--      {{ order.address.address }}<br>-->
-<!--      {{ order.address.city }}, {{ order.address.state }}, India<br>-->
-<!--      {{ order.address.pincode }}<br>-->
-<!--      {{ order.address.mobile }}-->
-<!--    </div>-->
-
-<!--    <div class="right">-->
-<!--      {% if order.store.logo %}-->
-<!--        <img src="{{ order.store.logo }}" style="height:60px;">-->
-<!--      {% endif %}-->
-<!--    </div>-->
-<!--  </div>-->
-
-<!--  <div class="divider"></div>-->
-
-<!--  &lt;!&ndash; ORDER DETAILS &ndash;&gt;-->
-<!--  <div class="row">-->
-<!--    <div class="left">-->
-<!--      Payment: <strong>PREPAID</strong><br>-->
-<!--      Order Number: {{ order.order_number }}<br>-->
-<!--      Order Date: {{ order.created_at|date:"d/m/Y" }}<br>-->
-<!--      MRP: ₹{{ order.mrp }}<br>-->
-<!--      Order Amount: ₹{{ order.amount }}<br>-->
-<!--      Coupon Discount: ₹{{ order.coupon_discount }}-->
-<!--    </div>-->
-
-<!--    <div class="right">-->
-<!--      <strong>{{ order.store.name }}</strong>-->
-<!--      <div class="barcode">{{ order.order_number }}</div>-->
-<!--    </div>-->
-<!--  </div>-->
-
-<!--  <div class="divider"></div>-->
-
-<!--  &lt;!&ndash; SHIPPED BY &ndash;&gt;-->
-<!--  <div class="row">-->
-<!--    <div class="left">-->
-<!--      <div class="title">Shipped By <i>(if undelivered, return to)</i></div>-->
-<!--      {{ order.store.name }}<br>-->
-<!--      {{ order.store.address }}<br>-->
-<!--      Mobile: {{ order.store.mobile }}<br>-->
-<!--      GSTIN: {{ order.store.gst_number|default:"" }}-->
-<!--    </div>-->
-
-<!--    <div class="right">-->
-<!--      <strong>Order#: {{ order.order_number }}</strong><br>-->
-<!--      Invoice Date: {{ order.created_at|date:"d/m/Y" }}-->
-<!--    </div>-->
-<!--  </div>-->
-
-<!--  <div class="divider"></div>-->
-
-<!--  &lt;!&ndash; ITEMS &ndash;&gt;-->
-<!--  <table>-->
-<!--    <thead>-->
-<!--      <tr>-->
-<!--        <th>Item</th>-->
-<!--        <th>SKU</th>-->
-<!--        <th>Qty</th>-->
-<!--        <th>MRP</th>-->
-<!--        <th>Selling Price</th>-->
-<!--        <th>GST</th>-->
-<!--        <th>Total</th>-->
-<!--      </tr>-->
-<!--    </thead>-->
-<!--    <tbody>-->
-<!--      {% for item in order.items.all %}-->
-<!--      <tr>-->
-<!--        <td>{{ item.product.name }}</td>-->
-<!--        <td>{{ item.sku }}</td>-->
-<!--        <td>{{ item.qty }}</td>-->
-<!--        <td>₹{{ item.mrp }}</td>-->
-<!--        <td>₹{{ item.selling_price }}</td>-->
-<!--        <td>₹{{ item.apportioned_gst }}</td>-->
-<!--        <td>₹{{ item.selling_price }}</td>-->
-<!--      </tr>-->
-<!--      {% endfor %}-->
-<!--    </tbody>-->
-<!--  </table>-->
-
-<!--  <div class="totals">-->
-<!--    <div>-->
-<!--      Wallet Paid: ₹{{ order.wallet_paid }}<br>-->
-<!--      Paid Online: ₹{{ order.paid_online }}<br>-->
-<!--      Coupon Discount: ₹{{ order.coupon_discount }}-->
-<!--    </div>-->
-
-<!--    <div class="totals-right">-->
-<!--      Collectable Amount: ₹{{ order.cash_on_delivery }}-->
-<!--    </div>-->
-<!--  </div>-->
-
-<!--  <div class="divider"></div>-->
-
-<!--  <strong>All disputes are subject to Haryana Jurisdiction only.</strong><br>-->
-<!--  This is an auto generated label and does not require any signature.-->
-
-<!--</div>-->
-<!--</body>-->
-<!--</html>-->
-
-
-<!--<!DOCTYPE html>-->
-<!--<html>-->
-<!--<head>-->
-<!--  <meta charset="UTF-8">-->
-<!--  <title>Shipping Invoice</title>-->
-
-<!--  <style>-->
-<!--    @page { size: A4; margin: 10mm; }-->
-
-<!--    body {-->
-<!--      font-family: Arial, sans-serif;-->
-<!--      font-size: 12px;-->
-<!--      margin: 0;-->
-<!--    }-->
-
-<!--    .page {-->
-<!--      border: 2px solid #000;-->
-<!--      padding: 8px;-->
-<!--    }-->
-
-<!--    .divider {-->
-<!--      border-bottom: 1px solid #000;-->
-<!--      margin: 6px -8px;-->
-<!--    }-->
-
-<!--    .row {-->
-<!--      display: flex;-->
-<!--      justify-content: space-between;-->
-<!--    }-->
-
-<!--    .left { width: 65%; line-height: 1.4; }-->
-<!--    .right { width: 33%; text-align: right; line-height: 1.4; }-->
-
-<!--    .title {-->
-<!--      font-weight: bold;-->
-<!--      margin-bottom: 4px;-->
-<!--    }-->
-
-<!--    table {-->
-<!--      width: 100%;-->
-<!--      border-collapse: collapse;-->
-<!--      margin-top: 6px;-->
-<!--    }-->
-
-<!--    th, td {-->
-<!--      border-bottom: 1px solid #000;-->
-<!--      padding: 6px;-->
-<!--      text-align: left;-->
-<!--    }-->
-
-<!--    th { font-weight: bold; }-->
-
-<!--    .totals {-->
-<!--      display: flex;-->
-<!--      justify-content: space-between;-->
-<!--      margin-top: 6px;-->
-<!--    }-->
-
-<!--    .totals-right {-->
-<!--      font-weight: bold;-->
-<!--      text-align: right;-->
-<!--    }-->
-<!--  </style>-->
-<!--</head>-->
-
-<!--<body>-->
-<!--<div class="page">-->
-
-<!--  &lt;!&ndash; SHIP TO + LOGO &ndash;&gt;-->
-<!--  <div class="row">-->
-<!--    <div class="left">-->
-<!--      <div class="title">Ship To</div>-->
-<!--      {{ order.user.full_name|default:order.user.name }}<br>-->
-<!--      {{ order.address.address }}<br>-->
-<!--      {{ order.address.city }}, {{ order.address.state }}, India<br>-->
-<!--      {{ order.address.pincode }}<br>-->
-<!--      {{ order.address.mobile }}-->
-<!--    </div>-->
-
-<!--    <div class="right">-->
-<!--      {% if order.store.logo %}-->
-<!--        <img src="{{ order.store.logo }}" style="height:60px;">-->
-<!--      {% endif %}-->
-<!--    </div>-->
-<!--  </div>-->
-
-<!--  <div class="divider"></div>-->
-
-<!--  &lt;!&ndash; ORDER DETAILS &ndash;&gt;-->
-<!--  <div class="row">-->
-<!--    <div class="left">-->
-<!--      Payment: <strong>PREPAID</strong><br>-->
-<!--      Order Number: {{ order.order_number }}<br>-->
-<!--      Order Date: {{ order.created_at|date:"d/m/Y" }}<br>-->
-
-<!--      {% if order.weight %}-->
-<!--        Weight: {{ order.weight }} kg<br>-->
-<!--      {% endif %}-->
-
-<!--      {% if order.length and order.breadth and order.height %}-->
-<!--        Dimensions: {{ order.length }} x {{ order.breadth }} x {{ order.height }} cm<br>-->
-<!--      {% endif %}-->
-
-<!--      MRP: ₹{{ order.mrp }}<br>-->
-<!--      Order Amount: ₹{{ order.amount }}<br>-->
-<!--      Coupon Discount: ₹{{ order.coupon_discount }}-->
-<!--    </div>-->
-
-<!--    <div class="right">-->
-<!--      <strong>{{ order.store.name }}</strong>-->
-<!--    </div>-->
-<!--  </div>-->
-
-<!--  <div class="divider"></div>-->
-
-<!--  &lt;!&ndash; SHIPPED BY &ndash;&gt;-->
-<!--  <div class="row">-->
-<!--    <div class="left">-->
-<!--      <div class="title">Shipped By <i>(if undelivered, return to)</i></div>-->
-<!--      {{ order.store.name }}<br>-->
-<!--      {{ order.store.address }}<br>-->
-<!--      Mobile: {{ order.store.mobile }}<br>-->
-<!--      GSTIN: {{ order.store.gst_number|default:"" }}-->
-<!--    </div>-->
-
-<!--    <div class="right">-->
-<!--      Invoice Date: {{ order.created_at|date:"d/m/Y" }}-->
-<!--    </div>-->
-<!--  </div>-->
-
-<!--  <div class="divider"></div>-->
-
-<!--  &lt;!&ndash; ITEMS &ndash;&gt;-->
-<!--  <table>-->
-<!--    <thead>-->
-<!--      <tr>-->
-<!--        <th>Item</th>-->
-<!--        <th>SKU</th>-->
-<!--        <th>Qty</th>-->
-<!--        <th>MRP</th>-->
-<!--        <th>Selling Price</th>-->
-<!--        <th>GST</th>-->
-<!--        <th>Total</th>-->
-<!--      </tr>-->
-<!--    </thead>-->
-<!--    <tbody>-->
-<!--      {% for item in order.items.all %}-->
-<!--      <tr>-->
-<!--        <td>{{ item.product.name }}</td>-->
-<!--        <td>{{ item.sku }}</td>-->
-<!--        <td>{{ item.qty }}</td>-->
-<!--        <td>₹{{ item.mrp }}</td>-->
-<!--        <td>₹{{ item.selling_price }}</td>-->
-<!--        <td>₹{{ item.apportioned_gst }}</td>-->
-<!--        <td>₹{{ item.selling_price|floatformat:2 }}</td>-->
-<!--      </tr>-->
-<!--      {% endfor %}-->
-<!--    </tbody>-->
-<!--  </table>-->
-
-<!--  <div class="totals">-->
-<!--    <div>-->
-<!--      Wallet Paid: ₹{{ order.wallet_paid }}<br>-->
-<!--      Paid Online: ₹{{ order.paid_online }}<br>-->
-<!--      Coupon Discount: ₹{{ order.coupon_discount }}-->
-<!--    </div>-->
-
-<!--    <div class="totals-right">-->
-<!--      Collectable Amount: ₹{{ order.cash_on_delivery }}-->
-<!--    </div>-->
-<!--  </div>-->
-
-<!--  <div class="divider"></div>-->
-
-<!--  <strong>All disputes are subject to Haryana Jurisdiction only.</strong><br>-->
-<!--  This is an auto generated label and does not require any signature.-->
-
-<!--</div>-->
-<!--</body>-->
-<!--</html>-->
-
 <!DOCTYPE html>
 <html>
 <head>
@@ -372,17 +5,24 @@
   <title>Shipping Invoice</title>
 
   <style>
-    @page { size: A5 portrait; margin: 6mm; }
+    @page { size: 6in 4in;
+    margin: 0mm; }
+
+    html {
+      margin: 0;
+      padding: 0;
+    }
 
     body {
       font-family: Arial, sans-serif;
-      font-size: 10px;
+      font-size: 12px;
       margin: 0;
     }
 
     .page {
       border: 1px solid #000;
       padding: 6px;
+      margin-top: 0;
     }
 
     .divider {
@@ -403,7 +43,7 @@
 
     .title {
       font-weight: bold;
-      font-size: 11px;
+      font-size: 12px;
       margin-bottom: 3px;
     }
 
@@ -411,7 +51,7 @@
       width: 100%;
       border-collapse: collapse;
       margin-top: 4px;
-      font-size: 9px;
+      font-size: 10px;
     }
 
     th, td {
