@@ -15,7 +15,7 @@ import random
 
 from config.settings.common import DEBUG
 from db.models import User, UserOTP, TempUser, Store, UserSession
-from db.models.user import AppVersionConfig, Visitor
+from db.models.user import AppVersionConfig, Visitor, Enrollments
 from enums.store import NotificationEvent
 from mixins.drf_views import CustomResponse
 from serializers.user import UserMasterSerializer
@@ -586,7 +586,13 @@ class VisitorCreateAPIView(APIView):
             )
 
         # Get request metadata
-        ip_address = request.META.get("REMOTE_ADDR")
+        ip_address = ""
+        x_forwarded_for = request.META.get("HTTP_X_FORWARDED_FOR")
+
+        if x_forwarded_for:
+            ip_address = x_forwarded_for.split(',')[0]
+        else:
+            ip_address = request.META.get("REMOTE_ADDR")
         user_agent = request.META.get("HTTP_USER_AGENT")
 
         # Create or update visitor
@@ -646,3 +652,16 @@ class DeleteUserAPIView(APIView):
                 "your account and all associated data will be permanently deleted."
             )
         )
+
+class EnrolPlatinumJubli(APIView):
+
+    permission_classes = [AllowAny]
+    def post(self, request):
+        data = request.data
+        enroll = Enrollments()
+        enroll.payload = data
+        enroll.save()
+
+        return CustomResponse().successResponse(data={})
+
+

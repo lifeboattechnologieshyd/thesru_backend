@@ -2,7 +2,8 @@
 from django.urls import path
 
 from user.views import MobileSendOTPView, MobileVerifyOTPView, FileUploadView, CreateAdmin, AdminLogin, ProfileUpdate, \
-    AppVersionCheckAPI, EmailSendOTPView, EmailVerifyOTPView, VisitorCreateAPIView, DeleteUserAPIView
+    AppVersionCheckAPI, EmailSendOTPView, EmailVerifyOTPView, VisitorCreateAPIView, DeleteUserAPIView, \
+    EnrolPlatinumJubli
 
 urlpatterns = [
     path("send-otp", MobileSendOTPView.as_view()),
@@ -18,7 +19,12 @@ urlpatterns = [
 
     path("visitor",VisitorCreateAPIView.as_view()),
 
-    path("delete/user",DeleteUserAPIView.as_view())
+    path("delete/user",DeleteUserAPIView.as_view()),
+
+    # GPW - ALUMNI
+    path("register",EnrolPlatinumJubli.as_view())
+
+
 
 
 ]

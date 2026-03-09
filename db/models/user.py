@@ -439,3 +439,12 @@ class WebhookLog(AuditModel):
 
     class Meta:
         db_table = "webhook_logs"
+
+
+# this is being used for GPW Alumni
+class Enrollments(AuditModel):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    payload = models.JSONField()
+
+    class Meta:
+        db_table = "gpt_enrolls"
