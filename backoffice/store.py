@@ -3142,6 +3142,10 @@ class StoreAnalyticsAPIView(APIView):
             store=store
         ).count()
 
+        total_visitors = Visitor.objects.filter(
+            store=store
+        ).count()
+
         # -------------------------
         # 4️⃣ Total Products (NO date filter)
         # -------------------------
@@ -3264,6 +3268,7 @@ class StoreAnalyticsAPIView(APIView):
             "total_sales": float(total_sales),
             "total_orders": total_orders,
             "total_customers": total_customers,
+            "total_visitors": total_visitors,
             "total_products": total_products,
             "gross_profit": float(result["gross_profit"]),
 
