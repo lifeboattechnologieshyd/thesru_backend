@@ -15,7 +15,7 @@ import random
 
 from config.settings.common import DEBUG
 from db.models import User, UserOTP, TempUser, Store, UserSession
-from db.models.user import AppVersionConfig, Visitor
+from db.models.user import AppVersionConfig, Visitor, Enrollments
 from enums.store import NotificationEvent
 from mixins.drf_views import CustomResponse
 from serializers.user import UserMasterSerializer
@@ -646,3 +646,16 @@ class DeleteUserAPIView(APIView):
                 "your account and all associated data will be permanently deleted."
             )
         )
+
+class EnrolPlatinumJubli(APIView):
+
+    permission_classes = [AllowAny]
+    def post(self, request):
+        data = request.data
+        enroll = Enrollments()
+        enroll.payload = data
+        enroll.save()
+
+        return CustomResponse().successResponse(data={})
+
+
