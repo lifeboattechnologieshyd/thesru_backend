@@ -778,11 +778,14 @@ class IftarENoor(APIView):
             },
         }
 
+        CASHFREE_APP_ID = "TEST1011734049bd1500ed13dfd6b93404371101"
+        CASHFREE_SECRET_KEY = "cfsk_ma_test_1cc088db20df08421499959882252953_28b9a0f4"
+
         # --- Prepare headers ---
         headers = {
             "x-api-version": settings.CASHFREE_API_VERSION,
-            "x-client-id": settings.CASHFREE_APP_ID,
-            "x-client-secret": settings.CASHFREE_SECRET_KEY,
+            "x-client-id": CASHFREE_APP_ID,
+            "x-client-secret": CASHFREE_SECRET_KEY,
             "Content-Type": "application/json",
         }
         print("headers", headers)
