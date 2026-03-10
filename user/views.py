@@ -680,6 +680,7 @@ def fetch_cashfree_payment_status(order_number):
     print("headers", headers)
     print("settings.CASHFREE_URL ", settings.CASHFREE_URL)
     response = requests.get(url, headers=headers, timeout=10)
+    print(f"settings.CASHFREE_URL {response.json()}", )
     if response.status_code != 200:
         raise Exception("Failed to fetch order status from Cashfree")
     return response.json()
@@ -739,6 +740,7 @@ class IftarENoorUpdatePayment(APIView):
 
     def post(self, request):
         data = request.data
+        print(data)
         required_fields = ["order_number", "status"]
         for field in required_fields:
             if not data.get(field):
@@ -763,6 +765,8 @@ class IftarENoorUpdatePayment(APIView):
                 },
                 description="Payment status verified with Cashfree and updated"
             )
+        print("contacting CF for status update")
+
         cf_response = fetch_cashfree_payment_status(order_number)
         cf_order_status = cf_response.get("order_status")  # PAID / ACTIVE / FAILED
         order.status = cf_order_status
