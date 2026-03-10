@@ -790,6 +790,8 @@ class IftarENoor(APIView):
         }
         print("headers", headers)
         print("payload", payload)
+        print("settings.CASHFREE_URL ", settings.CASHFREE_URL)
+        print("payload", payload)
 
         try:
             # --- Send request to CashFree ---
@@ -798,6 +800,7 @@ class IftarENoor(APIView):
             # --- Validate response ---
             if response.status_code == 200:
                 resp_json = response.json()
+                print(resp_json)
                 order_id = resp_json.get("cf_order_id")
                 session_id = resp_json.get("payment_session_id")
 
