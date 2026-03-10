@@ -188,6 +188,8 @@ CASHFREE_APP_ID = os.environ.get("CASHFREE_APP_ID")
 CASHFREE_SECRET_KEY = os.environ.get("CASHFREE_SECRET_KEY")
 CASHFREE_WEBHOOK = "https://dev-api.sru.ai/store/paymentWebhook"
 
+CASHFREE_IFTAR_WEBHOOK = "https://dev-api.sru.ai/user/paymentWebhook"
+
 SIMPLE_JWT = {
     "BLACKLIST_DB_ALIAS": "default",
     "ACCESS_TOKEN_LIFETIME": timedelta(

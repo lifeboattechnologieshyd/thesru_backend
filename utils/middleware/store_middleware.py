@@ -102,8 +102,9 @@ class StoreMiddleware:
             "/user/update-users",
             "/user/delete/user",
             "/user/register",
+            "/user/booking",
+            "/user/booking/status/update",
 
-            #  SUPERADMIN / BACKOFFICE
 
             "/backoffice/superadmin/send-otp",
             "/backoffice/superadmin/verify-otp",
