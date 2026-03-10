@@ -1,5 +1,6 @@
 from datetime import timedelta, datetime
 
+import requests
 from django.core.files.base import ContentFile
 from django.core.files.storage import default_storage
 from django.utils import timezone
@@ -15,7 +16,7 @@ import random
 
 from config.settings.common import DEBUG
 from db.models import User, UserOTP, TempUser, Store, UserSession
-from db.models.user import AppVersionConfig, Visitor, Enrollments
+from db.models.user import AppVersionConfig, Visitor, Enrollments, IftarBookings
 from enums.store import NotificationEvent
 from mixins.drf_views import CustomResponse
 from serializers.user import UserMasterSerializer
@@ -661,7 +662,98 @@ class EnrolPlatinumJubli(APIView):
         enroll = Enrollments()
         enroll.payload = data
         enroll.save()
-
         return CustomResponse().successResponse(data={})
 
 
+class IftarENoor(APIView):
+
+    def post(self, request):
+        data = request.data
+
+        # 1. Required fields
+        required_fields = ["mobile", "email", "age", "name"]
+        for field in required_fields:
+            if not data.get(field):
+                return CustomResponse.errorResponse(
+                    description=f"{field} is required"
+                )
+
+        booking_id = "IEN-"+str(generate_otp())
+        booking = IftarBookings()
+        booking.mobile = data["mobile"]
+        booking.email = data["email"]
+        booking.age = data["age"]
+        booking.name = data["name"]
+        booking.booking_id = booking_id
+        booking.status = "INITIATED"
+        booking.save()
+
+
+        # connect to payment gateway
+        payment_resp = self.initatepayment(550.00, booking)
+        booking.cf_session_id = payment_resp["payment_session_id"]
+        booking.cf_id = payment_resp["cf_order_id"]
+        booking.save(
+            update_fields=["cf_session_id", "cf_id"]
+        )
+        return CustomResponse.successResponse(
+            data={
+                "order_number": booking.booking_id,
+                "payment_session_id": booking.cf_session_id,
+                "cf_order_id": booking.cf_id,
+                "amount": str(550.00)
+            },
+            description="Order initiated successfully"
+        )
+
+    def initatepayment(self, amount, booking):
+
+        # --- Prepare payload ---
+        payload = {
+            "order_currency": "INR",
+            "order_amount": float(amount),
+            "order_id": str(booking.booking_id),
+            "customer_details": {
+                "customer_id": str(booking.id),
+                "customer_phone": str(booking.mobile),
+                "customer_name": str(booking.name),
+            },
+            "order_meta": {
+                "notify_url": settings.CASHFREE_WEBHOOK,
+            },
+        }
+
+        # --- Prepare headers ---
+        headers = {
+            "x-api-version": settings.CASHFREE_API_VERSION,
+            "x-client-id": settings.CASHFREE_APP_ID,
+            "x-client-secret": settings.CASHFREE_SECRET_KEY,
+            "Content-Type": "application/json",
+        }
+        print("headers", headers)
+        print("payload", payload)
+
+        try:
+            # --- Send request to CashFree ---
+            response = requests.post(settings.CASHFREE_URL, json=payload, headers=headers, timeout=15)
+
+            # --- Validate response ---
+            if response.status_code == 200:
+                resp_json = response.json()
+                order_id = resp_json.get("cf_order_id")
+                session_id = resp_json.get("payment_session_id")
+
+                if order_id and session_id:
+                    return {
+                        "cf_order_id": order_id,
+                        "payment_session_id": session_id,
+                        "order_number": booking.booking_id
+                    }
+                else:
+                    raise Exception("Could not found cf_order_id and payment_session_id")
+            else:
+                raise Exception(
+                    f"Cashfree response code {response.status_code}: {response.text}"
+                )
+        except Exception as e:
+            raise Exception(e)
