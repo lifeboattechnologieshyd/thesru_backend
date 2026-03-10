@@ -458,7 +458,7 @@ class IftarBookings(AuditModel):
     mobile = models.CharField(max_length=100)
     booking_id = models.CharField(max_length=100)
     cf_id = models.CharField(max_length=100)
-    cf_session_id = models.CharField(max_length=100)
+    cf_session_id = models.CharField(max_length=1000)
     status = models.CharField(max_length=100)
 
     class Meta:

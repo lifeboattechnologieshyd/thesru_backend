@@ -817,4 +817,5 @@ class IftarENoor(APIView):
                     f"Cashfree response code {response.status_code}: {response.text}"
                 )
         except Exception as e:
+            print(e)
             raise Exception(e)
