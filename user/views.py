@@ -680,6 +680,7 @@ def fetch_cashfree_payment_status(order_number):
 
 
 class IftarENoorUpdatePayment(APIView):
+    permission_classes = [AllowAny]
 
     def post(self, request):
         data = request.data
@@ -722,6 +723,7 @@ class IftarENoorUpdatePayment(APIView):
 
 class IftarENoor(APIView):
 
+    permission_classes = [AllowAny]
     def post(self, request):
         data = request.data
         # 1. Required fields
