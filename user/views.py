@@ -3,6 +3,7 @@ from datetime import timedelta, datetime
 import requests
 from django.core.files.base import ContentFile
 from django.core.files.storage import default_storage
+from django.db import transaction
 from django.utils import timezone
 from psutil import users
 from rest_framework.parsers import FormParser, MultiPartParser
@@ -664,12 +665,65 @@ class EnrolPlatinumJubli(APIView):
         enroll.save()
         return CustomResponse().successResponse(data={})
 
+def fetch_cashfree_payment_status(order_number):
+    url = f"{settings.CASHFREE_URL}/{order_number}"
+    headers = {
+        "x-api-version": settings.CASHFREE_API_VERSION,
+        "x-client-id": settings.CASHFREE_APP_ID,
+        "x-client-secret": settings.CASHFREE_SECRET_KEY,
+        "Content-Type": "application/json",
+    }
+    response = requests.get(url, headers=headers, timeout=10)
+    if response.status_code != 200:
+        raise Exception("Failed to fetch order status from Cashfree")
+    return response.json()
+
+
+class IftarENoorUpdatePayment(APIView):
+
+    def post(self, request):
+        data = request.data
+        required_fields = ["order_number", "status"]
+        for field in required_fields:
+            if not data.get(field):
+                return CustomResponse.errorResponse(
+                    description=f"{field} is required"
+                )
+        order_number = data.get("order_number")
+        if not order_number:
+            return CustomResponse().errorResponse(
+                description="order number  required"
+            )
+        order = IftarBookings.objects.filter(booking_id=order_number).first()
+        if not order:
+            return CustomResponse().errorResponse(
+                description="Order Details Mismatched"
+            )
+        if order.status == "COMPLETED":
+            return CustomResponse().successResponse(
+                data={
+                    "order_number": order_number,
+                    "final_payment_status": order.status,
+                },
+                description="Payment status verified with Cashfree and updated"
+            )
+        cf_response = fetch_cashfree_payment_status(order_number)
+        cf_order_status = cf_response.get("order_status")  # PAID / ACTIVE / FAILED
+        order.status = cf_order_status
+        order.save(update_fields=["status"])
+        return CustomResponse().successResponse(
+            data={
+                "order_number": order_number,
+                "final_payment_status": order.status,
+            },
+            description="Payment status verified with Cashfree and updated"
+        )
+
 
 class IftarENoor(APIView):
 
     def post(self, request):
         data = request.data
-
         # 1. Required fields
         required_fields = ["mobile", "email", "age", "name"]
         for field in required_fields:
@@ -687,7 +741,6 @@ class IftarENoor(APIView):
         booking.booking_id = booking_id
         booking.status = "INITIATED"
         booking.save()
-
 
         # connect to payment gateway
         payment_resp = self.initatepayment(550.00, booking)
