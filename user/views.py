@@ -667,8 +667,15 @@ class EnrolPlatinumJubli(APIView):
 
 def fetch_cashfree_payment_status(order_number):
     url = f"{settings.CASHFREE_URL}/{order_number}"
-    CASHFREE_APP_ID = "TEST1011734049bd1500ed13dfd6b93404371101"
-    CASHFREE_SECRET_KEY = "cfsk_ma_test_1cc088db20df08421499959882252953_28b9a0f4"
+    # CASHFREE_APP_ID = "623429ab66400ca4e318370c2d924326"
+    # CASHFREE_SECRET_KEY = "cfsk_ma_prod_4e9093365c5c98638e736183cf187d9b_4ec3d2ca"
+
+    if settings.ENV == 'prod':
+        CASHFREE_APP_ID = "623429ab66400ca4e318370c2d924326"
+        CASHFREE_SECRET_KEY = "cfsk_ma_prod_4e9093365c5c98638e736183cf187d9b_4ec3d2ca"
+    else:
+        CASHFREE_APP_ID = "TEST1011734049bd1500ed13dfd6b93404371101"
+        CASHFREE_SECRET_KEY = "cfsk_ma_test_1cc088db20df08421499959882252953_28b9a0f4"
 
     # --- Prepare headers ---
     headers = {
@@ -822,7 +829,7 @@ class IftarENoor(APIView):
         )
 
     def initatepayment(self, amount, booking):
-
+        print("====== * 20")
         # --- Prepare payload ---
         payload = {
             "order_currency": "INR",
@@ -837,9 +844,14 @@ class IftarENoor(APIView):
                 "notify_url": settings.CASHFREE_IFTAR_WEBHOOK,
             },
         }
-
-        CASHFREE_APP_ID = "TEST1011734049bd1500ed13dfd6b93404371101"
-        CASHFREE_SECRET_KEY = "cfsk_ma_test_1cc088db20df08421499959882252953_28b9a0f4"
+        # CASHFREE_APP_ID = "623429ab66400ca4e318370c2d924326"
+        # CASHFREE_SECRET_KEY = "cfsk_ma_prod_4e9093365c5c98638e736183cf187d9b_4ec3d2ca"
+        if settings.ENV == 'prod':
+            CASHFREE_APP_ID = "623429ab66400ca4e318370c2d924326"
+            CASHFREE_SECRET_KEY = "cfsk_ma_prod_4e9093365c5c98638e736183cf187d9b_4ec3d2ca"
+        else:
+            CASHFREE_APP_ID = "TEST1011734049bd1500ed13dfd6b93404371101"
+            CASHFREE_SECRET_KEY = "cfsk_ma_test_1cc088db20df08421499959882252953_28b9a0f4"
 
         # --- Prepare headers ---
         headers = {
