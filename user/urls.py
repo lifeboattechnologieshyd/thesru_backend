@@ -27,5 +27,6 @@ urlpatterns = [
     path("booking",IftarENoor.as_view()),
 
     path("booking/status/update", IftarENoorUpdatePayment.as_view()),
+    path("paymentWebhook", IftarENoorUpdatePayment.as_view()),
 
 ]

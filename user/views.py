@@ -678,6 +678,54 @@ def fetch_cashfree_payment_status(order_number):
         raise Exception("Failed to fetch order status from Cashfree")
     return response.json()
 
+class IftarWebhook(APIView):
+    permission_classes = [AllowAny]
+    def post(self, request):
+        data = request.data
+        print(data)
+        event_type = data.get("type")
+        order_id = data.get("data", {}).get("order", {}).get("order_id")
+        order_amount = data.get("data", {}).get("order", {}).get("order_amount")
+        print("Webhook received:", data)
+        if not order_id:
+            print("Webhook test / invalid payload")
+            return CustomResponse().successResponse(data={},
+                                                    description="Webhook received"
+                                                    )
+        order = IftarBookings.objects.select_for_update().filter(booking_id=order_id).first()
+        if not order:
+            print("No Order Found with Order Number")
+            return CustomResponse().successResponse(data={},
+                                                    description="No Order Found with Order Number"
+                                                    )
+        if order.status != "INITIATED":
+            print("Payment status verified with Cashfree and updated Already")
+            return CustomResponse().successResponse(
+                data={
+                    "order_number": order.order_number,
+                    "final_payment_status": order.status,
+                },
+                description="Payment status verified with Cashfree and updated"
+            )
+        if event_type == "PAYMENT_SUCCESS_WEBHOOK":
+            order.status = "PAID"
+            order.updated_by = event_type
+            order.save(update_fields=["status", "updated_by"])
+        elif event_type == "PAYMENT_FAILED_WEBHOOK":
+            order.status = "FAILED"
+            order.updated_by = event_type
+            order.save(update_fields=["status", "updated_by"])
+        else:
+            order.status = "PENDING"
+            order.updated_by = event_type
+            order.save(update_fields=["status", "updated_by"])
+        return CustomResponse().successResponse(
+            data={
+                "order_number": order.booking_id,
+                "final_payment_status": order.status,
+            },
+            description="Payment status verified with Cashfree and updated"
+        )
 
 class IftarENoorUpdatePayment(APIView):
     permission_classes = [AllowAny]
@@ -774,7 +822,7 @@ class IftarENoor(APIView):
                 "customer_name": str(booking.name),
             },
             "order_meta": {
-                "notify_url": settings.CASHFREE_WEBHOOK,
+                "notify_url": settings.CASHFREE_IFTAR_WEBHOOK,
             },
         }
 
