@@ -667,12 +667,18 @@ class EnrolPlatinumJubli(APIView):
 
 def fetch_cashfree_payment_status(order_number):
     url = f"{settings.CASHFREE_URL}/{order_number}"
+    CASHFREE_APP_ID = "TEST1011734049bd1500ed13dfd6b93404371101"
+    CASHFREE_SECRET_KEY = "cfsk_ma_test_1cc088db20df08421499959882252953_28b9a0f4"
+
+    # --- Prepare headers ---
     headers = {
         "x-api-version": settings.CASHFREE_API_VERSION,
-        "x-client-id": settings.CASHFREE_APP_ID,
-        "x-client-secret": settings.CASHFREE_SECRET_KEY,
+        "x-client-id": CASHFREE_APP_ID,
+        "x-client-secret": CASHFREE_SECRET_KEY,
         "Content-Type": "application/json",
     }
+    print("headers", headers)
+    print("settings.CASHFREE_URL ", settings.CASHFREE_URL)
     response = requests.get(url, headers=headers, timeout=10)
     if response.status_code != 200:
         raise Exception("Failed to fetch order status from Cashfree")
@@ -682,6 +688,7 @@ class IftarWebhook(APIView):
     permission_classes = [AllowAny]
     def post(self, request):
         data = request.data
+        print("Webhook triggered")
         print(data)
         event_type = data.get("type")
         order_id = data.get("data", {}).get("order", {}).get("order_id")
