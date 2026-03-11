@@ -2206,7 +2206,7 @@ class OrderStatsAPIView(APIView):
             return CustomResponse().successResponse(
                 description="Order statistics fetched successfully",
                 data=response_data,
-                total=len(total_orders)
+                total=total_orders
             )
 
         except Exception as e:
