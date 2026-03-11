@@ -3963,6 +3963,7 @@ class DashboardStatsAPIView(APIView):
         ).count()
 
         # ---------------- Top & Least selling products ----------------
+        # need to add store to this item
         product_sales = (
             OrderProducts.objects
             .filter(
@@ -3970,7 +3971,10 @@ class DashboardStatsAPIView(APIView):
                 **({"order__store_id": store_id} if store_id else {}),
                 **date_filter
             )
-            .values("product_id", "product__name")
+            .values("product_id",
+                    "product__name",
+                    "product__store_id",
+                    "product__store__name")
             .annotate(total_qty=Sum("qty"))
             .order_by("-total_qty")
         )
@@ -3988,6 +3992,10 @@ class DashboardStatsAPIView(APIView):
         # New visitors today
         new_visitors_today = Visitor.objects.filter(
             first_visited_at__date=today,
+            **visitor_store_filter
+        ).count()
+
+        all_visitors = Visitor.objects.filter(
             **visitor_store_filter
         ).count()
 
@@ -4026,6 +4034,7 @@ class DashboardStatsAPIView(APIView):
             # Visitors
             "new_visitors_today": new_visitors_today,
             "repeated_visitors_today": repeated_visitors_today,
+            "total_visitors": all_visitors,
 
             # Filters
             "store_id": store_id,
