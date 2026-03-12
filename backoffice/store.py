@@ -1614,7 +1614,7 @@ class PinCodeAPIView(APIView):
                 description="page and page_size must be positive integers"
             )
         if pincode:
-            queryset = PinCode.objects.filter(pin=pincode).first()
+            queryset = PinCode.objects.filter(pin=pincode)
             if queryset:
                 data = list(queryset.values())
                 return CustomResponse.successResponse(
