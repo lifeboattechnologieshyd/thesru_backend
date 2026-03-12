@@ -98,6 +98,7 @@ class StoreMiddleware:
             "/health/",
             "/backoffice/store",
             "/user/createadmin",
+            "/user/storage/upload"
             "/user/admin-login",
             "/user/update-users",
             "/user/delete/user",
