@@ -1744,8 +1744,6 @@ class StoreAPIView(APIView):
                 secondary_color = data.get("secondary_color"),
                 client_id = data.get("client_id"),
                 client_secret = data.get("client_secret"),
-
-
             )
             User.objects.create(
                 mobile=store.mobile,
@@ -1844,6 +1842,15 @@ class StoreAPIView(APIView):
                 setattr(store, field, request.data.get(field))
 
         store.save()
+        clients = request.data.get("clients")
+
+        for item in clients:
+            store_client = StoreClient()
+            store_client.store = store
+            store_client.identifier = item["identifier"]
+            store_client.client_type = item["client_type"]
+            store_client.is_active = True
+            store_client.save()
 
         return CustomResponse.successResponse(
             data={},
