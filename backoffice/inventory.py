@@ -151,6 +151,9 @@ class BulkInventory(APIView, CustomResponse):
                 quantity = int(qty)
                 cost_per_unit = Decimal(cost)
                 sell_price = Decimal(price)
+                exists = InventoryBatch.objects.filter(product=product).first()
+                if exists:
+                    continue
 
                 # ---- Create Inventory Batch ----
                 batch = InventoryBatch.objects.create(
