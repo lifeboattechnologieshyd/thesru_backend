@@ -1821,17 +1821,22 @@ class StoreAPIView(APIView):
     # ---------------- UPDATE STORE ----------------
     def put(self, request, id=None):
         store_id = id
-        if not id:
+        data = request.data
+        if not store_id:
             return CustomResponse.errorResponse(description="store_id required")
+
         try:
             store = Store.objects.get(id=store_id)
         except Store.DoesNotExist:
             return CustomResponse.errorResponse(description="Store not found")
-        data = request.data
+
         clients = data.get("clients", [])
+
         try:
             with transaction.atomic():
-                # -------- UPDATE STORE --------
+
+                # ---------------- UPDATE STORE ----------------
+
                 store.name = data.get("name", store.name)
                 store.mobile = data.get("mobile", store.mobile)
                 store.email = data.get("email", store.email)
@@ -1844,56 +1849,87 @@ class StoreAPIView(APIView):
                 store.secondary_color = data.get("secondary_color", store.secondary_color)
                 store.client_id = data.get("client_id", store.client_id)
                 store.client_secret = data.get("client_secret", store.client_secret)
+
                 store.save()
 
-                # -------- STORE CLIENT SYNC --------
+                # ---------------- CLEAN CLIENTS (remove duplicates) ----------------
 
-                existing_clients = StoreClient.objects.filter(store=store)
+                clean_clients = []
+                seen = set()
 
-                existing_identifiers = set(
-                    existing_clients.values_list("identifier", flat=True)
-                )
-
-                request_identifiers = set()
-
-                for item in clients:
-
-                    identifier = item.get("identifier")
-                    client_type = item.get("client_type")
+                for c in clients:
+                    identifier = str(c.get("identifier", "")).strip()
+                    client_type = c.get("client_type")
 
                     if not identifier:
                         continue
 
+                    if identifier in seen:
+                        continue
+
+                    seen.add(identifier)
+
+                    clean_clients.append({
+                        "identifier": identifier,
+                        "client_type": client_type
+                    })
+
+                clients = clean_clients
+
+                # ---------------- EXISTING ----------------
+
+                existing_qs = StoreClient.objects.filter(store=store)
+
+                existing_map = {
+                    x.identifier: x for x in existing_qs
+                }
+
+                request_identifiers = set()
+
+                # ---------------- UPSERT ----------------
+
+                for item in clients:
+
+                    identifier = item["identifier"]
+                    client_type = item.get("client_type")
+
                     request_identifiers.add(identifier)
 
-                    obj, created = StoreClient.objects.get_or_create(
-                        store=store,
-                        identifier=identifier,
-                        defaults={
-                            "client_type": client_type,
-                            "is_active": True
-                        }
-                    )
+                    if identifier in existing_map:
 
-                    if not created:
+                        obj = existing_map[identifier]
                         obj.client_type = client_type
                         obj.is_active = True
                         obj.save()
-                # -------- DELETE REMOVED CLIENTS --------
-                delete_identifiers = existing_identifiers - request_identifiers
-                if delete_identifiers:
+
+                    else:
+
+                        StoreClient.objects.create(
+                            store=store,
+                            identifier=identifier,
+                            client_type=client_type,
+                            is_active=True
+                        )
+
+                # ---------------- DELETE REMOVED ----------------
+
+                existing_identifiers = set(existing_map.keys())
+
+                delete_ids = existing_identifiers - request_identifiers
+
+                if delete_ids:
                     StoreClient.objects.filter(
                         store=store,
-                        identifier__in=delete_identifiers
+                        identifier__in=delete_ids
                     ).delete()
+
             return CustomResponse.successResponse(
-                description="Store updated successfully",
-                data={}
+                description="Store updated successfully"
             )
+
         except IntegrityError as error:
             return CustomResponse.errorResponse(
                 description=f"Database error {error}"
-
             )
 
     # ---------------- DELETE STORE ----------------
