@@ -65,7 +65,12 @@ class StockInAPIView(APIView):
 
     def get(self,request):
         store = request.store
+        product_id = request.GET.get("product_id")
+
         queryset = InventoryBatch.objects.select_related("product").filter(store=store).order_by("-created_at")
+        # ✅ optional filter
+        if product_id:
+            queryset = queryset.filter(product_id=product_id)
         page = int(request.GET.get("page", 1))
         page_size = int(request.GET.get("page_size", 10))
         offset = (page - 1) * page_size
