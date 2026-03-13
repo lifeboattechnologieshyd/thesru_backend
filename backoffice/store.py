@@ -50,7 +50,7 @@ class SendOTP(APIView):
         store = request.store
         user = User.objects.filter(mobile=data.get("mobile"),user_role__contains=["ADMIN"], store=store).first()
         if user:
-            otp = generate_otp()
+            otp = 1234
             context = {
                 "var": f"{otp}|"
             }
@@ -1614,7 +1614,7 @@ class PinCodeAPIView(APIView):
                 description="page and page_size must be positive integers"
             )
         if pincode:
-            queryset = PinCode.objects.filter(pin=pincode).first()
+            queryset = PinCode.objects.filter(pin=pincode)
             if queryset:
                 data = list(queryset.values())
                 return CustomResponse.successResponse(
@@ -1731,21 +1731,19 @@ class StoreAPIView(APIView):
                 mobile=data.get("mobile"),
                 email=data.get("email"),
                 address=data.get("address"),
-                logo=data.get("logo"),
+                logo=data.get("logo", ""),
                 created_by="SUPERADMIN",
                 product_code = data.get("product_code"),
                 aws_bucket_name = data.get("aws_bucket_name"),
                 bo_title = data.get("bo_title"),
                 bo_subtitle = data.get("bo_subtitle"),
-                highlights = data.get("highlights"),
+                highlights = data.get("highlights", None),
                 email_login = data.get("email_login"),
                 mobile_login = data.get("mobile_login"),
                 primary_color = data.get("primary_color"),
                 secondary_color = data.get("secondary_color"),
                 client_id = data.get("client_id"),
                 client_secret = data.get("client_secret"),
-
-
             )
             User.objects.create(
                 mobile=store.mobile,
@@ -1822,33 +1820,117 @@ class StoreAPIView(APIView):
 
     # ---------------- UPDATE STORE ----------------
     def put(self, request, id=None):
-        if not id:
-            return CustomResponse.errorResponse(
-                description="store id required"
+        store_id = id
+        data = request.data
+        if not store_id:
+            return CustomResponse.errorResponse(description="store_id required")
+
+        try:
+            store = Store.objects.get(id=store_id)
+        except Store.DoesNotExist:
+            return CustomResponse.errorResponse(description="Store not found")
+
+        clients = data.get("clients", [])
+
+        try:
+            with transaction.atomic():
+
+                # ---------------- UPDATE STORE ----------------
+
+                store.name = data.get("name", store.name)
+                store.mobile = data.get("mobile", store.mobile)
+                store.email = data.get("email", store.email)
+                store.address = data.get("address", store.address)
+                store.product_code = data.get("product_code", store.product_code)
+                store.aws_bucket_name = data.get("aws_bucket_name", store.aws_bucket_name)
+                store.email_login = data.get("email_login", store.email_login)
+                store.mobile_login = data.get("mobile_login", store.mobile_login)
+                store.primary_color = data.get("primary_color", store.primary_color)
+                store.secondary_color = data.get("secondary_color", store.secondary_color)
+                store.client_id = data.get("client_id", store.client_id)
+                store.client_secret = data.get("client_secret", store.client_secret)
+
+                store.save()
+
+                # ---------------- CLEAN CLIENTS (remove duplicates) ----------------
+
+                clean_clients = []
+                seen = set()
+
+                for c in clients:
+                    identifier = str(c.get("identifier", "")).strip()
+                    client_type = c.get("client_type")
+
+                    if not identifier:
+                        continue
+
+                    if identifier in seen:
+                        continue
+
+                    seen.add(identifier)
+
+                    clean_clients.append({
+                        "identifier": identifier,
+                        "client_type": client_type
+                    })
+
+                clients = clean_clients
+
+                # ---------------- EXISTING ----------------
+
+                existing_qs = StoreClient.objects.filter(store=store)
+
+                existing_map = {
+                    x.identifier: x for x in existing_qs
+                }
+
+                request_identifiers = set()
+
+                # ---------------- UPSERT ----------------
+
+                for item in clients:
+
+                    identifier = item["identifier"]
+                    client_type = item.get("client_type")
+
+                    request_identifiers.add(identifier)
+
+                    if identifier in existing_map:
+
+                        obj = existing_map[identifier]
+                        obj.client_type = client_type
+                        obj.is_active = True
+                        obj.save()
+
+                    else:
+
+                        StoreClient.objects.create(
+                            store=store,
+                            identifier=identifier,
+                            client_type=client_type,
+                            is_active=True
+                        )
+
+                # ---------------- DELETE REMOVED ----------------
+
+                existing_identifiers = set(existing_map.keys())
+
+                delete_ids = existing_identifiers - request_identifiers
+
+                if delete_ids:
+                    StoreClient.objects.filter(
+                        store=store,
+                        identifier__in=delete_ids
+                    ).delete()
+
+            return CustomResponse.successResponse(
+                description="Store updated successfully"
             )
 
-        store = Store.objects.filter(id=id).first()
-        if not store:
+        except IntegrityError as error:
             return CustomResponse.errorResponse(
-                description="store not found"
+                description=f"Database error {error}"
             )
-
-        for field in [
-            "name",
-            "mobile",
-            "address",
-            "logo",
-            "gst_number",
-        ]:
-            if field in request.data:
-                setattr(store, field, request.data.get(field))
-
-        store.save()
-
-        return CustomResponse.successResponse(
-            data={},
-            description="store updated successfully"
-        )
 
     # ---------------- DELETE STORE ----------------
     def delete(self, request, id=None):

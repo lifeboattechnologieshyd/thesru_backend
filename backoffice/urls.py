@@ -1,6 +1,6 @@
 from django.urls import path
 
-from backoffice.inventory import StockInAPIView
+from backoffice.inventory import StockInAPIView, BulkInventory
 from backoffice.shipping import  ShippingPlanAPIView, ShippinPlanCrud
 from backoffice.store import ProductAPIView, CategoriesAPIView, BannerAPIView, \
     PinCodeAPIView, StoreAPIView, WebBannerAPIView, FlashSaleBannerAPIView, OrderStatsAPIView, \
@@ -104,5 +104,6 @@ urlpatterns = [
     ## stock related apis -- INVENTORY ##
     #####################################
     path("stock-in",StockInAPIView.as_view()),
+    path("bulk/stock-in",BulkInventory.as_view()),
 
 ]
