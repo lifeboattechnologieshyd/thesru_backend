@@ -1,8 +1,9 @@
 from decimal import Decimal
 
+import pandas as pd
 from django.db import transaction
 from django.db.models import F
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.views import APIView
 
 from db.models import Product, InventoryBatch, InventoryTransaction
@@ -101,7 +102,82 @@ class StockInAPIView(APIView):
 
 
 
+class BulkInventory(APIView, CustomResponse):
 
+    permission_classes = [AllowAny]
+    def post(self, request):
+
+        if "file" not in request.FILES:
+            return self.errorResponse(
+                data={},
+                description="Excel file required"
+            )
+
+        file = request.FILES["file"]
+
+        try:
+            df = pd.read_csv(file)
+        except Exception as e:
+            return self.errorResponse(
+                description="Invalid Excel file"
+            )
+
+        required_columns = [
+            "product_id",
+            "name",
+            "qty",
+            "cost_price",
+            "selling_price"
+        ]
+
+        for col in required_columns:
+            if col not in df.columns:
+                return self.errorResponse(
+                    description=f"{col} column missing"
+                )
+        with transaction.atomic():
+
+            for _, row in df.iterrows():
+
+                product_id = row["product_id"]
+                qty = row["qty"]
+                cost = row["cost_price"]
+                price = row["selling_price"]
+                try:
+                    product = Product.objects.get(id=product_id, store=store)
+                except Product.DoesNotExist:
+                    return CustomResponse().errorResponse(data={}, description="Invalid product_id")
+
+                quantity = int(qty)
+                cost_per_unit = Decimal(cost)
+                sell_price = Decimal(price)
+
+                # ---- Create Inventory Batch ----
+                batch = InventoryBatch.objects.create(
+                    store=product.store,
+                    product=product,
+                    input_quantity=quantity,
+                    remaining_quantity=quantity,
+                    cost_per_unit=cost_per_unit,
+                )
+
+                # ---- Create Ledger Entry ----
+                InventoryTransaction.objects.create(
+                    store=product.store,
+                    product=product,
+                    batch=batch,
+                    transaction_type='IN',
+                    quantity=quantity,
+                    cost_price=cost_per_unit,
+                    selling_price=sell_price
+                )
+                Product.objects.filter(id=product.id).update(
+                    current_stock=F("current_stock") + quantity
+                )
+        return self.successResponse(
+            description="Inventory updated",
+            data={}
+        )
 
 
 
