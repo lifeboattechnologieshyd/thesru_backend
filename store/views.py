@@ -939,7 +939,7 @@ class InitiateOrder(APIView):
             platform_fee = Decimal("0.00")
 
             final_amount = subtotal - coupon_discount + shipping_charge + platform_fee
-            order_number = generate_order_number(store, "ORD")
+            order_number = generate_order_number(store, "SRU")
             order = Order.objects.create(
                 store=store,
                 user=user,

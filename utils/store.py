@@ -65,8 +65,10 @@ def generate_order_number(store, prefix):
         )
         seq.order_number += 1
         seq.save(update_fields=["order_number"])
-
-        return f"{prefix}-{store.id.hex[:4].upper()}-{seq.order_number:08d}"
+        order_number = f"{prefix}-{store.id.hex[:4].upper()}-{seq.order_number:08d}"
+        if Order.objects.filter(order_number=order_number).first():
+            generate_order_number(store, prefix)
+        return order_number
 
 
 BO_STATUS_FLOW = {
