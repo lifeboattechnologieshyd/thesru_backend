@@ -24,6 +24,7 @@ from db.models import AddressMaster, PinCode, Product, Order, OrderProducts, Pay
     Banner, Category, Cart, CouponUsage, Wishlist, CouponProduct, CouponCategory, CouponTag, WebBanner, FlashSaleBanner, \
     ProductReviews, ContactMessage, Tag, Coupons, ProductReviewMedia, Store, InventoryBatch, \
     InventoryTransaction, ShippingPlan
+from db.models.user import WebhookLog
 from enums.store import OrderStatus, PaymentStatus, NotificationEvent
 from mixins.drf_views import CustomResponse
 from utils.notification import trigger_notification
@@ -1151,6 +1152,11 @@ class Webhook(APIView):
             order_id = data.get("data", {}).get("order", {}).get("order_id")
             order_amount = data.get("data", {}).get("order", {}).get("order_amount")
             print("Webhook received:", data)
+            # logs of webhook just for records...
+            log = WebhookLog()
+            log.event_type = "ORDER_PAYMENT_WEBHOOK"
+            log.payload = data
+            log.save()
             # Cashfree test webhook may not have real order_id
             if not order_id:
                 print("Webhook test / invalid payload")
