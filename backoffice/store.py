@@ -1868,42 +1868,28 @@ class StoreAPIView(APIView):
                         continue
 
                     seen.add(identifier)
-
                     clean_clients.append({
                         "identifier": identifier,
                         "client_type": client_type
                     })
-
                 clients = clean_clients
-
                 # ---------------- EXISTING ----------------
-
                 existing_qs = StoreClient.objects.filter(store=store)
-
                 existing_map = {
                     x.identifier: x for x in existing_qs
                 }
-
                 request_identifiers = set()
-
                 # ---------------- UPSERT ----------------
-
                 for item in clients:
-
                     identifier = item["identifier"]
                     client_type = item.get("client_type")
-
                     request_identifiers.add(identifier)
-
                     if identifier in existing_map:
-
                         obj = existing_map[identifier]
                         obj.client_type = client_type
                         obj.is_active = True
                         obj.save()
-
                     else:
-
                         StoreClient.objects.create(
                             store=store,
                             identifier=identifier,

@@ -510,6 +510,7 @@ class Payment(AuditModel):
     session_id = models.CharField(max_length=200, null=False)
     amount = models.DecimalField(decimal_places=2, max_digits=10, default=0)
     status = models.CharField(choices=PaymentStatus.choices)
+    remarks = models.TextField(default="")
 
     class Meta:
         db_table = "payment"
