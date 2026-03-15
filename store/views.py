@@ -132,6 +132,7 @@ class ProductListAPIView(APIView):
         search = request.query_params.get("search")
         category_id = request.query_params.get("categories")
         tags = request.query_params.get("tags")
+        product_id = request.query_params.get("product_id", None)
 
         page = int(request.query_params.get("page", 1))
         page_size = int(request.query_params.get("page_size", 15))
@@ -158,6 +159,9 @@ class ProductListAPIView(APIView):
             queryset = queryset.filter(
                 categories__id=category_id
             )
+
+        if product_id:
+            queryset = queryset.filter(id=product_id)
 
         # ---------- Tags filter ----------
         if tags:
