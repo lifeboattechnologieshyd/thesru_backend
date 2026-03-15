@@ -144,7 +144,7 @@ class BulkInventory(APIView, CustomResponse):
                 cost = row["cost_price"]
                 price = row["selling_price"]
                 try:
-                    product = Product.objects.get(id=product_id, store=store)
+                    product = Product.objects.get(id=product_id)
                 except Product.DoesNotExist:
                     return CustomResponse().errorResponse(data={}, description="Invalid product_id")
 

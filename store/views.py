@@ -1245,8 +1245,8 @@ class Webhook(APIView):
                     remove_cart_items(order.user, order.store)
                 elif event_type == "PAYMENT_FAILED_WEBHOOK":
                     payment.status = PaymentStatus.FAILED
-                    order.updated_by = event_type
-                    order.save(update_fields=["status", "paid_online", "updated_by"])
+                    payment.updated_by = event_type
+                    payment.save(update_fields=["status", "updated_by"])
 
                     order.status = OrderStatus.FAILED
                     order.updated_by = event_type
@@ -1272,6 +1272,7 @@ class Webhook(APIView):
                     )
                 else:
                     print("Unhandled webhook type:", event_type)
+
             print("Webhook Processed")
             return CustomResponse().successResponse(data={},
                 description="Webhook processed"
@@ -1329,6 +1330,7 @@ class PaymentStatusAPIView(APIView):
 
             if verified_status == PaymentStatus.COMPLETED:
                 update_stock_after_order(order)
+
                 order.status = OrderStatus.CREATED
                 order.paid_online = payment.amount
                 order.updated_by = "PAYMENT STATUS BY FE"
