@@ -133,6 +133,7 @@ class ProductListAPIView(APIView):
         category_id = request.query_params.get("categories")
         tags = request.query_params.get("tags")
         product_id = request.query_params.get("product_id", None)
+        price = request.query_params.get("price", None)
 
         page = int(request.query_params.get("page", 1))
         page_size = int(request.query_params.get("page_size", 15))
@@ -162,6 +163,8 @@ class ProductListAPIView(APIView):
 
         if product_id:
             queryset = queryset.filter(id=product_id)
+        if price:
+            queryset = queryset.filter(selling_price__lte=price)
 
         # ---------- Tags filter ----------
         if tags:
