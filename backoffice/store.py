@@ -441,7 +441,7 @@ class ProductAPIView(APIView):
         product=Product.objects.create(
             store=store,
             sku=sku,
-            lsin=generate_lsin(store, "SRU"),
+            lsin=generate_lsin(store, store.product_code),
             name=data["name"].strip(),
             size=data.get("size"),
             colour=data.get("colour"),
