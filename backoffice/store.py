@@ -50,7 +50,7 @@ class SendOTP(APIView):
         store = request.store
         user = User.objects.filter(mobile=data.get("mobile"),user_role__contains=["ADMIN"], store=store).first()
         if user:
-            otp = 1234
+            otp = generate_otp()
             context = {
                 "var": f"{otp}|"
             }
@@ -367,6 +367,9 @@ class UserAPIView(APIView):
                 store=store,
                 mobile__startswith=mobile
             ).first()
+        if not users_qs:
+            return CustomResponse().errorResponse(data={}, description="No results from provided input")
+
         address = AddressMaster.objects.filter(store_id=store.id,
                                                mobile=users_qs.mobile,
                                                is_default=True).values().first()
@@ -383,17 +386,7 @@ class UserAPIView(APIView):
         })
 
 
-class UserAddress(APIView):
-    permission_classes = [IsAuthenticated]
 
-    def get(self, request):
-        mobile = request.query_params.get("mobile")
-        store = request.store
-        address = AddressMaster.objects.filter(store_id=store.id, mobile=mobile, is_default=True).values()
-        if address:
-            return CustomResponse().successResponse(data=address.first())
-        else:
-            return CustomResponse().errorResponse(data={}, description="No Address found for this user")
 
 
 
