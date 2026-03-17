@@ -1,12 +1,12 @@
 from django.urls import path
 
-from backoffice.customer import CustomerCreation
+from backoffice.customer import CustomerCreation, UserAddress
 from backoffice.inventory import StockInAPIView, BulkInventory
 from backoffice.shipping import  ShippingPlanAPIView, ShippinPlanCrud
 from backoffice.store import ProductAPIView, CategoriesAPIView, BannerAPIView, \
     PinCodeAPIView, StoreAPIView, WebBannerAPIView, FlashSaleBannerAPIView, OrderStatsAPIView, \
     CartListView, OrderListAPIView, AbandonedOrderListAPIView, Login, SendOTP, TagsAPIView, AdminOrderDetailAPIView, \
-    AdminCreateCouponAPIView, UserAddress, UserAPIView, CreateAppVersionConfigAPI, OrderShippingSlipAPIView, \
+    AdminCreateCouponAPIView, UserAPIView, CreateAppVersionConfigAPI, OrderShippingSlipAPIView, \
     StoreAnalyticsAPIView, EmailSendOTPView, EmailVerifyOTPView, ClientInfo, NotificationConfig, \
     NotificationTemplateConfig, SuperAdminSendOTPAPIView, SuperAdminVerifyOTPAPIView, StoreListAPIView, \
     DashboardStatsAPIView, PinCodeStatesAPIView, PinCodeDistrictAPIView
@@ -29,7 +29,7 @@ urlpatterns = [
     #####################################
 
     path("user/search",UserAPIView.as_view()),
-    path("user/address",UserAddress.as_view()),
+    path("user/address",UserAddress.as_view()), #post n get
 
     path("admin/customer/add", CustomerCreation.as_view()),
 
