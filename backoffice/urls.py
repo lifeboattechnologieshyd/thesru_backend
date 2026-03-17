@@ -1,5 +1,6 @@
 from django.urls import path
 
+from backoffice.customer import CustomerCreation
 from backoffice.inventory import StockInAPIView, BulkInventory
 from backoffice.shipping import  ShippingPlanAPIView, ShippinPlanCrud
 from backoffice.store import ProductAPIView, CategoriesAPIView, BannerAPIView, \
@@ -29,6 +30,8 @@ urlpatterns = [
 
     path("user/search",UserAPIView.as_view()),
     path("user/address",UserAddress.as_view()),
+
+    path("admin/customer/add", CustomerCreation.as_view()),
 
     #####################################
     ## Store  API's                    ##

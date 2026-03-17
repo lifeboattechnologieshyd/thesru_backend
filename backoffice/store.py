@@ -50,7 +50,7 @@ class SendOTP(APIView):
         store = request.store
         user = User.objects.filter(mobile=data.get("mobile"),user_role__contains=["ADMIN"], store=store).first()
         if user:
-            otp = 1234
+            otp = generate_otp()
             context = {
                 "var": f"{otp}|"
             }

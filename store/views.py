@@ -577,7 +577,7 @@ class CheckoutPreview(APIView):
         user = request.user
         data = request.data
 
-        items = data.get("products", [])
+        items = data.get("products", data.get("items", []))
         coupon_code = data.get("coupon_code")
         address = data.get("address")
 
