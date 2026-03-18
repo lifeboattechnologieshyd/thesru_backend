@@ -378,6 +378,7 @@ class UserAPIView(APIView):
 
 
         return CustomResponse().successResponse(data={
+            "id":users_qs.id,
             "username": users_qs.username,
             "name": users_qs.name,
             "mobile": users_qs.mobile,

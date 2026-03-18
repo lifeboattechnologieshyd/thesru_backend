@@ -25,6 +25,7 @@ class CustomerCreation(APIView):
             mobile=data.get("mobile"),
             store=request.store,
             username=data.get("name"),
+            name=data.get("name"),
             referral_code=generate_referral_code()
         )
         new_customer.save()
