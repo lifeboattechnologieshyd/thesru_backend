@@ -378,6 +378,7 @@ class UserAPIView(APIView):
 
 
         return CustomResponse().successResponse(data={
+            "id":users_qs.id,
             "username": users_qs.username,
             "name": users_qs.name,
             "mobile": users_qs.mobile,
@@ -1902,9 +1903,7 @@ class StoreAPIView(APIView):
                         identifier__in=delete_ids
                     ).delete()
 
-            return CustomResponse.successResponse(
-                description="Store updated successfully"
-            )
+            return CustomResponse.successResponse(data={},description="Store updated successfully")
 
         except IntegrityError as error:
             return CustomResponse.errorResponse(

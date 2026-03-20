@@ -23,10 +23,11 @@ class CustomerCreation(APIView):
             return CustomResponse().errorResponse(data={}, description="this username is not available")
         new_customer = User.objects.create(
             mobile=data.get("mobile"),
-            store=request.store
+            store=request.store,
+            username=data.get("name"),
+            name=data.get("name"),
+            referral_code=generate_referral_code()
         )
-        new_customer.username = data.get("name")
-        new_customer.referral_code = generate_referral_code()
         new_customer.save()
         return CustomResponse().successResponse(data={}, description="Customer created successfully")
 
