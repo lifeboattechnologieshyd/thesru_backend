@@ -1903,9 +1903,7 @@ class StoreAPIView(APIView):
                         identifier__in=delete_ids
                     ).delete()
 
-            return CustomResponse.successResponse(
-                description="Store updated successfully"
-            )
+            return CustomResponse.successResponse(data={},description="Store updated successfully")
 
         except IntegrityError as error:
             return CustomResponse.errorResponse(

@@ -40,10 +40,12 @@ urlpatterns = [
     path("store", StoreAPIView.as_view()),
     path("store/<str:id>", StoreAPIView.as_view()),
 
+    #####################################
+    ## Product  API's                    ##
+    #####################################
     path("product", ProductAPIView.as_view()),
     path("product/<str:id>", ProductAPIView.as_view()),
 
-    # path("product-variants",DisplayProductAPIView.as_view()),
     path("category",CategoriesAPIView.as_view()),
     path("category/<str:id>",CategoriesAPIView.as_view()),
 
@@ -53,9 +55,15 @@ urlpatterns = [
     path("appversion",CreateAppVersionConfigAPI.as_view()),
     path("appversion/<str:id>",CreateAppVersionConfigAPI.as_view()),
 
+    #####################################
+    ## Mobile banner  API's            ##
+    #####################################
     path("banner",BannerAPIView.as_view()),
     path("banner/<str:id>",BannerAPIView.as_view()),
 
+    #####################################
+    ## Pincode  API's            ##
+    #####################################
 
     path("pin",PinCodeAPIView.as_view()),
     path("pin/<str:id>",PinCodeAPIView.as_view()),
@@ -68,28 +76,22 @@ urlpatterns = [
     path("flashsale/banner",FlashSaleBannerAPIView.as_view()),
     path("flashsale/banner/<str:id>",FlashSaleBannerAPIView.as_view()),
 
-    path("order/stats",OrderStatsAPIView.as_view()),
-    path("abandoned/stats",AbandonedOrderListAPIView.as_view()),
-    path("cart/total",CartListView.as_view()),
-
+    #####################################
+    ## Order  API's                    ##
+    #####################################
     path("orders",OrderListAPIView.as_view()),
     path("orders/<str:id>",OrderListAPIView.as_view()),
     path("order/details",AdminOrderDetailAPIView.as_view()),
+
+    path("order/stats",OrderStatsAPIView.as_view()),
+    path("abandoned/stats",AbandonedOrderListAPIView.as_view()),
+    path("cart/total",CartListView.as_view()),
 
     path("coupon",AdminCreateCouponAPIView.as_view()),
     path("shippingslip/<str:id>",OrderShippingSlipAPIView.as_view()),
     path("analytics",StoreAnalyticsAPIView.as_view()),
     path("client_info",ClientInfo.as_view()),
 
-    path("notification/config",NotificationConfig.as_view()),
-    path("notification/config/<str:id>",NotificationConfig.as_view()),
-
-
-    path("notification/template/config",NotificationTemplateConfig.as_view()),
-    path("notification/template/config/<str:id>",NotificationTemplateConfig.as_view()),
-
-    path("superadmin/send-otp",SuperAdminSendOTPAPIView.as_view()),
-    path("superadmin/verify-otp",SuperAdminVerifyOTPAPIView.as_view()),
 
     path("get/store",StoreListAPIView.as_view()),
 
@@ -97,16 +99,28 @@ urlpatterns = [
     path("shipping/plan",ShippingPlanAPIView.as_view()),# create, get, edit
 
     path("shipping/rule",ShippinPlanCrud.as_view()), # create, get, edit
-
-    ## SUPER ADMIN
-    path("dashboard",DashboardStatsAPIView.as_view()),
-    path("subscription/plan",CreateSubscriptionPlanAPI.as_view()),
-
-
     #####################################
     ## stock related apis -- INVENTORY ##
     #####################################
     path("stock-in",StockInAPIView.as_view()),
     path("bulk/stock-in",BulkInventory.as_view()),
+
+    #####################################
+    ## SUPER ADMIN                     ##
+    #####################################
+    path("superadmin/send-otp", SuperAdminSendOTPAPIView.as_view()),
+    path("superadmin/verify-otp", SuperAdminVerifyOTPAPIView.as_view()),
+
+    path("notification/config", NotificationConfig.as_view()),
+    path("notification/config/<str:id>", NotificationConfig.as_view()),
+
+    path("notification/template/config", NotificationTemplateConfig.as_view()),
+    path("notification/template/config/<str:id>", NotificationTemplateConfig.as_view()),
+
+    path("dashboard",DashboardStatsAPIView.as_view()),
+    path("subscription/plan",CreateSubscriptionPlanAPI.as_view()),
+
+
+
 
 ]
