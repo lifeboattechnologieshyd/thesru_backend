@@ -141,50 +141,145 @@ from django.conf import settings
 #
 #     return file_url
 
+#
+# def generate_shipping_invoice(order):
+#     """
+#     Generates shipping invoice PDF using Playwright
+#     and uploads it using Django default_storage (S3 / MinIO / local)
+#     """
+#
+#     #  PREPARE ITEMS (IMPORTANT)
+#     items = []
+#     for item in order.items.select_related("product"):
+#         items.append({
+#             "name": item.product.name,
+#             "qty": item.qty,
+#             "unit_price": item.selling_price,
+#             "total_price": item.selling_price * item.qty,
+#         })
+#
+#     #  TEMPLATE SELECTION (NEW)
+#     template_name = "store/shipping_invoice.html"
+#     is_thermal = False
+#
+#     if order.store and order.store.product_code == "SRU":
+#         template_name = "store/shipping_invoice_sru.html"
+#         is_thermal = True
+#
+#     # Render HTML
+#     html_content = render_to_string(
+#         template_name,
+#         {
+#             "order": order,
+#             "address": order.address,
+#             "store": order.store,
+#             "items": items,
+#         }
+#     )
+#
+#     #  Create temp files
+#     with tempfile.TemporaryDirectory() as tmpdir:
+#         html_path = Path(tmpdir) / "invoice.html"
+#         pdf_path = Path(tmpdir) / f"invoice_{order.id}.pdf"
+#
+#         html_path.write_text(html_content, encoding="utf-8")
+#
+#         #  Generate PDF
+#         with sync_playwright() as p:
+#             browser = p.chromium.launch(
+#                 args=["--no-sandbox", "--disable-dev-shm-usage"]
+#             )
+#             page = browser.new_page()
+#             page.goto(f"file://{html_path}", wait_until="networkidle")
+#
+#             #  PDF CONFIG (NEW)
+#             if is_thermal:
+#                 page.pdf(
+#                     path=str(pdf_path),
+#                     width="6in",
+#                     height="4in",
+#                     print_background=True,
+#                 )
+#             else:
+#                 page.pdf(
+#                     path=str(pdf_path),
+#                     format="A4",
+#                     print_background=True,
+#                     margin={
+#                         "top": "10mm",
+#                         "bottom": "10mm",
+#                         "left": "10mm",
+#                         "right": "10mm",
+#                     },
+#                 )
+#
+#             browser.close()
+#
+#         #  Upload
+#         storage_path = f"shipping/invoice_{order.id}.pdf"
+#
+#         with open(pdf_path, "rb") as f:
+#             saved_path = default_storage.save(
+#                 storage_path,
+#                 ContentFile(f.read())
+#             )
+#
+#         file_url = settings.MEDIA_URL + saved_path
+#
+#     return file_url
 
-def generate_shipping_invoice(order):
+
+def generate_shipping_invoice(orders):
     """
-    Generates shipping invoice PDF using Playwright
-    and uploads it using Django default_storage (S3 / MinIO / local)
+    Generates invoice PDF
+    Only prints MAX 2 orders in SINGLE PAGE
     """
 
-    #  PREPARE ITEMS (IMPORTANT)
-    items = []
-    for item in order.items.select_related("product"):
-        items.append({
-            "name": item.product.name,
-            "qty": item.qty,
-            "unit_price": item.selling_price,
-            "total_price": item.selling_price * item.qty,
-        })
+    # ✅ LIMIT TO 2 ORDERS ONLY
+    orders = orders[:2]
 
-    #  TEMPLATE SELECTION (NEW)
     template_name = "store/shipping_invoice.html"
     is_thermal = False
 
-    if order.store and order.store.product_code == "SRU":
+    if orders and orders[0].store and orders[0].store.product_code == "SRU":
         template_name = "store/shipping_invoice_sru.html"
         is_thermal = True
 
-    # Render HTML
-    html_content = render_to_string(
-        template_name,
-        {
+    orders_data = []
+
+    # ✅ PREPARE DATA
+    for order in orders:
+        items = []
+        for item in order.items.select_related("product"):
+            items.append({
+                "name": item.product.name,
+                "qty": item.qty,
+                "unit_price": item.selling_price,
+                "total_price": item.selling_price * item.qty,
+            })
+
+        orders_data.append({
             "order": order,
             "address": order.address,
             "store": order.store,
             "items": items,
+        })
+
+    # ✅ RENDER HTML
+    html_content = render_to_string(
+        template_name,
+        {
+            "orders": orders_data  # 🔥 pass list
         }
     )
 
-    #  Create temp files
+    # ✅ CREATE PDF
     with tempfile.TemporaryDirectory() as tmpdir:
         html_path = Path(tmpdir) / "invoice.html"
-        pdf_path = Path(tmpdir) / f"invoice_{order.id}.pdf"
+        pdf_path = Path(tmpdir) / f"invoice_{orders[0].id}.pdf"
 
         html_path.write_text(html_content, encoding="utf-8")
 
-        #  Generate PDF
         with sync_playwright() as p:
             browser = p.chromium.launch(
                 args=["--no-sandbox", "--disable-dev-shm-usage"]
@@ -192,7 +287,6 @@ def generate_shipping_invoice(order):
             page = browser.new_page()
             page.goto(f"file://{html_path}", wait_until="networkidle")
 
-            #  PDF CONFIG (NEW)
             if is_thermal:
                 page.pdf(
                     path=str(pdf_path),
@@ -215,8 +309,8 @@ def generate_shipping_invoice(order):
 
             browser.close()
 
-        #  Upload
-        storage_path = f"shipping/invoice_{order.id}.pdf"
+        #  UPLOAD
+        storage_path = f"shipping/invoice_{orders[0].id}.pdf"
 
         with open(pdf_path, "rb") as f:
             saved_path = default_storage.save(
