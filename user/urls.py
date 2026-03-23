@@ -1,10 +1,9 @@
 
 from django.urls import path
 
-from db.models.user import IftarBookings
 from user.views import MobileSendOTPView, MobileVerifyOTPView, FileUploadView, CreateAdmin, AdminLogin, ProfileUpdate, \
     AppVersionCheckAPI, EmailSendOTPView, EmailVerifyOTPView, VisitorCreateAPIView, DeleteUserAPIView, \
-    EnrolPlatinumJubli, IftarENoor, IftarENoorUpdatePayment, IftarWebhook
+    EnrolPlatinumJubli
 
 urlpatterns = [
     path("send-otp", MobileSendOTPView.as_view()),
@@ -24,9 +23,6 @@ urlpatterns = [
 
     # GPW - ALUMNI
     path("register",EnrolPlatinumJubli.as_view()),
-    path("booking",IftarENoor.as_view()),
 
-    path("booking/status/update", IftarENoorUpdatePayment.as_view()),
-    path("paymentWebhook", IftarWebhook.as_view()),
 
 ]

@@ -449,17 +449,3 @@ class Enrollments(AuditModel):
     class Meta:
         db_table = "gpt_enrolls"
 
-# this is being used for Iftar Bookings
-class IftarBookings(AuditModel):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    name = models.CharField(max_length=100)
-    age = models.CharField(max_length=100)
-    email = models.CharField(max_length=100)
-    mobile = models.CharField(max_length=100)
-    booking_id = models.CharField(max_length=100)
-    cf_id = models.CharField(max_length=100)
-    cf_session_id = models.CharField(max_length=1000)
-    status = models.CharField(max_length=100)
-
-    class Meta:
-        db_table = "iftar_bookings"
