@@ -100,7 +100,7 @@ class BackofficeCustomerListAPI(APIView):
                 description="Access denied"
             )
 
-        store_id = request.query_params.get("store_id")
+        store_id = request.store.id
 
         page = int(request.query_params.get("page", 1))
         page_size = int(request.query_params.get("page_size", 20))
