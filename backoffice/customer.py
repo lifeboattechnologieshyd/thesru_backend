@@ -1,3 +1,4 @@
+from django.db.models import Q, OuterRef, Subquery, Count, Sum
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.views import APIView
 
@@ -89,3 +90,120 @@ class UserAddress(APIView):
 
 
 
+class BackofficeCustomerListAPI(APIView):
+
+    def get(self, request):
+
+        roles = request.user.user_role or []
+        if "ADMIN" not in roles:
+            return CustomResponse().errorResponse(
+                description="Access denied"
+            )
+
+        store_id = request.query_params.get("store_id")
+
+        page = int(request.query_params.get("page", 1))
+        page_size = int(request.query_params.get("page_size", 20))
+
+        search = request.query_params.get("search")
+        state = request.query_params.get("state")
+        district = request.query_params.get("district")
+        paid_user = request.query_params.get("paid_user")
+
+        users = User.objects.filter(store_id=store_id)
+
+        # ---------------- search ----------------
+
+        if search:
+            users = users.filter(
+                Q(name__icontains=search) |
+                Q(mobile__icontains=search)
+            )
+
+        # ---------------- address subquery ----------------
+
+        address_qs = AddressMaster.objects.filter(
+            user_id=OuterRef("id"),
+            store_id=store_id,
+            is_default=True
+        )
+
+        users = users.annotate(
+            state_name=Subquery(address_qs.values("state")[:1]),
+            district_name=Subquery(address_qs.values("city")[:1])
+        )
+
+        # ---------------- filters ----------------
+
+        if state:
+            users = users.filter(state_name=state)
+
+        if district:
+            users = users.filter(district_name=district)
+
+        # ---------------- orders aggregation ----------------
+
+        users = users.annotate(
+            total_orders=Count(
+                "orders",
+                filter=Q(
+                    orders__store_id=store_id,
+                    orders__status__in=[
+                        "PLACED",
+                        "DELIVERED",
+                        "SHIPPED",
+                        "COMPLETED"
+                    ]
+                )
+            ),
+            total_amount_paid=Sum(
+                "orders__amount",
+                filter=Q(
+                    orders__store_id=store_id,
+                    orders__status__in=[
+                        "PLACED",
+                        "DELIVERED",
+                        "SHIPPED",
+                        "COMPLETED"
+                    ]
+                )
+            )
+        )
+
+        # ---------------- paid filter ----------------
+
+        if paid_user == "true":
+            users = users.filter(total_orders__gt=0)
+
+        if paid_user == "false":
+            users = users.filter(
+                Q(total_orders=0) | Q(total_orders__isnull=True)
+            )
+
+        total_count = users.count()
+
+        start = (page - 1) * page_size
+        end = start + page_size
+
+        users = users.order_by("-created_at")[start:end]
+
+        data = []
+
+        for u in users:
+            data.append({
+                "id": u.id,
+                "name": u.name,
+                "mobile": u.mobile,
+                "state": u.state_name,
+                "district": u.district_name,
+                "is_paid_user": (u.total_orders or 0) > 0,
+                "total_orders": u.total_orders or 0,
+                "total_amount_paid": u.total_amount_paid or 0,
+                "created_at": u.created_at,
+            })
+
+        return CustomResponse().successResponse(
+            description="Customer list",
+            total=total_count,
+            data=data
+        )

@@ -32,6 +32,7 @@ urlpatterns = [
     path("user/address",UserAddress.as_view()), #post n get
 
     path("merchant/customer/add", CustomerCreation.as_view()),
+    path("merchant/users", BulkInventory.as_view()),
 
     #####################################
     ## Store  API's                    ##
@@ -104,6 +105,8 @@ urlpatterns = [
     #####################################
     path("stock-in",StockInAPIView.as_view()),
     path("bulk/stock-in",BulkInventory.as_view()),
+
+
 
     #####################################
     ## SUPER ADMIN                     ##
