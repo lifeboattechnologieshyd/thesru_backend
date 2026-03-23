@@ -111,6 +111,7 @@ class BackofficeCustomerListAPI(APIView):
         paid_user = request.query_params.get("paid_user")
 
         users = User.objects.filter(store_id=store_id)
+        # users = User.objects.all()
 
         # ---------------- search ----------------
 
@@ -186,7 +187,7 @@ class BackofficeCustomerListAPI(APIView):
         start = (page - 1) * page_size
         end = start + page_size
 
-        users = users.order_by("-created_at")[start:end]
+        users = users[start:end]
 
         data = []
 
