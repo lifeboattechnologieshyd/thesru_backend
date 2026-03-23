@@ -161,7 +161,8 @@ class BackofficeCustomerListAPI(APIView):
                 filter=Q(
                     orders__store_id=store_id,
                     orders__status__in=[
-                        "PLACED",
+                        "CREATED",
+                        "PACKED",
                         "DELIVERED",
                         "SHIPPED",
                         "COMPLETED"
