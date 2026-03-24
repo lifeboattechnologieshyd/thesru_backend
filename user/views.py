@@ -175,12 +175,10 @@ class MobileVerifyOTPView(APIView):
             user = User.objects.create(
                 mobile=mobile,
                 device_id=device_id,
+                username = generate_username(),
+                referral_code = generate_referral_code(),
                 store=request.store
             )
-
-            user.username = generate_username(user)
-            user.referral_code = generate_referral_code()
-            user.save()
 
             is_new_user = True
 

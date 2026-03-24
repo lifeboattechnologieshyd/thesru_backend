@@ -11,18 +11,28 @@ from django.template.loader import render_to_string
 from django.core.mail import EmailMultiAlternatives
 from django.core.exceptions import ImproperlyConfigured
 
-def generate_username(user):
+# def generate_username(user):
+#     """
+#     This function generates a username with combination of first name and last name and a random number.
+#     """
+#     random_suffix = uuid.uuid4().hex[:6]
+#
+#
+#
+#     username = random_suffix
+#     if User.objects.filter(username=username).exists():
+#         return generate_username(user)
+#     return username
+
+def generate_username():
     """
-    This function generates a username with combination of first name and last name and a random number.
+    Generates a unique username using random UUID
     """
-    random_suffix = uuid.uuid4().hex[:6]
+    while True:
+        username = uuid.uuid4().hex[:6]   # short random string
 
-
-
-    username = random_suffix
-    if User.objects.filter(username=username).exists():
-        return generate_username(user)
-    return username
+        if not User.objects.filter(username=username).exists():
+            return username
 
 def generate_referral_code():
     """
