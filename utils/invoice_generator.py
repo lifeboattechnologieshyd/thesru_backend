@@ -250,6 +250,13 @@ from django.conf import settings
 def generate_shipping_invoice(orders):
 
     from collections import defaultdict
+    import tempfile
+    from pathlib import Path
+    from playwright.sync_api import sync_playwright
+    from django.template.loader import render_to_string
+    from django.core.files.base import ContentFile
+    from django.core.files.storage import default_storage
+    from django.conf import settings
 
     # ✅ handle single order
     if not isinstance(orders, (list, tuple)):
@@ -257,6 +264,7 @@ def generate_shipping_invoice(orders):
 
     first_order = orders[0]
 
+    # ✅ group items
     items_map = defaultdict(lambda: {
         "name": "",
         "qty": 0,
@@ -264,7 +272,6 @@ def generate_shipping_invoice(orders):
         "total_price": 0,
     })
 
-    # ✅ loop all orders
     for order in orders:
         for item in order.items.select_related("product"):
             key = item.product.id
@@ -274,10 +281,9 @@ def generate_shipping_invoice(orders):
             items_map[key]["qty"] += item.qty
             items_map[key]["total_price"] += item.selling_price * item.qty
 
-    # ✅ group items
     items = list(items_map.values())
 
-    # ✅ limit items
+    # ✅ limit items (max 2)
     display_items = items[:2]
     remaining_count = max(0, len(items) - 2)
 
@@ -289,7 +295,7 @@ def generate_shipping_invoice(orders):
         template_name = "store/shipping_invoice_sru.html"
         is_thermal = True
 
-    # ✅ render html
+    # ✅ render HTML
     html_content = render_to_string(
         template_name,
         {
@@ -300,3 +306,61 @@ def generate_shipping_invoice(orders):
             "remaining_count": remaining_count,
         }
     )
+
+    # ✅ DEBUG
+    print("HTML OK")
+
+    # ✅ create temp files
+    with tempfile.TemporaryDirectory() as tmpdir:
+        html_path = Path(tmpdir) / "invoice.html"
+        pdf_path = Path(tmpdir) / f"invoice_{first_order.id}.pdf"
+
+        html_path.write_text(html_content, encoding="utf-8")
+
+        # ✅ generate PDF
+        with sync_playwright() as p:
+            browser = p.chromium.launch(
+                args=["--no-sandbox", "--disable-dev-shm-usage"]
+            )
+            page = browser.new_page()
+
+            page.goto(f"file://{html_path}", wait_until="networkidle")
+
+            if is_thermal:
+                page.pdf(
+                    path=str(pdf_path),
+                    width="6in",
+                    height="4in",
+                    print_background=True,
+                )
+            else:
+                page.pdf(
+                    path=str(pdf_path),
+                    format="A4",
+                    print_background=True,
+                    margin={
+                        "top": "10mm",
+                        "bottom": "10mm",
+                        "left": "10mm",
+                        "right": "10mm",
+                    },
+                )
+
+            browser.close()
+
+        print("PDF GENERATED:", pdf_path)
+
+        # ✅ upload
+        storage_path = f"shipping/invoice_{first_order.id}.pdf"
+
+        with open(pdf_path, "rb") as f:
+            saved_path = default_storage.save(
+                storage_path,
+                ContentFile(f.read())
+            )
+
+        file_url = settings.MEDIA_URL + saved_path
+
+    print("UPLOADED:", file_url)
+
+    return file_url
