@@ -149,14 +149,33 @@ def generate_shipping_invoice(order):
     """
 
     #  PREPARE ITEMS (IMPORTANT)
-    items = []
+    # items = []
+    # for item in order.items.select_related("product"):
+    #     items.append({
+    #         "name": item.product.name,
+    #         "qty": item.qty,
+    #         "unit_price": item.selling_price,
+    #         "total_price": item.selling_price * item.qty,
+    #     })
+    from collections import defaultdict
+
+    items_map = defaultdict(lambda: {
+        "name": "",
+        "qty": 0,
+        "unit_price": 0,
+        "total_price": 0,
+    })
+
     for item in order.items.select_related("product"):
-        items.append({
-            "name": item.product.name,
-            "qty": item.qty,
-            "unit_price": item.selling_price,
-            "total_price": item.selling_price * item.qty,
-        })
+        key = item.product.id
+
+        items_map[key]["name"] = item.product.name
+        items_map[key]["unit_price"] = item.selling_price
+        items_map[key]["qty"] += item.qty
+        items_map[key]["total_price"] += item.selling_price * item.qty
+
+    # convert to list
+    items = list(items_map.values())
 
     #  TEMPLATE SELECTION (NEW)
     template_name = "store/shipping_invoice.html"
