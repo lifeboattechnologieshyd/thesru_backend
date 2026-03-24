@@ -967,7 +967,9 @@ class InitiateOrder(APIView):
 
 
             # ---------- Create Order Products ----------
+            print(f"products data before === {products_data}")
             for item in products_data:
+
                 product = item["product"]
                 qty = item["qty"]
 
@@ -991,56 +993,57 @@ class InitiateOrder(APIView):
                     apportioned_wallet=Decimal("0.00"),
                     apportioned_gst=product.gst_amount
                 )
-                # ---------- Order Timeline ----------
-                OrderTimeLines.objects.create(
-                    order=order,
-                    status=OrderStatus.INITIATED,
-                    remarks="Order initiated"
-                )
+            # ---------- Order Timeline ----------
+            OrderTimeLines.objects.create(
+                order=order,
+                status=OrderStatus.INITIATED,
+                remarks="Order initiated"
+            )
 
-                # ---------- Create Payment ----------
-                payment = Payment.objects.create(
-                    store=store,
-                    user=user,
-                    order=order,
-                    gateway="CASHFREE",
-                    amount=final_amount,
-                    status=PaymentStatus.INITIATED,
-                    remarks="Payment Initiated"
+            # ---------- Create Payment ----------
+            payment = Payment.objects.create(
+                store=store,
+                user=user,
+                order=order,
+                gateway="CASHFREE",
+                amount=final_amount,
+                status=PaymentStatus.INITIATED,
+                remarks="Payment Initiated"
+            )
+            payment_resp = initiateOrder(
+                user=user,
+                amount=final_amount,
+                order=order,
+                store=store
+            )
+            if payment_resp["success"]:
+                payment.session_id = payment_resp["payment_session_id"]
+                payment.cf_order_id = payment_resp["cf_order_id"]
+                payment.save(
+                    update_fields=["session_id", "cf_order_id"]
                 )
-                payment_resp = initiateOrder(
-                    user=user,
-                    amount=final_amount,
-                    order=order,
-                    store=store
+                return CustomResponse.successResponse(
+                    data={
+                        "order_number": order.order_number,
+                        "payment_session_id": payment.session_id,
+                        "cf_order_id": payment.cf_order_id,
+                        "amount": str(final_amount)
+                    },
+                    description="Order initiated successfully"
                 )
-                if payment_resp["success"]:
-                    payment.session_id = payment_resp["payment_session_id"]
-                    payment.cf_order_id = payment_resp["cf_order_id"]
-                    payment.save(
-                        update_fields=["session_id", "cf_order_id"]
-                    )
-                    return CustomResponse.successResponse(
-                        data={
-                            "order_number": order.order_number,
-                            "payment_session_id": payment.session_id,
-                            "cf_order_id": payment.cf_order_id,
-                            "amount": str(final_amount)
-                        },
-                        description="Order initiated successfully"
-                    )
-                else:
-                    payment.status = PaymentStatus.FAILED
-                    payment.remarks = str(payment.remarks) + "==" + "PaymentStatus.FAILED" + ": " + payment_resp["description"]
-                    payment.save(
-                        update_fields=["status", "remarks"]
-                    )
-                    order.status = OrderStatus.FAILED
-                    order.save()
-                    return CustomResponse.errorResponse(
-                        data={},
-                        description=payment_resp["description"]
-                    )
+            else:
+                payment.status = PaymentStatus.FAILED
+                payment.remarks = str(payment.remarks) + "==" + "PaymentStatus.FAILED" + ": " + payment_resp[
+                    "description"]
+                payment.save(
+                    update_fields=["status", "remarks"]
+                )
+                order.status = OrderStatus.FAILED
+                order.save()
+                return CustomResponse.errorResponse(
+                    data={},
+                    description=payment_resp["description"]
+                )
         except Exception as e:
             return CustomResponse().errorResponse(
                 description=str(e) or "Failed to initiate order"
