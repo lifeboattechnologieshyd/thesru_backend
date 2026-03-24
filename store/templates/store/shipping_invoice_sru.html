@@ -145,16 +145,23 @@
       </tr>
     </thead>
     <tbody>
-      {% for item in items %}
-<tr>
-  <td>{{ item.name }}</td>
-  <td>{{ item.qty }}</td>
-  <td>₹{{ item.unit_price }}</td>
-  <td>₹{{ item.total_price|floatformat:2 }}</td>
-</tr>
-{% endfor %}
+  {% for item in items %}
+  <tr>
+    <td>{{ item.name }}</td>
+    <td>{{ item.qty }}</td>
+    <td>₹{{ item.unit_price }}</td>
+    <td>₹{{ item.total_price|floatformat:2 }}</td>
+  </tr>
+  {% endfor %}
 
-    </tbody>
+  {% if remaining_count > 0 %}
+  <tr>
+  <td colspan="4" style="text-align:right; font-size:9px;">
+    +{{ remaining_count }} more item{{ remaining_count|pluralize }}
+  </td>
+</tr>
+  {% endif %}
+</tbody>
   </table>
 
   <div class="totals">

@@ -251,7 +251,10 @@ def generate_shipping_invoice(orders):
 
     from collections import defaultdict
 
-    #  Use first order for header
+    # ✅ handle single order
+    if not isinstance(orders, (list, tuple)):
+        orders = [orders]
+
     first_order = orders[0]
 
     items_map = defaultdict(lambda: {
@@ -261,7 +264,7 @@ def generate_shipping_invoice(orders):
         "total_price": 0,
     })
 
-    #  Loop all orders
+    # ✅ loop all orders
     for order in orders:
         for item in order.items.select_related("product"):
             key = item.product.id
@@ -271,9 +274,14 @@ def generate_shipping_invoice(orders):
             items_map[key]["qty"] += item.qty
             items_map[key]["total_price"] += item.selling_price * item.qty
 
+    # ✅ group items
     items = list(items_map.values())
 
-    #  Template selection
+    # ✅ limit items
+    display_items = items[:2]
+    remaining_count = max(0, len(items) - 2)
+
+    # ✅ template selection
     template_name = "store/shipping_invoice.html"
     is_thermal = False
 
@@ -281,13 +289,14 @@ def generate_shipping_invoice(orders):
         template_name = "store/shipping_invoice_sru.html"
         is_thermal = True
 
-    #  Render HTML
+    # ✅ render html
     html_content = render_to_string(
         template_name,
         {
             "order": first_order,
             "address": first_order.address,
             "store": first_order.store,
-            "items": items,
+            "items": display_items,
+            "remaining_count": remaining_count,
         }
     )
