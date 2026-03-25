@@ -100,6 +100,17 @@ class User(AbstractBaseUser):
     country = models.CharField(max_length=30,null=True)
     gender =  models.CharField(max_length=30, null=True)
     dob = models.DateField(null=True)
+    created_by = models.CharField(
+        max_length=255,
+        null=True,
+    )
+    updated_by = models.CharField(
+        max_length=255,
+        null=True,
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
 
 
     objects = CustomUserManager()

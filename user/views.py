@@ -177,11 +177,11 @@ class MobileVerifyOTPView(APIView):
                 device_id=device_id,
                 username = generate_username(),
                 referral_code = generate_referral_code(),
-                store=request.store
+                store=request.store,
+                last_login=timezone.now(),
+                user_role='USER'
             )
-
             is_new_user = True
-
         else:
             # Update device if changed
             if device_id and user.device_id != device_id:
