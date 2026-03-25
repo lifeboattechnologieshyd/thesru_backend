@@ -2457,21 +2457,6 @@ class CartListView(APIView):
 class OrderListAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
-    STATUS_FILTER_MAP = {
-        "ONGOING": [
-            OrderStatus.INITIATED,
-            OrderStatus.CREATED,
-            OrderStatus.PACKED,
-            OrderStatus.SHIPPED,
-        ],
-        "DELIVERED": [OrderStatus.DELIVERED],
-        "CANCELLED": [
-            OrderStatus.CANCELLED,
-            OrderStatus.FAILED,
-            OrderStatus.UNFULFILLED,
-        ],
-    }
-
     def get(self, request):
         store = request.store
 
@@ -2489,6 +2474,10 @@ class OrderListAPIView(APIView):
             status_filter = status_filter.upper()
             queryset = queryset.filter(
                 status=status_filter
+            )
+        else:
+            queryset = queryset.exclude(
+                status="INITIATED"
             )
         # ---- search by order number ----
         if search:
