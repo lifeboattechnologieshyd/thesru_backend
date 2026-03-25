@@ -1,4 +1,5 @@
 from django.db.models import Q, OuterRef, Subquery, Count, Sum
+from django.forms import model_to_dict
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.views import APIView
 
@@ -30,7 +31,10 @@ class CustomerCreation(APIView):
             referral_code=generate_referral_code()
         )
         new_customer.save()
-        return CustomResponse().successResponse(data={}, description="Customer created successfully")
+        return CustomResponse().successResponse(
+            data=model_to_dict(new_customer),
+            description="Customer created successfully"
+        )
 
 
 class UserAddress(APIView):
@@ -150,10 +154,10 @@ class BackofficeCustomerListAPI(APIView):
                 filter=Q(
                     orders__store_id=store_id,
                     orders__status__in=[
-                        "PLACED",
+                        "PACKED",
                         "DELIVERED",
                         "SHIPPED",
-                        "COMPLETED"
+                        "CREATED"
                     ]
                 )
             ),
@@ -166,7 +170,6 @@ class BackofficeCustomerListAPI(APIView):
                         "PACKED",
                         "DELIVERED",
                         "SHIPPED",
-                        "COMPLETED"
                     ]
                 )
             )
