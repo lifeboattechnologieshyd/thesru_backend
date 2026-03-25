@@ -1,3 +1,5 @@
+from django.utils import timezone
+
 from django.db.models import Q, OuterRef, Subquery, Count, Sum
 from django.forms import model_to_dict
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -28,7 +30,8 @@ class CustomerCreation(APIView):
             store=request.store,
             username=data.get("name"),
             name=data.get("name"),
-            referral_code=generate_referral_code()
+            referral_code=generate_referral_code(),
+            created_by='ADMIN - '+ user.mobile,
         )
         new_customer.save()
         return CustomResponse().successResponse(
