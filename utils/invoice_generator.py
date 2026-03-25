@@ -7,6 +7,9 @@ from django.core.files.base import ContentFile
 from django.core.files.storage import default_storage
 from django.conf import settings
 
+from utils.storage import StoreS3Storage
+
+
 #
 # def generate_shipping_invoice(order):
 #     """
@@ -349,17 +352,30 @@ def generate_shipping_invoice(orders):
             browser.close()
 
         print("PDF GENERATED:", pdf_path)
+        storage = StoreS3Storage(
+            bucket_name=first_order.store.aws_bucket_name
+        )
 
         # ✅ upload
-        storage_path = f"shipping/invoice_{first_order.id}.pdf"
+        file_key = f"invoices/invoice_{first_order.id}.pdf"
 
+        # storage_path = f"shipping/invoice_{first_order.id}.pdf"
+
+        # with open(pdf_path, "rb") as f:
+        #     saved_path = default_storage.save(
+        #         storage_path,
+        #         ContentFile(f.read())
+        #     )
+        #
+        # file_url = settings.MEDIA_URL + saved_path
         with open(pdf_path, "rb") as f:
-            saved_path = default_storage.save(
-                storage_path,
+            file_path = storage.save(
+                file_key,
                 ContentFile(f.read())
             )
 
-        file_url = settings.MEDIA_URL + saved_path
+        # get file URL
+        file_url = storage.url(file_path)
 
     print("UPLOADED:", file_url)
 
