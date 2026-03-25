@@ -6,7 +6,7 @@ from django.core.mail import send_mail
 from django.conf import settings
 from django.core.mail import get_connection
 from django.core.exceptions import ImproperlyConfigured
-from db.models import User
+from db.models import User, NotificationChannelConfig
 from django.template.loader import render_to_string
 from django.core.mail import EmailMultiAlternatives
 from django.core.exceptions import ImproperlyConfigured
@@ -119,36 +119,42 @@ def send_otp_email(email, otp):
 
 
 
-def get_store_email_connection(store):
-    """
-    Returns SMTP connection for the store.
-    Raises error if SMTP is not configured.
-    """
+def get_email_connection_from_config(config):
     if not all([
-        store.smtp_host,
-        store.smtp_port,
-        store.smtp_username,
-        store.smtp_password,
+        config.smtp_host,
+        config.smtp_port,
+        config.smtp_user,
+        config.smtp_password,
     ]):
         raise ImproperlyConfigured(
-            f"SMTP not configured for store: {store.name}"
+            f"SMTP not configured for store: {config.store.name}"
         )
 
     return get_connection(
-        host=store.smtp_host,
-        port=store.smtp_port,
-        username=store.smtp_username,
-        password=store.smtp_password,
-        use_tls=store.smtp_use_tls,
+        host=config.smtp_host,
+        port=config.smtp_port,
+        username=config.smtp_user,
+        password=config.smtp_password,
+        use_tls=True,  # or add field if needed
     )
-
 
 def send_order_created_admin_email(order):
     store = order.store
 
+    # ✅ Get EMAIL config
+    config = NotificationChannelConfig.objects.filter(
+        store=store,
+        channel="EMAIL",
+        is_active=True
+    ).first()
+
+    if not config:
+        return
+
+    # ✅ Get admins
     admins = User.objects.filter(
         store=store,
-        user_role__contains=["ADMIN"],
+        user_role__icontains="ADMIN",  # ✅ fixed
         email__isnull=False
     ).exclude(email="")
 
@@ -173,12 +179,15 @@ def send_order_created_admin_email(order):
 New order created
 
 Order Number: {order.order_number}
+Customer: {order.user.username}
 Amount: ₹{order.amount}
 """
 
-    from_email = f"{store.name} <{store.smtp_username}>"
+    # ✅ use config smtp user
+    from_email = f"{store.name} <{config.smtp_user}>"
 
-    connection = get_store_email_connection(store)
+    # ✅ FIX: pass config (not store)
+    connection = get_email_connection_from_config(config)
 
     email = EmailMultiAlternatives(
         subject=subject,
@@ -189,4 +198,5 @@ Amount: ₹{order.amount}
     )
 
     email.attach_alternative(html_body, "text/html")
+
     email.send(fail_silently=False)
