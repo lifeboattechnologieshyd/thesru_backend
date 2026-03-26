@@ -1238,6 +1238,7 @@ class Webhook(APIView):
                     )
                     try:
                         send_order_created_admin_email(order)
+                        print("send_order_created_admin_email")
                     except ImproperlyConfigured as e:
                         pass
                     if order.coupon is not None:
