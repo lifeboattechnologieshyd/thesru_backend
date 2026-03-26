@@ -85,7 +85,7 @@ class UserAddress(APIView):
             full_address=data.get("full_address"),
             house_number=data.get("house_number"),
             country=data.get("country"),
-            city=data.get("city"),
+            city=data.get("district"),
             state=data.get("state"),
             area=data.get("area"),
             pin_code=data.get("pin_code"),
