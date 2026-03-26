@@ -2566,7 +2566,7 @@ class OrderListAPIView(APIView):
                 order_items.append((product, qty))
 
             # ---------- Create Order ----------
-            order_number = generate_order_number(store, "SRU")  # sequence-based
+            order_number = generate_order_number(store, store.product_code)  # sequence-based
 
             order = Order.objects.create(
                 store=store,
@@ -2601,7 +2601,7 @@ class OrderListAPIView(APIView):
                 product.save(update_fields=["current_stock"])
             OrderTimeLines.objects.create(
                 order=order,
-                status=OrderStatus.INITIATED,
+                status=OrderStatus.CREATED,
                 remarks=data.get("remarks", "Order initiated")
             )
 
