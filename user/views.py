@@ -710,7 +710,7 @@ class TestSMTPView(APIView):
 
             email.send(fail_silently=False)
 
-            return CustomResponse().successResponse(
+            return CustomResponse().successResponse(data={},
                 description="Email sent successfully"
             )
 
