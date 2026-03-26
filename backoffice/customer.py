@@ -35,7 +35,9 @@ class CustomerCreation(APIView):
         )
         new_customer.save()
         return CustomResponse().successResponse(
-            data=model_to_dict(new_customer),
+            data={
+                "id": new_customer.id
+            },
             description="Customer created successfully"
         )
 
