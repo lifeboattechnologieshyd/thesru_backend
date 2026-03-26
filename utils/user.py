@@ -120,28 +120,40 @@ def send_otp_email(email, otp):
 
 
 def get_email_connection_from_config(config):
+    print(" Creating SMTP connection...", flush=True)
+
     if not all([
         config.smtp_host,
         config.smtp_port,
         config.smtp_user,
         config.smtp_password,
     ]):
+        print(" SMTP config missing", flush=True)
         raise ImproperlyConfigured(
             f"SMTP not configured for store: {config.store.name}"
         )
 
-    return get_connection(
+    print(f"SMTP Config Found: {config.smtp_host}:{config.smtp_port}", flush=True)
+
+    connection = get_connection(
         host=config.smtp_host,
         port=config.smtp_port,
         username=config.smtp_user,
         password=config.smtp_password,
-        use_tls=True,  # or add field if needed
+        use_tls=True,
+        use_ssl=False,
+        timeout=20,
     )
 
+    print(" SMTP Connection object created", flush=True)
+    return connection
+
 def send_order_created_admin_email(order):
+    print(" EMAIL FUNCTION STARTED", flush=True)
+
     store = order.store
 
-    # ✅ Get EMAIL config
+    #  Get EMAIL config
     config = NotificationChannelConfig.objects.filter(
         store=store,
         channel="EMAIL",
@@ -149,27 +161,34 @@ def send_order_created_admin_email(order):
     ).first()
 
     if not config:
+        print(" No EMAIL config found", flush=True)
         return
 
-    # ✅ Get admins
+    print(" EMAIL config found", flush=True)
+
+    #  Get admins
     admins = User.objects.filter(
         store=store,
-        user_role__icontains="ADMIN",  # ✅ fixed
+        user_role__icontains="ADMIN",
         email__isnull=False
     ).exclude(email="")
 
     if not admins.exists():
+        print(" No admin users found", flush=True)
         return
 
     recipients = [a.email for a in admins]
+    print(f" Recipients: {recipients}", flush=True)
 
     subject = f"New Order Created | {order.order_number}"
+    print(f" Subject: {subject}", flush=True)
 
     context = {
         "order": order,
         "store": store,
     }
 
+    print(" Rendering HTML template...", flush=True)
     html_body = render_to_string(
         "store/admin_order_created.html",
         context
@@ -183,20 +202,27 @@ Customer: {order.user.username}
 Amount: ₹{order.amount}
 """
 
-    # ✅ use config smtp user
     from_email = f"{store.name} <{config.smtp_user}>"
+    print(f"From Email: {from_email}", flush=True)
 
-    # ✅ FIX: pass config (not store)
-    connection = get_email_connection_from_config(config)
+    try:
+        connection = get_email_connection_from_config(config)
 
-    email = EmailMultiAlternatives(
-        subject=subject,
-        body=text_body,
-        from_email=from_email,
-        to=recipients,
-        connection=connection
-    )
+        print("Creating email object...", flush=True)
+        email = EmailMultiAlternatives(
+            subject=subject,
+            body=text_body,
+            from_email=from_email,
+            to=recipients,
+            connection=connection
+        )
 
-    email.attach_alternative(html_body, "text/html")
+        email.attach_alternative(html_body, "text/html")
 
-    email.send(fail_silently=False)
+        print(" Sending email...", flush=True)
+        email.send(fail_silently=False)
+
+        print(" EMAIL SENT SUCCESSFULLY", flush=True)
+
+    except Exception as e:
+        print(f" EMAIL FAILED: {str(e)}", flush=True)
