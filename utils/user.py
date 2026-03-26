@@ -141,7 +141,7 @@ def get_email_connection_from_config(config):
 def send_order_created_admin_email(order):
     store = order.store
 
-    # ✅ Get EMAIL config
+    #  Get EMAIL config
     config = NotificationChannelConfig.objects.filter(
         store=store,
         channel="EMAIL",
@@ -151,10 +151,10 @@ def send_order_created_admin_email(order):
     if not config:
         return
 
-    # ✅ Get admins
+    #  Get admins
     admins = User.objects.filter(
         store=store,
-        user_role__icontains="ADMIN",  # ✅ fixed
+        user_role__icontains="ADMIN",  #  fixed
         email__isnull=False
     ).exclude(email="")
 
@@ -183,10 +183,10 @@ Customer: {order.user.username}
 Amount: ₹{order.amount}
 """
 
-    # ✅ use config smtp user
+    #  use config smtp user
     from_email = f"{store.name} <{config.smtp_user}>"
 
-    # ✅ FIX: pass config (not store)
+    #  FIX: pass config (not store)
     connection = get_email_connection_from_config(config)
 
     email = EmailMultiAlternatives(

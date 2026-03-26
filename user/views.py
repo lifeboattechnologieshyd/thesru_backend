@@ -3,6 +3,7 @@ from datetime import timedelta, datetime
 import requests
 from django.core.files.base import ContentFile
 from django.core.files.storage import default_storage
+from django.core.mail import EmailMultiAlternatives
 from django.db import transaction
 from django.utils import timezone
 from psutil import users
@@ -16,7 +17,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 import random
 
 from config.settings.common import DEBUG
-from db.models import User, UserOTP, TempUser, Store, UserSession
+from db.models import User, UserOTP, TempUser, Store, UserSession, NotificationChannelConfig
 from db.models.user import AppVersionConfig, Visitor, Enrollments
 from enums.store import NotificationEvent
 from mixins.drf_views import CustomResponse
@@ -27,7 +28,7 @@ from rest_framework import status
 from utils.notification import trigger_notification
 from utils.storage import add_unique_suffix_to_filename, sanitize_filename, StoreS3Storage
 from utils.user import generate_username, generate_referral_code, generate_otp, version_to_tuple, \
-    send_otp_email
+    send_otp_email, get_email_connection_from_config
 
 
 class MobileSendOTPView(APIView):
@@ -663,3 +664,57 @@ class EnrolPlatinumJubli(APIView):
         enroll.save()
         return CustomResponse().successResponse(data={})
 
+
+
+
+class TestSMTPView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        store = request.store
+        test_email = request.data.get("email")
+
+        if not test_email:
+            return CustomResponse().errorResponse(
+                description="Email is required"
+            )
+
+        # ✅ get config
+        config = NotificationChannelConfig.objects.filter(
+            store=store,
+            channel="EMAIL",
+            is_active=True
+        ).first()
+
+        if not config:
+            return CustomResponse().errorResponse(
+                description="SMTP config not found"
+            )
+
+        try:
+            # ✅ create connection
+            connection = get_email_connection_from_config(config)
+
+            subject = "SMTP Test Email ✅"
+            message = "This is a test email from your Django application."
+
+            from_email = f"{store.name} <{config.smtp_user}>"
+
+            email = EmailMultiAlternatives(
+                subject=subject,
+                body=message,
+                from_email=from_email,
+                to=[test_email],
+                connection=connection
+            )
+
+            email.send(fail_silently=False)
+
+            return CustomResponse().successResponse(
+                description="Email sent successfully"
+            )
+
+        except Exception as e:
+            return CustomResponse().errorResponse(
+                description=f"SMTP Failed: {str(e)}"
+            )
