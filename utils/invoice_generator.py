@@ -81,7 +81,7 @@ from utils.storage import StoreS3Storage
 #     and uploads it using Django default_storage (S3 / MinIO / local)
 #     """
 #
-#     # ✅ PREPARE ITEMS (IMPORTANT)
+#     #  PREPARE ITEMS (IMPORTANT)
 #     items = []
 #     for item in order.items.select_related("product"):
 #         items.append({
@@ -258,16 +258,15 @@ def generate_shipping_invoice(orders):
     from playwright.sync_api import sync_playwright
     from django.template.loader import render_to_string
     from django.core.files.base import ContentFile
-    from django.core.files.storage import default_storage
-    from django.conf import settings
 
-    # ✅ handle single order
+
+    #  handle single order
     if not isinstance(orders, (list, tuple)):
         orders = [orders]
 
     first_order = orders[0]
 
-    # ✅ group items
+    #  group items
     items_map = defaultdict(lambda: {
         "name": "",
         "qty": 0,
@@ -286,11 +285,11 @@ def generate_shipping_invoice(orders):
 
     items = list(items_map.values())
 
-    # ✅ limit items (max 2)
+    #  limit items (max 2)
     display_items = items[:2]
     remaining_count = max(0, len(items) - 2)
 
-    # ✅ template selection
+    #  template selection
     template_name = "store/shipping_invoice.html"
     is_thermal = False
 
@@ -298,7 +297,7 @@ def generate_shipping_invoice(orders):
         template_name = "store/shipping_invoice_sru.html"
         is_thermal = True
 
-    # ✅ render HTML
+    #  render HTML
     html_content = render_to_string(
         template_name,
         {
@@ -310,17 +309,17 @@ def generate_shipping_invoice(orders):
         }
     )
 
-    # ✅ DEBUG
+    # DEBUG
     print("HTML OK")
 
-    # ✅ create temp files
+    #  create temp files
     with tempfile.TemporaryDirectory() as tmpdir:
         html_path = Path(tmpdir) / "invoice.html"
         pdf_path = Path(tmpdir) / f"invoice_{first_order.id}.pdf"
 
         html_path.write_text(html_content, encoding="utf-8")
 
-        # ✅ generate PDF
+        # generate PDF
         with sync_playwright() as p:
             browser = p.chromium.launch(
                 args=["--no-sandbox", "--disable-dev-shm-usage"]
@@ -356,7 +355,7 @@ def generate_shipping_invoice(orders):
             bucket_name=first_order.store.aws_bucket_name
         )
 
-        # ✅ upload
+        #  upload
         file_key = f"invoices/invoice_{first_order.id}.pdf"
 
         # storage_path = f"shipping/invoice_{first_order.id}.pdf"

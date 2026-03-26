@@ -17,7 +17,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 import random
 
 from config.settings.common import DEBUG
-from db.models import User, UserOTP, TempUser, Store, UserSession, NotificationChannelConfig
+from db.models import User, UserOTP, TempUser, Store, UserSession, NotificationChannelConfig, Order
 from db.models.user import AppVersionConfig, Visitor, Enrollments
 from enums.store import NotificationEvent
 from mixins.drf_views import CustomResponse
@@ -25,6 +25,7 @@ from serializers.user import UserMasterSerializer
 
 from rest_framework import status
 
+from utils.invoice_generator import generate_shipping_invoice
 from utils.notification import trigger_notification
 from utils.storage import add_unique_suffix_to_filename, sanitize_filename, StoreS3Storage
 from utils.user import generate_username, generate_referral_code, generate_otp, version_to_tuple, \
@@ -718,3 +719,52 @@ class TestSMTPView(APIView):
             return CustomResponse().errorResponse(
                 description=f"SMTP Failed: {str(e)}"
             )
+
+
+class GenerateInvoiceAPIView(APIView):
+
+    def post(self, request):
+        try:
+            order_number = request.data.get("order_number")
+
+            if not order_number:
+                return Response({
+                    "success": False,
+                    "message": "order_number is required"
+                }, status=status.HTTP_400_BAD_REQUEST)
+
+            print(f" Invoice request for: {order_number}", flush=True)
+
+            #  fetch order
+            orders = Order.objects.filter(order_number=order_number)
+
+            if not orders.exists():
+                print(" Order not found", flush=True)
+                return Response({
+                    "success": False,
+                    "message": "Order not found"
+                }, status=status.HTTP_404_NOT_FOUND)
+
+            print(f" Orders found: {orders.count()}", flush=True)
+
+            #  generate invoice
+            file_url = generate_shipping_invoice(list(orders))
+
+            print(f" Invoice URL: {file_url}", flush=True)
+
+            return Response({
+                "success": True,
+                "message": "Invoice generated successfully",
+                "data": {
+                    "invoice_url": file_url
+                }
+            }, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            print(f" Invoice API Error: {str(e)}", flush=True)
+
+            return Response({
+                "success": False,
+                "message": "Something went wrong",
+                "error": str(e)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
