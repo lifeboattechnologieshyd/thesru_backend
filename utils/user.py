@@ -136,7 +136,8 @@ def get_email_connection_from_config(config):
         username=config.smtp_user,
         password=config.smtp_password,
         use_tls=True,
-        use_ssl=False
+        use_ssl=False,
+        timeout=20,
     )
 
 def send_order_created_admin_email(order):
