@@ -93,12 +93,11 @@
       <div class="title">Ship To</div>
 
       <strong>{{ address.name }}</strong><br>
-      {% if address.house_number %}{{ address.house_number }}, {% endif %}
-      {{ address.full_address }}<br>
+      Mobile: {{ address.mobile }}<br>
 
+      {% if address.house_number %}{{ address.house_number }}, {% endif %}
       {{ address.area }}, {{ address.district }}<br>
       {{ address.state }}, {{ address.country }} - {{ address.pincode }}<br>
-      Mobile: {{ address.mobile }}<br>
 
 <!--      <span style="font-size:10px;">-->
 <!--        ({{ address.address_type|default:"Home" }})-->
