@@ -2652,7 +2652,6 @@ class OrderListAPIView(APIView):
 
         #  Require dimensions only when first time PACKED
         if is_becoming_packed:
-
             weight = request.data.get("weight")
             length = request.data.get("length")
             breadth = request.data.get("breadth")
