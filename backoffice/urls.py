@@ -29,6 +29,7 @@ urlpatterns = [
     #####################################
 
     path("user/search",UserAPIView.as_view()),
+    path("user/details/<str:id>",UserAPIView.as_view()),
     path("user/address",UserAddress.as_view()), #post n get
 
     path("merchant/customer/add", CustomerCreation.as_view()),

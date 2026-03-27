@@ -65,7 +65,7 @@ class UserAddress(APIView):
 
         required_fields = [
             "mobile", "name", "address_name", "address_type", "full_address",
-            "house_number", "country", "city", "state", "area", "pin_code",
+            "house_number", "country", "city", "state", "area", "pincode",
             "user_id"
         ]
         for field in required_fields:
@@ -88,7 +88,7 @@ class UserAddress(APIView):
             city=data.get("district"),
             state=data.get("state"),
             area=data.get("area"),
-            pin_code=data.get("pin_code"),
+            pin_code=data.get("pincode"),
             landmark=data.get("landmark", ""),
             is_default=data.get("is_default", True),
         )
@@ -216,3 +216,31 @@ class BackofficeCustomerListAPI(APIView):
             total=total_count,
             data=data
         )
+
+
+class CustomerDetails(APIView):
+
+    def get(self, request, id):
+        store = request.store
+        roles = request.user.user_role or []
+        if "ADMIN" not in roles:
+            return CustomResponse().errorResponse(
+                description="Access denied"
+            )
+        user = User.objects.filter(id=id).first()
+        d = {
+                "id": user.id,
+                "name": user.name,
+                "mobile": user.mobile,
+                "state": user.state_name,
+                "district": user.district_name,
+                "user_role": user.user_role,
+                "profile_image": user.profile_image,
+                "email": user.email,
+                "referral_code": user.referral_code,
+                "gender": user.gender,
+                "dob": user.dob,
+                "created_by": user.created_by,
+                "created_at": user.created_at,
+            }
+        return CustomResponse().successResponse(data=d)
