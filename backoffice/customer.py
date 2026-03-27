@@ -1,8 +1,5 @@
-from django.utils import timezone
-
 from django.db.models import Q, OuterRef, Subquery, Count, Sum
-from django.forms import model_to_dict
-from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.views import APIView
 
 from db.models import User, AddressMaster
@@ -69,7 +66,7 @@ class UserAddress(APIView):
         required_fields = [
             "mobile", "name", "address_name", "address_type", "full_address",
             "house_number", "country", "city", "state", "area", "pin_code",
-            "is_default", "user_id"
+            "user_id"
         ]
         for field in required_fields:
             if not data.get(field):
@@ -88,14 +85,17 @@ class UserAddress(APIView):
             full_address=data.get("full_address"),
             house_number=data.get("house_number"),
             country=data.get("country"),
-            city=data.get("city"),
+            city=data.get("district"),
             state=data.get("state"),
             area=data.get("area"),
             pin_code=data.get("pin_code"),
             landmark=data.get("landmark", ""),
-            is_default=data.get("is_default"),
+            is_default=data.get("is_default", True),
         )
-        return CustomResponse.successResponse(data={}, description="shipping address added successfully")
+        return CustomResponse.successResponse(
+            data={},
+            description="shipping address added successfully"
+        )
 
 
 
