@@ -2499,7 +2499,8 @@ class OrderListAPIView(APIView):
                 "status": order.status,
                 "amount": str(order.amount),
                 "created_at": order.created_at,
-                "item_count": order.items.count()
+                "created_by": order.created_by,
+                "item_count": order.items.count(),
             })
 
         return CustomResponse.successResponse(
