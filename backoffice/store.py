@@ -2597,8 +2597,8 @@ class OrderListAPIView(APIView):
                     apportioned_gst=Decimal("0.00")
                 )
 
-                # Reduce stock immediately (admin confirmed)
-                update_stock_after_order(order)
+            # Reduce stock immediately (admin confirmed)
+            update_stock_after_order(order)
 
                 # product.current_stock -= qty
                 # product.save(update_fields=["current_stock"])
