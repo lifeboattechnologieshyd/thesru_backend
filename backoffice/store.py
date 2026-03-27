@@ -36,7 +36,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 
 from utils.invoice_generator import generate_shipping_invoice
 from utils.notification import trigger_notification
-from utils.store import generate_lsin, generate_order_number, BO_STATUS_FLOW
+from utils.store import generate_lsin, generate_order_number, BO_STATUS_FLOW, update_stock_after_order
 from utils.user import generate_otp, send_otp_email, generate_username, generate_referral_code
 from django.db.models import Sum, F, DecimalField, ExpressionWrapper
 
@@ -2598,8 +2598,10 @@ class OrderListAPIView(APIView):
                 )
 
                 # Reduce stock immediately (admin confirmed)
-                product.current_stock -= qty
-                product.save(update_fields=["current_stock"])
+                update_stock_after_order(order)
+
+                # product.current_stock -= qty
+                # product.save(update_fields=["current_stock"])
             OrderTimeLines.objects.create(
                 order=order,
                 status=OrderStatus.CREATED,
