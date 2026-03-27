@@ -65,7 +65,7 @@ class UserAddress(APIView):
 
         required_fields = [
             "mobile", "name", "address_name", "address_type", "full_address",
-            "house_number", "country", "city", "state", "area", "pin_code",
+            "house_number", "country", "city", "state", "area", "pincode",
             "user_id"
         ]
         for field in required_fields:
@@ -88,7 +88,7 @@ class UserAddress(APIView):
             city=data.get("district"),
             state=data.get("state"),
             area=data.get("area"),
-            pin_code=data.get("pin_code"),
+            pin_code=data.get("pincode"),
             landmark=data.get("landmark", ""),
             is_default=data.get("is_default", True),
         )
