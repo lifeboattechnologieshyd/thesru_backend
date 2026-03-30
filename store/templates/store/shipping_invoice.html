@@ -98,10 +98,6 @@
       {% if address.house_number %}{{ address.house_number }}, {% endif %}
       {{ address.area }}, {{ address.district }}<br>
       {{ address.state }}, {{ address.country }} - {{ address.pincode }}<br>
-
-<!--      <span style="font-size:10px;">-->
-<!--        ({{ address.address_type|default:"Home" }})-->
-<!--      </span>-->
     </div>
 
     <div class="col" style="text-align:right;">
@@ -118,9 +114,9 @@
     <div class="col">
       <div class="title">Payment Details</div>
       Payment Mode: <strong>PREPAID</strong><br>
-      Wallet Paid: ₹{{ order.wallet_paid }}<br>
+<!--      Wallet Paid: ₹{{ order.wallet_paid }}<br>-->
       Paid Online: ₹{{ order.paid_online }}<br>
-      COD: ₹{{ order.cash_on_delivery }}
+<!--      COD: ₹{{ order.cash_on_delivery }}-->
     </div>
 
     <div class="col">

@@ -181,7 +181,7 @@ class MobileVerifyOTPView(APIView):
                 referral_code = generate_referral_code(),
                 store=request.store,
                 last_login=timezone.now(),
-                user_role='USER'
+                user_role=["USER"]
             )
             is_new_user = True
         else:
