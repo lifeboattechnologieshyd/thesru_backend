@@ -1,4 +1,4 @@
-from datetime import timedelta
+from datetime import timedelta, time
 from decimal import Decimal
 import json
 from django.db.models.functions import Coalesce
@@ -3307,14 +3307,20 @@ class StoreAnalyticsAPIView(APIView):
                     "total_amount": float(cat["total_amount"] or 0),
                 })
 
+        start_datetime = datetime.combine(from_date, time.min)
+        end_datetime = datetime.combine(to_date, time.max)
 
         # GROSS SALES AND PROFITS
-        queryset = OrderProducts.objects.filter(created_at__date__range=[from_date, to_date])
-
+        queryset = OrderProducts.objects.filter(
+            order__store=request.store,
+            created_at__range=[start_datetime, end_datetime]
+        )
         result = queryset.aggregate(
-            gross_profit=Coalesce(Sum("gross_profit"), 0,
-                                  output_field=DecimalField()
-)
+            gross_profit=Coalesce(
+                Sum("gross_profit"),
+                0,
+                output_field=DecimalField()
+            )
         )
 
 
