@@ -3323,10 +3323,9 @@ class StoreAnalyticsAPIView(APIView):
             "total_customers": total_customers,
             "total_visitors": total_visitors,
             "total_products": total_products,
-            "gross_profit": float(result["gross_profit"]),
-
+            # "gross_profit": float(result["gross_profit"]),
+            "gross_profit": result,
             "order_status_counts": order_status_counts,
-
             "recent_orders": recent_orders,
             "top_selling_products": top_products,
 
