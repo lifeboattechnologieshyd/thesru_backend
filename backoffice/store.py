@@ -2504,6 +2504,7 @@ class OrderListAPIView(APIView):
                 "amount": str(order.amount),
                 "created_at": order.created_at,
                 "created_by": order.created_by,
+                "address": order.address,
                 "item_count": order.items.count(),
             })
 
