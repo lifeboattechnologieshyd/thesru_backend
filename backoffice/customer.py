@@ -228,6 +228,8 @@ class CustomerDetails(APIView):
                 description="Access denied"
             )
         user = User.objects.filter(id=id).first()
+        address = AddressMaster.objects.filter(store_id=store.id,
+                                               mobile=request.user.mobile).values()
         d = {
                 "id": user.id,
                 "name": user.name,
@@ -242,5 +244,6 @@ class CustomerDetails(APIView):
                 "dob": user.dob,
                 "created_by": user.created_by,
                 "created_at": user.created_at,
+                "address": address
             }
         return CustomResponse().successResponse(data=d)

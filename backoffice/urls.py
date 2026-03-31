@@ -1,6 +1,6 @@
 from django.urls import path
 
-from backoffice.customer import CustomerCreation, UserAddress, BackofficeCustomerListAPI
+from backoffice.customer import CustomerCreation, UserAddress, BackofficeCustomerListAPI, CustomerDetails
 from backoffice.inventory import StockInAPIView, BulkInventory
 from backoffice.shipping import  ShippingPlanAPIView, ShippinPlanCrud
 from backoffice.store import ProductAPIView, CategoriesAPIView, BannerAPIView, \
@@ -29,7 +29,7 @@ urlpatterns = [
     #####################################
 
     path("user/search",UserAPIView.as_view()),
-    path("user/details/<str:id>",UserAPIView.as_view()),
+    path("user/details/<str:id>",CustomerDetails.as_view()),
     path("user/address",UserAddress.as_view()), #post n get
 
     path("merchant/customer/add", CustomerCreation.as_view()),
@@ -123,8 +123,5 @@ urlpatterns = [
 
     path("dashboard",DashboardStatsAPIView.as_view()),
     path("subscription/plan",CreateSubscriptionPlanAPI.as_view()),
-
-
-
 
 ]
