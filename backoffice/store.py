@@ -2504,6 +2504,7 @@ class OrderListAPIView(APIView):
                 "amount": str(order.amount),
                 "created_at": order.created_at,
                 "created_by": order.created_by,
+                "address": order.address,
                 "item_count": order.items.count(),
             })
 
@@ -3307,13 +3308,10 @@ class StoreAnalyticsAPIView(APIView):
                     "total_amount": float(cat["total_amount"] or 0),
                 })
 
-        start_datetime = datetime.combine(from_date, time.min)
-        end_datetime = datetime.combine(to_date, time.max)
-
         # GROSS SALES AND PROFITS
         queryset = OrderProducts.objects.filter(
             order__store=request.store,
-            created_at__range=[start_datetime, end_datetime]
+            **order_date_filters
         )
         result = queryset.aggregate(
             gross_profit=Coalesce(
