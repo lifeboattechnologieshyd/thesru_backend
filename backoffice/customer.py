@@ -1,5 +1,5 @@
 from django.db.models import Q, OuterRef, Subquery, Count, Sum
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.views import APIView
 
 from db.models import User, AddressMaster
@@ -246,6 +246,8 @@ class CustomerDetails(APIView):
 
 
 class UpdateUserDetails(APIView):
+
+    permission_classes = [IsAuthenticated]
     def post(self, request):
         data = request.data
         user_id = data.get("id")
