@@ -4112,6 +4112,8 @@ class DashboardStatsAPIView(APIView):
 
 
 class S3BucketAPIView(APIView):
+    permission_classes = [AllowAny]
+
 
     def post(self, request):
         bucket_name = request.data.get("bucket_name")
