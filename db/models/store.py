@@ -474,7 +474,10 @@ class OrderTimeLines(AuditModel):
 # not being used so far...
 class OrderShippingDetails(AuditModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    order_id = models.CharField(max_length=50, null=False)
+    order = models.ForeignKey("Order",
+                              on_delete=models.CASCADE,
+                              null=True,
+                              related_name="shipping_details")
     courier_service = models.CharField(max_length=50, null=False)
     tracking_id = models.CharField(max_length=250, null=False)
     tracking_url = models.CharField(max_length=250, null=False)

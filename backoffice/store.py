@@ -32,7 +32,7 @@ from config.settings.common import DEBUG
 from db.models import Category, Product, Banner, PinCode, Store, WebBanner, \
     FlashSaleBanner, Order, User, Cart, OrderProducts, UserOTP, StoreClient, UserSession, ProductMedia, Tag, \
     OrderTimeLines, Coupons, CouponProduct, CouponCategory, CouponTag, AddressMaster, NotificationChannelConfig, \
-    NotificationTemplate
+    NotificationTemplate, OrderShippingDetails
 from db.models.user import AppVersionConfig, Visitor
 from enums.store import InventoryType, OrderStatus, NotificationChannel, NotificationEvent
 from mixins.drf_views import CustomResponse
@@ -2709,7 +2709,16 @@ class OrderListAPIView(APIView):
                                  NotificationEvent.ORDER_SHIPPED,
                                  context,
                                  order.user.mobile, order.user.email)
-            pass
+            # todo: shipping to be tested.
+            osd = OrderShippingDetails()
+            osd.courier_service = request.data.get("courier", "POSTOFFICE")
+            osd.tracking_url = request.data.get("tracking_url", "")
+            osd.tracking_id = request.data.get("tracking_id", "")
+            osd.estimated_delivery_date = request.data.get("estimated_delivery_date", "")
+            osd.remarks = request.data.get("remarks", "")
+            osd.order = order
+            osd.save()
+
         elif order.status == OrderStatus.DELIVERED:
             context = {
                 "var": f"{order.order_number}|"
