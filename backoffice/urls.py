@@ -1,6 +1,7 @@
 from django.urls import path
 
-from backoffice.customer import CustomerCreation, UserAddress, BackofficeCustomerListAPI
+from backoffice.customer import CustomerCreation, UserAddress, BackofficeCustomerListAPI, CustomerDetails, \
+    UpdateUserDetails
 from backoffice.inventory import StockInAPIView, BulkInventory
 from backoffice.shipping import  ShippingPlanAPIView, ShippinPlanCrud
 from backoffice.store import ProductAPIView, CategoriesAPIView, BannerAPIView, \
@@ -24,15 +25,21 @@ urlpatterns = [
     path("email-send-otp",EmailSendOTPView.as_view()),
     path("email-verify-otp",EmailVerifyOTPView.as_view()),
 
+
+
+    ### DASHBOARD - ADMIN
+    path("dashboard", DashboardStatsAPIView.as_view()),
+    path("analytics", StoreAnalyticsAPIView.as_view()),
+
     #####################################
     ## User Search & Address API's     ##
     #####################################
 
     path("user/search",UserAPIView.as_view()),
-    path("user/details/<str:id>",UserAPIView.as_view()),
+    path("user/details/<str:id>",CustomerDetails.as_view()),
     path("user/address",UserAddress.as_view()), #post n get
-
     path("merchant/customer/add", CustomerCreation.as_view()),
+    path("merchant/customer/update", UpdateUserDetails.as_view()),
     path("merchant/users", BackofficeCustomerListAPI.as_view()),
 
     #####################################
@@ -91,7 +98,6 @@ urlpatterns = [
 
     path("coupon",AdminCreateCouponAPIView.as_view()),
     path("shippingslip/<str:id>",OrderShippingSlipAPIView.as_view()),
-    path("analytics",StoreAnalyticsAPIView.as_view()),
     path("client_info",ClientInfo.as_view()),
 
 
@@ -121,10 +127,6 @@ urlpatterns = [
     path("notification/template/config", NotificationTemplateConfig.as_view()),
     path("notification/template/config/<str:id>", NotificationTemplateConfig.as_view()),
 
-    path("dashboard",DashboardStatsAPIView.as_view()),
     path("subscription/plan",CreateSubscriptionPlanAPI.as_view()),
-
-
-
 
 ]

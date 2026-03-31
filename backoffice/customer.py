@@ -38,7 +38,6 @@ class CustomerCreation(APIView):
             description="Customer created successfully"
         )
 
-
 class UserAddress(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -96,8 +95,6 @@ class UserAddress(APIView):
             data={},
             description="shipping address added successfully"
         )
-
-
 
 class BackofficeCustomerListAPI(APIView):
 
@@ -217,7 +214,6 @@ class BackofficeCustomerListAPI(APIView):
             data=data
         )
 
-
 class CustomerDetails(APIView):
 
     def get(self, request, id):
@@ -228,12 +224,14 @@ class CustomerDetails(APIView):
                 description="Access denied"
             )
         user = User.objects.filter(id=id).first()
+        address = AddressMaster.objects.filter(store_id=store.id,
+                                               mobile=request.user.mobile).values()
         d = {
                 "id": user.id,
                 "name": user.name,
                 "mobile": user.mobile,
-                "state": user.state_name,
-                "district": user.district_name,
+                # "state": user.state_name,
+                # "district": user.district_name,
                 "user_role": user.user_role,
                 "profile_image": user.profile_image,
                 "email": user.email,
@@ -242,5 +240,25 @@ class CustomerDetails(APIView):
                 "dob": user.dob,
                 "created_by": user.created_by,
                 "created_at": user.created_at,
+                "address": address
             }
         return CustomResponse().successResponse(data=d)
+
+
+class UpdateUserDetails(APIView):
+    def post(self, request):
+        data = request.data
+        user_id = data.get("id")
+        user = User.objects.filter(id=user_id).first()
+        if "name" in data:
+            user.name = data.get("name")
+        if "email" in data:
+            user.email = data.get("email")
+        if "dob" in data:
+            user.dob = data.get("dob")
+        if "user_role" in data:
+            user.user_role = data.get("user_role")
+        if "profile_image" in data:
+            user.profile_image = data.get("profile_image")
+        user.save()
+        return CustomResponse().successResponse(data={}, description="")

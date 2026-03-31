@@ -2531,7 +2531,9 @@ class OrderListAPIView(APIView):
             user = User.objects.get(id=user_id)
         except User.DoesNotExist:
             return CustomResponse.errorResponse("Invalid user_id")
-
+        if not user.name:
+            user.name = address.get("name", None)
+            user.save()
         subtotal = Decimal("0.00")
         order_items = []
 
@@ -3321,10 +3323,9 @@ class StoreAnalyticsAPIView(APIView):
             "total_customers": total_customers,
             "total_visitors": total_visitors,
             "total_products": total_products,
-            "gross_profit": float(result["gross_profit"]),
-
+            # "gross_profit": float(result["gross_profit"]),
+            "gross_profit": result,
             "order_status_counts": order_status_counts,
-
             "recent_orders": recent_orders,
             "top_selling_products": top_products,
 
