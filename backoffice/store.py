@@ -2531,7 +2531,9 @@ class OrderListAPIView(APIView):
             user = User.objects.get(id=user_id)
         except User.DoesNotExist:
             return CustomResponse.errorResponse("Invalid user_id")
-
+        if not user.name:
+            user.name = address.get("name", None)
+            user.save()
         subtotal = Decimal("0.00")
         order_items = []
 
