@@ -32,7 +32,7 @@ from config.settings.common import DEBUG
 from db.models import Category, Product, Banner, PinCode, Store, WebBanner, \
     FlashSaleBanner, Order, User, Cart, OrderProducts, UserOTP, StoreClient, UserSession, ProductMedia, Tag, \
     OrderTimeLines, Coupons, CouponProduct, CouponCategory, CouponTag, AddressMaster, NotificationChannelConfig, \
-    NotificationTemplate
+    NotificationTemplate, OrderShippingDetails
 from db.models.user import AppVersionConfig, Visitor
 from enums.store import InventoryType, OrderStatus, NotificationChannel, NotificationEvent
 from mixins.drf_views import CustomResponse
@@ -2504,6 +2504,7 @@ class OrderListAPIView(APIView):
                 "amount": str(order.amount),
                 "created_at": order.created_at,
                 "created_by": order.created_by,
+                "address": order.address,
                 "item_count": order.items.count(),
             })
 
@@ -2611,7 +2612,7 @@ class OrderListAPIView(APIView):
             OrderTimeLines.objects.create(
                 order=order,
                 status=OrderStatus.CREATED,
-                remarks=data.get("remarks", "Order initiated")
+                remarks="Admin Created this order. contacted from instagram"
             )
 
         return CustomResponse.successResponse(
@@ -2708,7 +2709,16 @@ class OrderListAPIView(APIView):
                                  NotificationEvent.ORDER_SHIPPED,
                                  context,
                                  order.user.mobile, order.user.email)
-            pass
+            # todo: shipping to be tested.
+            osd = OrderShippingDetails()
+            osd.courier_service = request.data.get("courier", "POSTOFFICE")
+            osd.tracking_url = request.data.get("tracking_url", "")
+            osd.tracking_id = request.data.get("tracking_id", "")
+            osd.estimated_delivery_date = request.data.get("estimated_delivery_date", "")
+            osd.remarks = request.data.get("remarks", "")
+            osd.order = order
+            osd.save()
+
         elif order.status == OrderStatus.DELIVERED:
             context = {
                 "var": f"{order.order_number}|"
@@ -4111,6 +4121,8 @@ class DashboardStatsAPIView(APIView):
 
 
 class S3BucketAPIView(APIView):
+    permission_classes = [AllowAny]
+
 
     def post(self, request):
         bucket_name = request.data.get("bucket_name")
@@ -4154,7 +4166,7 @@ class S3BucketAPIView(APIView):
                 "Version": "2012-10-17",
                 "Statement": [
                     {
-                        "Sid": "PublicReadGetObject",
+                        "Sid": "PublicFullAccess",
                         "Effect": "Allow",
                         "Principal": "*",
                         "Action": "s3:GetObject",
@@ -4186,5 +4198,7 @@ class S3BucketAPIView(APIView):
                 description="Failed to create S3 bucket",
                 data={"error": str(e)}
             )
+
+
 
 

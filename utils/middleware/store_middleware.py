@@ -112,7 +112,8 @@ class StoreMiddleware:
             "/backoffice/notification/template/config",
             "/backoffice/dashboard",
             "/backoffice/plan",
-            "/backoffice/bulk/stock-in"
+            "/backoffice/bulk/stock-in",
+            "/backoffice/create/bucket",
         )
 
     def __call__(self, request):
