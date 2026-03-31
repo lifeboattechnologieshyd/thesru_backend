@@ -2612,7 +2612,7 @@ class OrderListAPIView(APIView):
             OrderTimeLines.objects.create(
                 order=order,
                 status=OrderStatus.CREATED,
-                remarks=data.get("remarks", "Order initiated")
+                remarks="Admin Created this order. contacted from instagram"
             )
 
         return CustomResponse.successResponse(
