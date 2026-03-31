@@ -1,12 +1,16 @@
 from datetime import timedelta
 from decimal import Decimal
-
+import json
 from django.db.models.functions import Coalesce
 from django.forms import model_to_dict
 from django.utils.timezone import make_aware
 from datetime import datetime
 from django.db.models import Count, Sum, F, Q
 from datetime import datetime
+import boto3
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework import status
 
 from django.core.files.storage import default_storage
 from django.db.models import Q, F
@@ -4097,3 +4101,84 @@ class DashboardStatsAPIView(APIView):
             data=response,
             description="Dashboard statistics fetched successfully"
         )
+
+
+
+
+
+class S3BucketAPIView(APIView):
+
+    def post(self, request):
+        bucket_name = request.data.get("bucket_name")
+
+        # Validation
+        if not bucket_name:
+            return CustomResponse.errorResponse(
+                description="Bucket name is required"
+            )
+
+        if not bucket_name.islower():
+            return CustomResponse.errorResponse(
+                description="Bucket name must be lowercase"
+            )
+
+
+        try:
+            s3 = boto3.client("s3", region_name="ap-south-1")
+
+            # Step 1: Create bucket
+            s3.create_bucket(
+                Bucket=bucket_name,
+                CreateBucketConfiguration={
+                    "LocationConstraint": "ap-south-1"
+                }
+            )
+
+            # Step 2: Configure public access settings
+            s3.put_public_access_block(
+                Bucket=bucket_name,
+                PublicAccessBlockConfiguration={
+                    "BlockPublicAcls": False,
+                    "IgnorePublicAcls": False,
+                    "BlockPublicPolicy": False,
+                    "RestrictPublicBuckets": False,
+                }
+            )
+
+            # Step 3: Add bucket policy (public read)
+            bucket_policy = {
+                "Version": "2012-10-17",
+                "Statement": [
+                    {
+                        "Sid": "PublicReadGetObject",
+                        "Effect": "Allow",
+                        "Principal": "*",
+                        "Action": "s3:GetObject",
+                        "Resource": f"arn:aws:s3:::{bucket_name}/*",
+                    }
+                ],
+            }
+
+            s3.put_bucket_policy(
+                Bucket=bucket_name,
+                Policy=json.dumps(bucket_policy),
+            )
+
+            return CustomResponse.successResponse(
+                data={
+                    "bucket_name": bucket_name,
+                    "bucket_url": f"https://{bucket_name}.s3.ap-south-1.amazonaws.com/"
+                },
+                description="S3 bucket created successfully with public access",
+            )
+
+        except s3.exceptions.BucketAlreadyExists:
+            return CustomResponse.errorResponse(
+                description="Bucket name already exists globally"
+            )
+
+        except Exception as e:
+            return CustomResponse.errorResponse(
+                description="Failed to create S3 bucket",
+                data={"error": str(e)}
+            )

@@ -10,7 +10,7 @@ from backoffice.store import ProductAPIView, CategoriesAPIView, BannerAPIView, \
     AdminCreateCouponAPIView, UserAPIView, CreateAppVersionConfigAPI, OrderShippingSlipAPIView, \
     StoreAnalyticsAPIView, EmailSendOTPView, EmailVerifyOTPView, ClientInfo, NotificationConfig, \
     NotificationTemplateConfig, SuperAdminSendOTPAPIView, SuperAdminVerifyOTPAPIView, StoreListAPIView, \
-    DashboardStatsAPIView, PinCodeStatesAPIView, PinCodeDistrictAPIView
+    DashboardStatsAPIView, PinCodeStatesAPIView, PinCodeDistrictAPIView, S3BucketAPIView
 from backoffice.subscriptions import CreateSubscriptionPlanAPI
 
 urlpatterns = [
@@ -124,5 +124,6 @@ urlpatterns = [
 
     path("dashboard",DashboardStatsAPIView.as_view()),
     path("subscription/plan",CreateSubscriptionPlanAPI.as_view()),
+    path("create/bucket",S3BucketAPIView.as_view()),
 
 ]
