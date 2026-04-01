@@ -256,7 +256,7 @@ class UpdateUserDetails(APIView):
             user.name = data.get("name")
         if "email" in data:
             user.email = data.get("email")
-        if "dob" in data:
+        if "dob" in data and data.get("dob"):
             user.dob = data.get("dob")
         if "user_role" in data:
             user.user_role = data.get("user_role")
