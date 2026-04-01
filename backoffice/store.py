@@ -41,7 +41,8 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from utils.invoice_generator import generate_shipping_invoice
 from utils.notification import trigger_notification
 from utils.store import generate_lsin, generate_order_number, BO_STATUS_FLOW, update_stock_after_order
-from utils.user import generate_otp, send_otp_email, generate_username, generate_referral_code
+from utils.user import generate_otp, send_otp_email, generate_username, generate_referral_code, \
+    create_s3_bucket_and_upload_logo
 from django.db.models import Sum, F, DecimalField, ExpressionWrapper
 
 
@@ -1704,45 +1705,131 @@ class PinCodeDistrictAPIView(APIView):
                                               description="pincode deleted successfully")
 
 
+# class StoreAPIView(APIView):
+#     permission_classes = [AllowAny]
+#
+#     # ---------------- CREATE STORE ----------------
+#     def post(self, request):
+#         data = request.data
+#         required_fields = ["name", "mobile", "email",
+#                            "address", "product_code",
+#                            "clients", "aws_bucket_name", "email_login",
+#                            "mobile_login", "primary_color", "secondary_color","client_id","client_secret"]
+#         clients = request.data.get("clients")
+#         for field in required_fields:
+#             if field not in data:
+#                 return CustomResponse.errorResponse(
+#                     description=f"{field} is required"
+#                 )
+#         if Store.objects.filter(mobile=data["mobile"]).exists():
+#             return CustomResponse.errorResponse(description="Store with this mobile already exists")
+#
+#         try:
+#             store = Store.objects.create(
+#                 name=data.get("name"),
+#                 mobile=data.get("mobile"),
+#                 email=data.get("email"),
+#                 address=data.get("address"),
+#                 logo=data.get("logo", ""),
+#                 created_by="SUPERADMIN",
+#                 product_code = data.get("product_code"),
+#                 aws_bucket_name = data.get("aws_bucket_name"),
+#                 bo_title = data.get("bo_title"),
+#                 bo_subtitle = data.get("bo_subtitle"),
+#                 highlights = data.get("highlights", None),
+#                 email_login = data.get("email_login"),
+#                 mobile_login = data.get("mobile_login"),
+#                 primary_color = data.get("primary_color"),
+#                 secondary_color = data.get("secondary_color"),
+#                 client_id = data.get("client_id"),
+#                 client_secret = data.get("client_secret"),
+#             )
+#             User.objects.create(
+#                 mobile=store.mobile,
+#                 email=store.email,
+#                 store=store,
+#                 user_role=["ADMIN"],
+#                 username=store.mobile
+#             )
+#             for item in clients:
+#                 store_client = StoreClient()
+#                 store_client.store = store
+#                 store_client.identifier = item["identifier"]
+#                 store_client.client_type = item["client_type"]
+#                 store_client.is_active = True
+#                 store_client.save()
+#
+#             return CustomResponse.successResponse(
+#                 data={},
+#                 description="store created successfully"
+#             )
+#
+#         except IntegrityError as error:
+#             return CustomResponse.errorResponse(
+#                 description=f"Database integrity error {error}"
+#             )
+
 class StoreAPIView(APIView):
     permission_classes = [AllowAny]
 
-    # ---------------- CREATE STORE ----------------
     def post(self, request):
         data = request.data
-        required_fields = ["name", "mobile", "email",
-                           "address", "product_code",
-                           "clients", "aws_bucket_name", "email_login",
-                           "mobile_login", "primary_color", "secondary_color","client_id","client_secret"]
-        clients = request.data.get("clients")
+        logo_file = request.FILES.get("logo")
+        bucket_name = data.get("aws_bucket_name")
+
+        required_fields = [
+            "name", "mobile", "email", "address",
+            "product_code", "clients", "aws_bucket_name",
+            "email_login", "mobile_login",
+            "primary_color", "secondary_color",
+            "client_id", "client_secret"
+        ]
+
         for field in required_fields:
             if field not in data:
                 return CustomResponse.errorResponse(
                     description=f"{field} is required"
                 )
+
         if Store.objects.filter(mobile=data["mobile"]).exists():
-            return CustomResponse.errorResponse(description="Store with this mobile already exists")
+            return CustomResponse.errorResponse(
+                description="Store with this mobile already exists"
+            )
 
         try:
+            #  STEP 1: Create bucket + upload logo
+            s3_response = create_s3_bucket_and_upload_logo(
+                bucket_name,
+                logo_file
+            )
+
+            # If failed → return immediately
+            if not s3_response.data.get("bucket_name"):
+                return s3_response
+
+            logo_url = s3_response.data.get("logo_url")
+
+            #  STEP 2: Create store
             store = Store.objects.create(
                 name=data.get("name"),
                 mobile=data.get("mobile"),
                 email=data.get("email"),
                 address=data.get("address"),
-                logo=data.get("logo", ""),
+                logo=logo_url,
                 created_by="SUPERADMIN",
-                product_code = data.get("product_code"),
-                aws_bucket_name = data.get("aws_bucket_name"),
-                bo_title = data.get("bo_title"),
-                bo_subtitle = data.get("bo_subtitle"),
-                highlights = data.get("highlights", None),
-                email_login = data.get("email_login"),
-                mobile_login = data.get("mobile_login"),
-                primary_color = data.get("primary_color"),
-                secondary_color = data.get("secondary_color"),
-                client_id = data.get("client_id"),
-                client_secret = data.get("client_secret"),
+                product_code=data.get("product_code"),
+                aws_bucket_name=bucket_name,
+                bo_title=data.get("bo_title"),
+                bo_subtitle=data.get("bo_subtitle"),
+                highlights=data.get("highlights"),
+                email_login=data.get("email_login"),
+                mobile_login=data.get("mobile_login"),
+                primary_color=data.get("primary_color"),
+                secondary_color=data.get("secondary_color"),
+                client_id=data.get("client_id"),
+                client_secret=data.get("client_secret"),
             )
+
             User.objects.create(
                 mobile=store.mobile,
                 email=store.email,
@@ -1750,17 +1837,18 @@ class StoreAPIView(APIView):
                 user_role=["ADMIN"],
                 username=store.mobile
             )
-            for item in clients:
-                store_client = StoreClient()
-                store_client.store = store
-                store_client.identifier = item["identifier"]
-                store_client.client_type = item["client_type"]
-                store_client.is_active = True
-                store_client.save()
+
+            for item in data.get("clients"):
+                StoreClient.objects.create(
+                    store=store,
+                    identifier=item["identifier"],
+                    client_type=item["client_type"],
+                    is_active=True
+                )
 
             return CustomResponse.successResponse(
-                data={},
-                description="store created successfully"
+                data={"logo_url": logo_url},
+                description="Store created successfully"
             )
 
         except IntegrityError as error:
