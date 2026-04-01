@@ -225,7 +225,7 @@ class CustomerDetails(APIView):
             )
         user = User.objects.filter(id=id).first()
         address = AddressMaster.objects.filter(store_id=store.id,
-                                               mobile=request.user.mobile).values()
+                                               mobile=user.mobile).values()
         d = {
                 "id": user.id,
                 "name": user.name,
@@ -256,7 +256,7 @@ class UpdateUserDetails(APIView):
             user.name = data.get("name")
         if "email" in data:
             user.email = data.get("email")
-        if "dob" in data:
+        if "dob" in data and data.get("dob"):
             user.dob = data.get("dob")
         if "user_role" in data:
             user.user_role = data.get("user_role")

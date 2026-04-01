@@ -612,7 +612,6 @@ class ProductAPIView(APIView):
             product = Product.objects.get(
                 id=id,
                 store=store,
-                is_active=True
             )
         except Product.DoesNotExist:
             return CustomResponse.errorResponse(
@@ -623,7 +622,7 @@ class ProductAPIView(APIView):
         updatable_fields = [
             "name", "size", "colour", "mrp", "is_free_shipping",
             "selling_price", "gst_percentage", "description",
-            "gst_amount", "current_stock", "is_active","group_code"
+            "gst_amount", "is_active","group_code"
         ]
 
         for field in updatable_fields:
@@ -2644,7 +2643,7 @@ class OrderListAPIView(APIView):
                     product = Product.objects.select_for_update().get(
                         id=product_id,
                         store=store,
-                        is_active=True
+                        # is_active=True
                     )
                 except Product.DoesNotExist:
                     return CustomResponse.errorResponse(
@@ -2700,7 +2699,7 @@ class OrderListAPIView(APIView):
             OrderTimeLines.objects.create(
                 order=order,
                 status=OrderStatus.CREATED,
-                remarks=data.get("remarks", "Order initiated")
+                remarks="Admin Created this order. contacted from instagram"
             )
 
         return CustomResponse.successResponse(
