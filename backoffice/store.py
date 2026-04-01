@@ -2555,7 +2555,7 @@ class OrderListAPIView(APIView):
                     product = Product.objects.select_for_update().get(
                         id=product_id,
                         store=store,
-                        is_active=True
+                        # is_active=True
                     )
                 except Product.DoesNotExist:
                     return CustomResponse.errorResponse(
