@@ -1,6 +1,5 @@
 import uuid
 import random
-import json
 import requests
 from django.core.mail import send_mail
 from django.conf import settings
@@ -10,6 +9,10 @@ from db.models import User, NotificationChannelConfig
 from django.template.loader import render_to_string
 from django.core.mail import EmailMultiAlternatives
 from django.core.exceptions import ImproperlyConfigured
+import boto3
+import json
+from mixins.drf_views import CustomResponse
+
 
 # def generate_username(user):
 #     """
@@ -226,3 +229,78 @@ Amount: ₹{order.amount}
 
     except Exception as e:
         print(f" EMAIL FAILED: {str(e)}", flush=True)
+
+
+
+
+
+
+
+
+def create_s3_bucket_and_upload_logo(bucket_name, logo_file):
+    try:
+        s3 = boto3.client("s3", region_name="ap-south-1")
+
+        # Create bucket
+        s3.create_bucket(
+            Bucket=bucket_name,
+            CreateBucketConfiguration={
+                "LocationConstraint": "ap-south-1"
+            }
+        )
+
+        # Public access config
+        s3.put_public_access_block(
+            Bucket=bucket_name,
+            PublicAccessBlockConfiguration={
+                "BlockPublicAcls": False,
+                "IgnorePublicAcls": False,
+                "BlockPublicPolicy": False,
+                "RestrictPublicBuckets": False,
+            }
+        )
+
+        # Bucket policy
+        bucket_policy = {
+            "Version": "2012-10-17",
+            "Statement": [
+                {
+                    "Sid": "PublicReadAccess",
+                    "Effect": "Allow",
+                    "Principal": "*",
+                    "Action": "s3:GetObject",
+                    "Resource": f"arn:aws:s3:::{bucket_name}/*",
+                }
+            ],
+        }
+
+        s3.put_bucket_policy(
+            Bucket=bucket_name,
+            Policy=json.dumps(bucket_policy),
+        )
+
+        # Upload logo
+        logo_url = None
+        if logo_file:
+            file_key = f"logo/{logo_file.name}"
+
+            s3.upload_fileobj(
+                logo_file,
+                bucket_name,
+                file_key,
+                ExtraArgs={"ContentType": logo_file.content_type}
+            )
+
+            logo_url = f"https://{bucket_name}.s3.ap-south-1.amazonaws.com/{file_key}"
+
+        return {
+            "success": True,
+            "bucket_name": bucket_name,
+            "logo_url": logo_url
+        }
+
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e)
+        }
