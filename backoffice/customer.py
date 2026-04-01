@@ -225,7 +225,7 @@ class CustomerDetails(APIView):
             )
         user = User.objects.filter(id=id).first()
         address = AddressMaster.objects.filter(store_id=store.id,
-                                               mobile=request.user.mobile).values()
+                                               mobile=user.mobile).values()
         d = {
                 "id": user.id,
                 "name": user.name,
