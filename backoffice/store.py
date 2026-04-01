@@ -2606,7 +2606,6 @@ class OrderListAPIView(APIView):
                 "user_name": order.user.name,
                 "status": order.status,
                 "amount": str(order.amount),
-                "profit": sum(item.gross_profit for item in order.items.all()),
                 "created_at": order.created_at,
                 "created_by": order.created_by,
                 "address": order.address,
@@ -2972,6 +2971,7 @@ class AdminOrderDetailAPIView(APIView):
                     "created_at": order.created_at,
                     "address": order.address,
                     "coupon": coupon_details,
+                    "profit": sum(item.gross_profit for item in order.items.all()),
                     "user": {
                         "id": str(order.user.id),
                         "name": order.user.name,
