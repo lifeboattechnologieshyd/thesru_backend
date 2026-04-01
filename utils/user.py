@@ -237,7 +237,9 @@ Amount: ₹{order.amount}
 
 
 
-def create_s3_bucket_and_upload_logo(bucket_name, logo_file):
+def create_bucket_and_upload_logo(bucket_name, logo_file):
+    import boto3, json
+
     try:
         s3 = boto3.client("s3", region_name="ap-south-1")
 
@@ -249,7 +251,7 @@ def create_s3_bucket_and_upload_logo(bucket_name, logo_file):
             }
         )
 
-        # Public access config
+        # Public access
         s3.put_public_access_block(
             Bucket=bucket_name,
             PublicAccessBlockConfiguration={
@@ -260,47 +262,29 @@ def create_s3_bucket_and_upload_logo(bucket_name, logo_file):
             }
         )
 
-        # Bucket policy
-        bucket_policy = {
+        # Policy
+        policy = {
             "Version": "2012-10-17",
-            "Statement": [
-                {
-                    "Sid": "PublicReadAccess",
-                    "Effect": "Allow",
-                    "Principal": "*",
-                    "Action": "s3:GetObject",
-                    "Resource": f"arn:aws:s3:::{bucket_name}/*",
-                }
-            ],
+            "Statement": [{
+                "Effect": "Allow",
+                "Principal": "*",
+                "Action": "s3:GetObject",
+                "Resource": f"arn:aws:s3:::{bucket_name}/*"
+            }]
         }
 
         s3.put_bucket_policy(
             Bucket=bucket_name,
-            Policy=json.dumps(bucket_policy),
+            Policy=json.dumps(policy)
         )
 
         # Upload logo
-        logo_url = None
-        if logo_file:
-            file_key = f"logo/{logo_file.name}"
+        file_path = f"logo/{logo_file.name}"
+        s3.upload_fileobj(logo_file, bucket_name, file_path)
 
-            s3.upload_fileobj(
-                logo_file,
-                bucket_name,
-                file_key,
-                ExtraArgs={"ContentType": logo_file.content_type}
-            )
+        logo_url = f"https://{bucket_name}.s3.ap-south-1.amazonaws.com/{file_path}"
 
-            logo_url = f"https://{bucket_name}.s3.ap-south-1.amazonaws.com/{file_key}"
-
-        return {
-            "success": True,
-            "bucket_name": bucket_name,
-            "logo_url": logo_url
-        }
+        return True, logo_url
 
     except Exception as e:
-        return {
-            "success": False,
-            "error": str(e)
-        }
+        return False, str(e)

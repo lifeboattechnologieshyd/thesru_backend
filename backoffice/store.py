@@ -42,7 +42,7 @@ from utils.invoice_generator import generate_shipping_invoice
 from utils.notification import trigger_notification
 from utils.store import generate_lsin, generate_order_number, BO_STATUS_FLOW, update_stock_after_order
 from utils.user import generate_otp, send_otp_email, generate_username, generate_referral_code, \
-    create_s3_bucket_and_upload_logo
+    create_s3_bucket_and_upload_logo, create_bucket_and_upload_logo
 from django.db.models import Sum, F, DecimalField, ExpressionWrapper
 
 
@@ -1775,49 +1775,34 @@ class StoreAPIView(APIView):
         data = request.data
 
         import json
+        clients = json.loads(request.data.get("clients", "[]"))
+        highlights = json.loads(request.data.get("highlights", "[]"))
 
-        # Parse JSON fields FIRST
-        try:
-            clients = json.loads(request.data.get("clients", "[]"))
-        except:
-            clients = []
+        bucket_name = data.get("aws_bucket_name")
+        logo_file = request.FILES.get("logo")
 
-        try:
-            highlights = json.loads(request.data.get("highlights", "[]"))
-        except:
-            highlights = []
+        #  STEP 1: CREATE BUCKET + UPLOAD LOGO FIRST
+        success, result = create_bucket_and_upload_logo(bucket_name, logo_file)
 
-        #  Required fields check
-        required_fields = ["name", "mobile", "email", "address",
-                           "product_code", "aws_bucket_name",
-                           "email_login", "mobile_login",
-                           "primary_color", "secondary_color",
-                           "client_id", "client_secret"]
-
-        for field in required_fields:
-            if field not in data:
-                return CustomResponse.errorResponse(
-                    description=f"{field} is required"
-                )
-
-        if Store.objects.filter(mobile=data["mobile"]).exists():
+        if not success:
             return CustomResponse.errorResponse(
-                description="Store with this mobile already exists"
+                description="S3 bucket creation failed",
+                data={"error": result}
             )
 
+        logo_url = result
+
+        #  STEP 2: CREATE STORE ONLY IF S3 SUCCESS
         try:
             store = Store.objects.create(
                 name=data.get("name"),
                 mobile=data.get("mobile"),
                 email=data.get("email"),
                 address=data.get("address"),
-                logo=data.get("logo", ""),
-                created_by="SUPERADMIN",
-                product_code=data.get("product_code"),
-                aws_bucket_name=data.get("aws_bucket_name"),
-                bo_title=data.get("bo_title"),
-                bo_subtitle=data.get("bo_subtitle"),
+                logo=logo_url,  
+                aws_bucket_name=bucket_name,
                 highlights=highlights,
+                product_code=data.get("product_code"),
                 email_login=data.get("email_login"),
                 mobile_login=data.get("mobile_login"),
                 primary_color=data.get("primary_color"),
@@ -1826,7 +1811,6 @@ class StoreAPIView(APIView):
                 client_secret=data.get("client_secret"),
             )
 
-            #  Use parsed clients
             for item in clients:
                 StoreClient.objects.create(
                     store=store,
@@ -1836,14 +1820,14 @@ class StoreAPIView(APIView):
                 )
 
             return CustomResponse.successResponse(
-                data={},
-                description="store created successfully"
+                data={"logo_url": logo_url},
+                description="Store + bucket created successfully"
             )
 
-        except Exception as error:
+        except Exception as e:
             return CustomResponse.errorResponse(
-                description="Something went wrong",
-                data={"error": str(error)}
+                description="Store creation failed",
+                data={"error": str(e)}
             )
     # ---------------- GET STORE / LIST ----------------
     def get(self, request, id=None):
