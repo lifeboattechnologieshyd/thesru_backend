@@ -611,7 +611,6 @@ class ProductAPIView(APIView):
             product = Product.objects.get(
                 id=id,
                 store=store,
-                is_active=True
             )
         except Product.DoesNotExist:
             return CustomResponse.errorResponse(
