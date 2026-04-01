@@ -238,11 +238,6 @@ Amount: ₹{order.amount}
 
 
 def create_s3_bucket_and_upload_logo(bucket_name, logo_file):
-    if not bucket_name:
-        return CustomResponse.errorResponse(
-            description="Bucket name is required"
-        )
-
     try:
         s3 = boto3.client("s3", region_name="ap-south-1")
 
@@ -284,7 +279,7 @@ def create_s3_bucket_and_upload_logo(bucket_name, logo_file):
             Policy=json.dumps(bucket_policy),
         )
 
-        # ✅ Upload logo if exists
+        # Upload logo
         logo_url = None
         if logo_file:
             file_key = f"logo/{logo_file.name}"
@@ -298,16 +293,14 @@ def create_s3_bucket_and_upload_logo(bucket_name, logo_file):
 
             logo_url = f"https://{bucket_name}.s3.ap-south-1.amazonaws.com/{file_key}"
 
-        return CustomResponse.successResponse(
-            data={
-                "bucket_name": bucket_name,
-                "logo_url": logo_url
-            },
-            description="Bucket created and logo uploaded"
-        )
+        return {
+            "success": True,
+            "bucket_name": bucket_name,
+            "logo_url": logo_url
+        }
 
     except Exception as e:
-        return CustomResponse.errorResponse(
-            description="S3 operation failed",
-            data={"error": str(e)}
-        )
+        return {
+            "success": False,
+            "error": str(e)
+        }
