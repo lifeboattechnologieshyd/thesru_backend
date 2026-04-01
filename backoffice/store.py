@@ -1773,18 +1773,27 @@ class StoreAPIView(APIView):
 
     def post(self, request):
         data = request.data
-        logo_file = request.FILES.get("logo")
-        bucket_name = data.get("aws_bucket_name")
 
-        required_fields = [
-            "name", "mobile", "email", "address",
-            "product_code", "clients", "aws_bucket_name",
-            "email_login", "mobile_login",
-            "primary_color", "secondary_color",
-            "client_id", "client_secret"
-        ]
+        import json
 
-        # ✅ Validate fields
+        # Parse JSON fields FIRST
+        try:
+            clients = json.loads(request.data.get("clients", "[]"))
+        except:
+            clients = []
+
+        try:
+            highlights = json.loads(request.data.get("highlights", "[]"))
+        except:
+            highlights = []
+
+        #  Required fields check
+        required_fields = ["name", "mobile", "email", "address",
+                           "product_code", "aws_bucket_name",
+                           "email_login", "mobile_login",
+                           "primary_color", "secondary_color",
+                           "client_id", "client_secret"]
+
         for field in required_fields:
             if field not in data:
                 return CustomResponse.errorResponse(
@@ -1797,79 +1806,44 @@ class StoreAPIView(APIView):
             )
 
         try:
-            # ✅ Parse clients (important for form-data)
-            clients = json.loads(data.get("clients", "[]"))
-
-            # ✅ Step 1: Create bucket + upload logo
-            s3_result = create_s3_bucket_and_upload_logo(
-                bucket_name,
-                logo_file
-            )
-
-            if not s3_result["success"]:
-                return CustomResponse.errorResponse(
-                    description="S3 operation failed",
-                    data={"error": s3_result.get("error")}
-                )
-
-            logo_url = s3_result.get("logo_url")
-
-            # ✅ Step 2: Create store
             store = Store.objects.create(
                 name=data.get("name"),
                 mobile=data.get("mobile"),
                 email=data.get("email"),
                 address=data.get("address"),
-                logo=logo_url,
+                logo=data.get("logo", ""),
                 created_by="SUPERADMIN",
                 product_code=data.get("product_code"),
-                aws_bucket_name=bucket_name,
+                aws_bucket_name=data.get("aws_bucket_name"),
                 bo_title=data.get("bo_title"),
                 bo_subtitle=data.get("bo_subtitle"),
-                highlights=data.get("highlights"),
-                email_login=data.get("email_login") == "true",
-                mobile_login=data.get("mobile_login") == "true",
+                highlights=highlights,
+                email_login=data.get("email_login"),
+                mobile_login=data.get("mobile_login"),
                 primary_color=data.get("primary_color"),
                 secondary_color=data.get("secondary_color"),
                 client_id=data.get("client_id"),
                 client_secret=data.get("client_secret"),
             )
 
-            # ✅ Create user
-            User.objects.create(
-                mobile=store.mobile,
-                email=store.email,
-                store=store,
-                user_role=["ADMIN"],
-                username=store.mobile
-            )
-
-            # ✅ Create clients
+            #  Use parsed clients
             for item in clients:
                 StoreClient.objects.create(
                     store=store,
-                    identifier=item["identifier"],
-                    client_type=item["client_type"],
+                    identifier=item.get("identifier"),
+                    client_type=item.get("client_type"),
                     is_active=True
                 )
 
             return CustomResponse.successResponse(
-                data={
-                    "store_id": str(store.id),
-                    "logo_url": logo_url
-                },
-                description="Store created successfully"
+                data={},
+                description="store created successfully"
             )
 
-        except IntegrityError as error:
-            return CustomResponse.errorResponse(
-                description=f"Database integrity error {error}"
-            )
-
-        except Exception as e:
+        except Exception as error:
             return CustomResponse.errorResponse(
                 description="Something went wrong",
-                data={"error": str(e)}
+                data={"error": str(error)}
             )
     # ---------------- GET STORE / LIST ----------------
     def get(self, request, id=None):
