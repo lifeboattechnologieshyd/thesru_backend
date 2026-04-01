@@ -653,7 +653,7 @@ class CheckoutPreview(APIView):
                 return CustomResponse.errorResponse(str(e))
 
         # ---------- Charges (future ready) ----------
-        shipping_charge = calculate_shipping(store, subtotal, address.get("pincode"), cart_items)
+        shipping_charge = calculate_shipping(store, subtotal, address.get("pincode", address.get("pin_code")), cart_items)
         platform_fee = Decimal("0.00")  # later config-based
 
         final_payable = (
