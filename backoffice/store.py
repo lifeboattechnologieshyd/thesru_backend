@@ -2558,6 +2558,7 @@ class CartListView(APIView):
             )
 
 
+from django.db.models import Sum
 
 
 
@@ -2605,6 +2606,7 @@ class OrderListAPIView(APIView):
                 "user_name": order.user.name,
                 "status": order.status,
                 "amount": str(order.amount),
+                "profit": sum(item.gross_profit for item in order.items.all()),
                 "created_at": order.created_at,
                 "created_by": order.created_by,
                 "address": order.address,
@@ -3444,7 +3446,6 @@ class StoreAnalyticsAPIView(APIView):
             "total_visitors": total_visitors,
             "total_products": total_products,
             "gross_profit": float(result["gross_profit"]),
-            "gross_profits": result,
             "order_status_counts": order_status_counts,
             "recent_orders": recent_orders,
             "top_selling_products": top_products,
