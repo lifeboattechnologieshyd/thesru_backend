@@ -42,7 +42,7 @@ from utils.invoice_generator import generate_shipping_invoice
 from utils.notification import trigger_notification
 from utils.store import generate_lsin, generate_order_number, BO_STATUS_FLOW, update_stock_after_order
 from utils.user import generate_otp, send_otp_email, generate_username, generate_referral_code, \
-    create_s3_bucket_and_upload_logo, create_bucket_and_upload_logo
+     create_bucket_and_upload_logo
 from django.db.models import Sum, F, DecimalField, ExpressionWrapper
 
 
@@ -1776,7 +1776,6 @@ class StoreAPIView(APIView):
 
         import json
         clients = json.loads(request.data.get("clients", "[]"))
-        highlights = json.loads(request.data.get("highlights", "[]"))
 
         bucket_name = data.get("aws_bucket_name")
         logo_file = request.FILES.get("logo")
@@ -1799,9 +1798,8 @@ class StoreAPIView(APIView):
                 mobile=data.get("mobile"),
                 email=data.get("email"),
                 address=data.get("address"),
-                logo=logo_url,  
+                logo=logo_url,
                 aws_bucket_name=bucket_name,
-                highlights=highlights,
                 product_code=data.get("product_code"),
                 email_login=data.get("email_login"),
                 mobile_login=data.get("mobile_login"),

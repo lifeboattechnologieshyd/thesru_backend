@@ -41,9 +41,9 @@ class Store(AuditModel):
     email_login = models.BooleanField(default=True)
     mobile_login = models.BooleanField(default=True)
     aws_bucket_name = models.CharField(max_length=50, null=True, blank=True)
-    bo_title = models.CharField(max_length=50, null=True, blank=True)
-    bo_subtitle = models.CharField(max_length=50, null=True, blank=True)
-    highlights = ArrayField(models.CharField(max_length=50, ), blank=True, null=True)
+    # bo_title = models.CharField(max_length=50, null=True, blank=True)
+    # bo_subtitle = models.CharField(max_length=50, null=True, blank=True)
+    # highlights = ArrayField(models.CharField(max_length=50, ), blank=True, null=True)
     is_active = models.BooleanField(default=True)
 
 
