@@ -1818,8 +1818,11 @@ class StoreAPIView(APIView):
                 )
 
             return CustomResponse.successResponse(
-                data={"logo_url": logo_url},
-                description="Store + bucket created successfully"
+                data={
+                    "bucket_name": bucket_name,
+                    "logo_url": logo_url
+                },
+                description="Store and bucket created successfully"
             )
 
         except Exception as e:
