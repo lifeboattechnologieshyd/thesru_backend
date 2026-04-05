@@ -42,7 +42,7 @@ from utils.invoice_generator import generate_shipping_invoice
 from utils.notification import trigger_notification
 from utils.store import generate_lsin, generate_order_number, BO_STATUS_FLOW, update_stock_after_order
 from utils.user import generate_otp, send_otp_email, generate_username, generate_referral_code, \
-    create_s3_bucket_and_upload_logo
+     create_bucket_and_upload_logo
 from django.db.models import Sum, F, DecimalField, ExpressionWrapper
 
 
@@ -1773,102 +1773,61 @@ class StoreAPIView(APIView):
 
     def post(self, request):
         data = request.data
-        logo_file = request.FILES.get("logo")
+
+        import json
+        clients = json.loads(request.data.get("clients", "[]"))
+
         bucket_name = data.get("aws_bucket_name")
+        logo_file = request.FILES.get("logo")
 
-        required_fields = [
-            "name", "mobile", "email", "address",
-            "product_code", "clients", "aws_bucket_name",
-            "email_login", "mobile_login",
-            "primary_color", "secondary_color",
-            "client_id", "client_secret"
-        ]
+        #  STEP 1: CREATE BUCKET + UPLOAD LOGO FIRST
+        success, result = create_bucket_and_upload_logo(bucket_name, logo_file)
 
-        # ✅ Validate fields
-        for field in required_fields:
-            if field not in data:
-                return CustomResponse.errorResponse(
-                    description=f"{field} is required"
-                )
-
-        if Store.objects.filter(mobile=data["mobile"]).exists():
+        if not success:
             return CustomResponse.errorResponse(
-                description="Store with this mobile already exists"
+                description="S3 bucket creation failed",
+                data={"error": result}
             )
 
+        logo_url = result
+
+        #  STEP 2: CREATE STORE ONLY IF S3 SUCCESS
         try:
-            # ✅ Parse clients (important for form-data)
-            clients = json.loads(data.get("clients", "[]"))
-
-            # ✅ Step 1: Create bucket + upload logo
-            s3_result = create_s3_bucket_and_upload_logo(
-                bucket_name,
-                logo_file
-            )
-
-            if not s3_result["success"]:
-                return CustomResponse.errorResponse(
-                    description="S3 operation failed",
-                    data={"error": s3_result.get("error")}
-                )
-
-            logo_url = s3_result.get("logo_url")
-
-            # ✅ Step 2: Create store
             store = Store.objects.create(
                 name=data.get("name"),
                 mobile=data.get("mobile"),
                 email=data.get("email"),
                 address=data.get("address"),
                 logo=logo_url,
-                created_by="SUPERADMIN",
-                product_code=data.get("product_code"),
                 aws_bucket_name=bucket_name,
-                bo_title=data.get("bo_title"),
-                bo_subtitle=data.get("bo_subtitle"),
-                highlights=data.get("highlights"),
-                email_login=data.get("email_login") == "true",
-                mobile_login=data.get("mobile_login") == "true",
+                product_code=data.get("product_code"),
+                email_login=data.get("email_login"),
+                mobile_login=data.get("mobile_login"),
                 primary_color=data.get("primary_color"),
                 secondary_color=data.get("secondary_color"),
                 client_id=data.get("client_id"),
                 client_secret=data.get("client_secret"),
             )
 
-            # ✅ Create user
-            User.objects.create(
-                mobile=store.mobile,
-                email=store.email,
-                store=store,
-                user_role=["ADMIN"],
-                username=store.mobile
-            )
-
-            # ✅ Create clients
             for item in clients:
                 StoreClient.objects.create(
                     store=store,
-                    identifier=item["identifier"],
-                    client_type=item["client_type"],
+                    identifier=item.get("identifier"),
+                    client_type=item.get("client_type"),
                     is_active=True
                 )
 
             return CustomResponse.successResponse(
                 data={
-                    "store_id": str(store.id),
+                    "bucket_name": bucket_name,
                     "logo_url": logo_url
                 },
-                description="Store created successfully"
-            )
-
-        except IntegrityError as error:
-            return CustomResponse.errorResponse(
-                description=f"Database integrity error {error}"
+                description="Store and bucket created successfully"
             )
 
         except Exception as e:
             return CustomResponse.errorResponse(
-                description="Something went wrong",
+                description="Store creation failed",
                 data={"error": str(e)}
             )
     # ---------------- GET STORE / LIST ----------------
@@ -2606,7 +2565,6 @@ class OrderListAPIView(APIView):
                 "user_name": order.user.name,
                 "status": order.status,
                 "amount": str(order.amount),
-                "profit": sum(item.gross_profit for item in order.items.all()),
                 "created_at": order.created_at,
                 "created_by": order.created_by,
                 "address": order.address,
@@ -2972,6 +2930,7 @@ class AdminOrderDetailAPIView(APIView):
                     "created_at": order.created_at,
                     "address": order.address,
                     "coupon": coupon_details,
+                    "profit": sum(item.gross_profit for item in order.items.all()),
                     "user": {
                         "id": str(order.user.id),
                         "name": order.user.name,
