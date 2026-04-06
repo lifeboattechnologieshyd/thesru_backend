@@ -2855,7 +2855,8 @@ class AdminOrderDetailAPIView(APIView):
             ).prefetch_related(
                 "items__product__media",
                 "payments",
-                "timelines"
+                "timelines",
+                "shipping_details"
             ).get(
                 id=order_id,
                 store=store
@@ -2903,6 +2904,17 @@ class AdminOrderDetailAPIView(APIView):
         # ---------- Timelines ----------
         timelines = []
         coupon_details = {}
+        shipping_details = []
+        for s in order.shipping_details:
+            shipping_details.append(
+                {
+                    "courier_service": s.courier_service,
+                    "tracking_id": s.tracking_id,
+                    "tracking_url": s.tracking_url,
+                    "estimated_delivery_date": s.estimated_delivery_date,
+                    "remarks": s.remarks,
+                }
+            )
         for t in order.timelines.all():
             timelines.append({
                 "status": t.status,
@@ -2941,7 +2953,8 @@ class AdminOrderDetailAPIView(APIView):
                 },
                 "items": items,
                 "payments": payments,
-                "timelines": timelines
+                "timelines": timelines,
+                "shipping_details": shipping_details
             },
             description="Order details fetched successfully"
         )
