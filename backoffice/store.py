@@ -2905,7 +2905,7 @@ class AdminOrderDetailAPIView(APIView):
         timelines = []
         coupon_details = {}
         shipping_details = {}
-        if order.shipping_details:
+        if order.shipping_details.first():
             shipping_details = {
                     "courier_service": order.shipping_details.courier_service,
                     "tracking_id": order.shipping_details.tracking_id,
