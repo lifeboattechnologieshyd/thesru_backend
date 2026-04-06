@@ -2907,11 +2907,11 @@ class AdminOrderDetailAPIView(APIView):
         shipping_details = {}
         if order.shipping_details.first():
             shipping_details = {
-                    "courier_service": order.shipping_details.courier_service,
-                    "tracking_id": order.shipping_details.tracking_id,
-                    "tracking_url": order.shipping_details.tracking_url,
-                    "estimated_delivery_date": order.shipping_details.estimated_delivery_date,
-                    "remarks": order.shipping_details.remarks,
+                    "courier_service": order.shipping_details.first().courier_service,
+                    "tracking_id": order.shipping_details.first().tracking_id,
+                    "tracking_url": order.shipping_details.first().tracking_url,
+                    "estimated_delivery_date": order.shipping_details.first().estimated_delivery_date,
+                    "remarks": order.shipping_details.first().remarks,
                 }
 
         for t in order.timelines.all():
