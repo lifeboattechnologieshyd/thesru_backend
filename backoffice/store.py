@@ -33,7 +33,7 @@ from db.models import Category, Product, Banner, PinCode, Store, WebBanner, \
     FlashSaleBanner, Order, User, Cart, OrderProducts, UserOTP, StoreClient, UserSession, ProductMedia, Tag, \
     OrderTimeLines, Coupons, CouponProduct, CouponCategory, CouponTag, AddressMaster, NotificationChannelConfig, \
     NotificationTemplate, OrderShippingDetails
-from db.models.user import AppVersionConfig, Visitor, BusinessOnboarding
+from db.models.user import AppVersionConfig, Visitor, BusinessOnboarding, PaymentTransaction
 from enums.store import InventoryType, OrderStatus, NotificationChannel, NotificationEvent, PaymentStatus
 from mixins.drf_views import CustomResponse
 from rest_framework_simplejwt.tokens import RefreshToken
@@ -41,7 +41,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from utils.invoice_generator import generate_shipping_invoice
 from utils.notification import trigger_notification
 from utils.store import generate_lsin, generate_order_number, BO_STATUS_FLOW, update_stock_after_order, \
-    generate_phonepe_payment
+    generate_phonepe_payment, get_phonepe_client
 from utils.user import generate_otp, send_otp_email, generate_username, generate_referral_code, \
      create_bucket_and_upload_logo
 from django.db.models import Sum, F, DecimalField, ExpressionWrapper
@@ -4291,7 +4291,7 @@ class BusinessOnboardingAPIView(APIView):
         payment_response = generate_phonepe_payment(obj)
 
         try:
-            payment_url = payment_response["data"]["instrumentResponse"]["redirectInfo"]["url"]
+            payment_url = payment_response["data"]["redirectUrl"]
         except Exception:
             return CustomResponse.errorResponse(
                 description="Payment creation failed"
@@ -4309,55 +4309,60 @@ class BusinessOnboardingAPIView(APIView):
 
 
 
+
+
+
 class PhonePeWebhookAPIView(APIView):
 
     def post(self, request):
 
-        data = request.data
-
-        transaction_id = data.get("merchantTransactionId")
-        phonepe_status = data.get("code")
-
-        #  Validate input
-        if not transaction_id:
-            return CustomResponse.errorResponse(
-                description="Invalid transaction_id"
-            )
+        client = get_phonepe_client()
 
         try:
-            obj = BusinessOnboarding.objects.get(id=transaction_id)
-        except BusinessOnboarding.DoesNotExist:
-            return CustomResponse.errorResponse(
-                description="Record not found"
+            callback_response = client.validate_callback(
+                username="YOUR_USERNAME",
+                password="YOUR_PASSWORD",
+                callback_header_data=request.headers.get("Authorization"),
+                callback_response_data=request.body.decode("utf-8")
             )
+        except Exception:
+            return CustomResponse.errorResponse(description="Invalid webhook")
 
-        #  Idempotency (avoid duplicate updates)
-        if obj.payment_status == PaymentStatus.COMPLETED:
-            return CustomResponse.successResponse(
-                description="Already processed"
+        event = callback_response.type
+        payload = callback_response.payload
+
+        merchant_txn_id = payload.originalMerchantOrderId
+
+        try:
+            txn = PaymentTransaction.objects.get(
+                merchant_transaction_id=merchant_txn_id
             )
+        except PaymentTransaction.DoesNotExist:
+            return CustomResponse.errorResponse(description="Transaction not found")
 
-        # Map PhonePe → Your statuses
-        if phonepe_status == "PAYMENT_SUCCESS":
-            obj.payment_status = PaymentStatus.COMPLETED
+        # 🔁 Idempotency
+        if txn.status == PaymentStatus.COMPLETED:
+            return CustomResponse.successResponse(description="Already processed")
 
-        elif phonepe_status == "PAYMENT_ERROR":
-            obj.payment_status = PaymentStatus.FAILED
+        # Update status
+        if event == "checkout.order.completed":
+            txn.status = PaymentStatus.COMPLETED
+            txn.onboarding.payment_status = PaymentStatus.COMPLETED
+
+        elif event == "checkout.order.failed":
+            txn.status = PaymentStatus.FAILED
+            txn.onboarding.payment_status = PaymentStatus.FAILED
 
         else:
-            obj.payment_status = PaymentStatus.CANCELLED
+            txn.status = PaymentStatus.CANCELLED
+            txn.onboarding.payment_status = PaymentStatus.CANCELLED
 
-        #  (Optional) store full response
-        if hasattr(obj, "payment_response"):
-            obj.payment_response = data
+        txn.phonepe_transaction_id = getattr(payload, "orderId", None)
+        txn.response_data = request.data
 
-        obj.save()
+        txn.save()
+        txn.onboarding.save()
 
         return CustomResponse.successResponse(
-            description="Webhook processed successfully",
-            data={
-                "transaction_id": str(obj.id),
-                "status": obj.payment_status
-            }
+            description="Webhook processed"
         )
-
