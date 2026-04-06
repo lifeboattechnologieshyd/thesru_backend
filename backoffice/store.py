@@ -2904,17 +2904,16 @@ class AdminOrderDetailAPIView(APIView):
         # ---------- Timelines ----------
         timelines = []
         coupon_details = {}
-        shipping_details = []
-        for s in order.shipping_details:
-            shipping_details.append(
-                {
-                    "courier_service": s.courier_service,
-                    "tracking_id": s.tracking_id,
-                    "tracking_url": s.tracking_url,
-                    "estimated_delivery_date": s.estimated_delivery_date,
-                    "remarks": s.remarks,
+        shipping_details = {}
+        if order.shipping_details:
+            shipping_details = {
+                    "courier_service": order.shipping_details.courier_service,
+                    "tracking_id": order.shipping_details.tracking_id,
+                    "tracking_url": order.shipping_details.tracking_url,
+                    "estimated_delivery_date": order.shipping_details.estimated_delivery_date,
+                    "remarks": order.shipping_details.remarks,
                 }
-            )
+
         for t in order.timelines.all():
             timelines.append({
                 "status": t.status,
