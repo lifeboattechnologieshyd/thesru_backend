@@ -6,6 +6,7 @@ from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 
 from db.mixins import AuditModel
+from enums.store import PaymentStatus
 
 
 class CustomUserManager(BaseUserManager):
@@ -459,4 +460,19 @@ class Enrollments(AuditModel):
 
     class Meta:
         db_table = "gpt_enrolls"
+
+class BusinessOnboarding(AuditModel):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    business_email = models.EmailField(max_length=255)
+    business_phone = models.CharField(max_length=15)
+    mobile_number = models.CharField(max_length=15)
+    payment_status = models.CharField( max_length=20,choices=PaymentStatus.choices,default=PaymentStatus.INITIATED)
+    payment_url = models.TextField(null=True, blank=True)
+
+    class Meta:
+        db_table = "business_onboarding"
+
+
+
+
 
