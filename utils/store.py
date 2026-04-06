@@ -2,6 +2,12 @@ import string
 import time
 import random
 
+import base64
+import hashlib
+import json
+import requests
+from django.conf import settings
+
 from db.models import Order, StoreSequence, OrderSequence, Product, InventoryBatch, InventoryTransaction
 
 # def generate_order_id():
@@ -131,3 +137,48 @@ def update_stock_after_order(order):
         item.cost_price = cost_price_at_sale
         item.gross_profit = gross_profit
         item.save(update_fields=["cost_price", "gross_profit"])
+
+
+
+
+def generate_phonepe_payment(obj):
+
+    payload = {
+        "merchantId": settings.PHONEPE_MERCHANT_ID,
+        "merchantTransactionId": str(obj.id),
+        "merchantUserId": str(obj.id),
+        "amount": 100 * 100,  # ₹100 → paise
+        "redirectUrl": f"https://yourdomain.com/payment-success/{obj.id}",
+        "redirectMode": "POST",
+        "callbackUrl": "https://yourdomain.com/api/phonepe/webhook/",
+        "mobileNumber": obj.mobile_number,
+        "paymentInstrument": {
+            "type": "PAY_PAGE"
+        }
+    }
+
+    #  Step 1: Convert to JSON string
+    payload_json = json.dumps(payload)
+
+    #  Step 2: Base64 encode
+    payload_base64 = base64.b64encode(payload_json.encode()).decode()
+
+    #  Step 3: Create checksum
+    string_to_hash = payload_base64 + "/pg/v1/pay" + settings.PHONEPE_SALT_KEY
+    sha256 = hashlib.sha256(string_to_hash.encode()).hexdigest()
+    checksum = sha256 + "###" + settings.PHONEPE_SALT_INDEX
+
+    #  Step 4: Headers
+    headers = {
+        "Content-Type": "application/json",
+        "X-VERIFY": checksum
+    }
+
+    #  Step 5: API Call
+    response = requests.post(
+        settings.PHONEPE_BASE_URL,
+        json={"request": payload_base64},
+        headers=headers
+    )
+
+    return response.json()

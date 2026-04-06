@@ -33,14 +33,15 @@ from db.models import Category, Product, Banner, PinCode, Store, WebBanner, \
     FlashSaleBanner, Order, User, Cart, OrderProducts, UserOTP, StoreClient, UserSession, ProductMedia, Tag, \
     OrderTimeLines, Coupons, CouponProduct, CouponCategory, CouponTag, AddressMaster, NotificationChannelConfig, \
     NotificationTemplate, OrderShippingDetails
-from db.models.user import AppVersionConfig, Visitor
-from enums.store import InventoryType, OrderStatus, NotificationChannel, NotificationEvent
+from db.models.user import AppVersionConfig, Visitor, BusinessOnboarding
+from enums.store import InventoryType, OrderStatus, NotificationChannel, NotificationEvent, PaymentStatus
 from mixins.drf_views import CustomResponse
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from utils.invoice_generator import generate_shipping_invoice
 from utils.notification import trigger_notification
-from utils.store import generate_lsin, generate_order_number, BO_STATUS_FLOW, update_stock_after_order
+from utils.store import generate_lsin, generate_order_number, BO_STATUS_FLOW, update_stock_after_order, \
+    generate_phonepe_payment
 from utils.user import generate_otp, send_otp_email, generate_username, generate_referral_code, \
      create_bucket_and_upload_logo
 from django.db.models import Sum, F, DecimalField, ExpressionWrapper
@@ -2854,7 +2855,8 @@ class AdminOrderDetailAPIView(APIView):
             ).prefetch_related(
                 "items__product__media",
                 "payments",
-                "timelines"
+                "timelines",
+                "shipping_details"
             ).get(
                 id=order_id,
                 store=store
@@ -2902,6 +2904,17 @@ class AdminOrderDetailAPIView(APIView):
         # ---------- Timelines ----------
         timelines = []
         coupon_details = {}
+        shipping_details = []
+        for s in order.shipping_details:
+            shipping_details.append(
+                {
+                    "courier_service": s.courier_service,
+                    "tracking_id": s.tracking_id,
+                    "tracking_url": s.tracking_url,
+                    "estimated_delivery_date": s.estimated_delivery_date,
+                    "remarks": s.remarks,
+                }
+            )
         for t in order.timelines.all():
             timelines.append({
                 "status": t.status,
@@ -2940,7 +2953,8 @@ class AdminOrderDetailAPIView(APIView):
                 },
                 "items": items,
                 "payments": payments,
-                "timelines": timelines
+                "timelines": timelines,
+                "shipping_details": shipping_details
             },
             description="Order details fetched successfully"
         )
@@ -4264,4 +4278,99 @@ class S3BucketAPIView(APIView):
 
 
 
+class BusinessOnboardingAPIView(APIView):
+
+    def post(self, request):
+
+        name = request.data.get("name")
+        email = request.data.get("email")
+        mobile = request.data.get("mobile")
+
+        #  Basic validation
+        if not name or not email or not mobile:
+            return CustomResponse.errorResponse(
+                description="name, email, mobile are required",
+            )
+
+        #  Create record
+        obj = BusinessOnboarding.objects.create(
+            business_email=email,
+            business_phone=mobile,
+            mobile_number=mobile,
+            payment_status=PaymentStatus.INITIATED
+        )
+
+        #  Call PhonePe
+        payment_response = generate_phonepe_payment(obj)
+
+        try:
+            payment_url = payment_response["data"]["instrumentResponse"]["redirectInfo"]["url"]
+        except Exception:
+            return CustomResponse.errorResponse(
+                description="Payment creation failed"
+            )
+
+        obj.payment_url = payment_url
+        obj.payment_status = PaymentStatus.PENDING
+        obj.save()
+
+        return CustomResponse.successResponse(
+            description= "Payment link generated",
+            data= {"payment_url": payment_url}
+        )
+
+
+
+
+class PhonePeWebhookAPIView(APIView):
+
+    def post(self, request):
+
+        data = request.data
+
+        transaction_id = data.get("merchantTransactionId")
+        phonepe_status = data.get("code")
+
+        #  Validate input
+        if not transaction_id:
+            return CustomResponse.errorResponse(
+                description="Invalid transaction_id"
+            )
+
+        try:
+            obj = BusinessOnboarding.objects.get(id=transaction_id)
+        except BusinessOnboarding.DoesNotExist:
+            return CustomResponse.errorResponse(
+                description="Record not found"
+            )
+
+        #  Idempotency (avoid duplicate updates)
+        if obj.payment_status == PaymentStatus.COMPLETED:
+            return CustomResponse.successResponse(
+                description="Already processed"
+            )
+
+        # Map PhonePe → Your statuses
+        if phonepe_status == "PAYMENT_SUCCESS":
+            obj.payment_status = PaymentStatus.COMPLETED
+
+        elif phonepe_status == "PAYMENT_ERROR":
+            obj.payment_status = PaymentStatus.FAILED
+
+        else:
+            obj.payment_status = PaymentStatus.CANCELLED
+
+        #  (Optional) store full response
+        if hasattr(obj, "payment_response"):
+            obj.payment_response = data
+
+        obj.save()
+
+        return CustomResponse.successResponse(
+            description="Webhook processed successfully",
+            data={
+                "transaction_id": str(obj.id),
+                "status": obj.payment_status
+            }
+        )
 
