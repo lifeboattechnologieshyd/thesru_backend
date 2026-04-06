@@ -157,6 +157,7 @@ def get_phonepe_client():
 
 
 def generate_phonepe_payment(obj):
+    print(" Generating PhonePe Payment for:", obj.id)
 
     client = get_phonepe_client()
 
@@ -167,5 +168,8 @@ def generate_phonepe_payment(obj):
         callback_url="https://sru-dev-api.dhuniya.in/api/backoffice/webhook/",
         mobile_number=obj.mobile_number
     )
+
+    print(" PhonePe API Raw Response:", response)
+
 
     return response
