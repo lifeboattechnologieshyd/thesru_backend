@@ -2751,13 +2751,13 @@ class OrderListAPIView(APIView):
             order.shipping_slip = shipping_slip_path
             order.save(update_fields=["shipping_slip"])
             context = {
-                "var": f"{order.order_number}|"
+                "var": f"{order.user.name}|{order.order_number[-5:]}|"
             }
 
             trigger_notification(order.store,
                                  NotificationEvent.ORDER_PACKED,
                                  context,
-                                 order.user.mobile, order.user.email)
+                                 order.user.mobile, order.user.email, order.user.name)
 
         # Timeline
         OrderTimeLines.objects.create(
@@ -2766,13 +2766,6 @@ class OrderListAPIView(APIView):
             remarks=remarks
         )
         if order.status == OrderStatus.SHIPPED:
-            context = {
-                "var": f"{order.order_number}|"
-            }
-            trigger_notification(order.store,
-                                 NotificationEvent.ORDER_SHIPPED,
-                                 context,
-                                 order.user.mobile, order.user.email)
             # todo: shipping to be tested.
             osd = OrderShippingDetails()
             osd.courier_service = request.data.get("courier", "POSTOFFICE")
@@ -2782,10 +2775,18 @@ class OrderListAPIView(APIView):
             osd.remarks = request.data.get("remarks", "")
             osd.order = order
             osd.save()
+            context = {
+                "var": f"{order.user.name}|{order.order_number[-5:]}|{osd.courier_service}|{osd.tracking_id}|"
+            }
+            trigger_notification(order.store,
+                                 NotificationEvent.ORDER_SHIPPED,
+                                 context,
+                                 order.user.mobile, order.user.email)
+
 
         elif order.status == OrderStatus.DELIVERED:
             context = {
-                "var": f"{order.order_number}|"
+                "var": f"{order.user.name}|{order.order_number[-5:]}|"
             }
             trigger_notification(order.store,
                                  NotificationEvent.ORDER_DELIVERED,
@@ -2796,51 +2797,6 @@ class OrderListAPIView(APIView):
             description="Order Updated successfully"
         )
 
-
-    # def put(self, request, id):
-    #     order = Order.objects.filter(
-    #         id=id
-    #     ).first()
-    #     if not order:
-    #         return CustomResponse().errorResponse(data={}, description="No order found with provided Id")
-    #     new_status = request.data.get("status")
-    #     remarks = request.data.get("remarks")
-    #
-    #     if not new_status:
-    #         return CustomResponse().errorResponse(data={}, description="status is required")
-    #
-    #     current_status = order.status
-    #     allowed_next = BO_STATUS_FLOW.get(current_status, [])
-    #     if new_status not in allowed_next:
-    #         return CustomResponse().errorResponse( data=
-    #             {
-    #                 "message": "Invalid status transition",
-    #                 "current_status": current_status,
-    #                 "allowed_next": allowed_next
-    #             },
-    #             description="Invalid status transition",
-    #         )
-    #     order.status = new_status
-    #     order.save()
-    #     if order.status == OrderStatus.PACKED:
-    #         shipping_slip_path = generate_shipping_invoice(order)
-    #         order.shipping_slip = shipping_slip_path
-    #         order.save(update_fields=["shipping_slip"])
-    #
-    #
-    #
-    #         #todo: generate shipping slip
-    #         # pass
-    #     OrderTimeLines.objects.create(
-    #         order=order,
-    #         status=new_status,
-    #         remarks=remarks
-    #     )
-    #     return CustomResponse.successResponse(
-    #         data={},
-    #         description="Order Updated successfully"
-    #     )
-    #
 
 
 class AdminOrderDetailAPIView(APIView):
