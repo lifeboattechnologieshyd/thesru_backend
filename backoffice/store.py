@@ -2764,7 +2764,7 @@ class OrderListAPIView(APIView):
             trigger_notification(order.store,
                                  NotificationEvent.ORDER_PACKED,
                                  context,
-                                 order.user.mobile, order.user.email, order.user.name)
+                                 order.user.mobile, order.user.email)
 
         # Timeline
         OrderTimeLines.objects.create(
