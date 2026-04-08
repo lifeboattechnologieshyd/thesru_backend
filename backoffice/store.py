@@ -1891,7 +1891,14 @@ class StoreAPIView(APIView):
         except Store.DoesNotExist:
             return CustomResponse.errorResponse(description="Store not found")
 
+
+        if isinstance(data, str):
+            data = json.loads(data)
+
         clients = data.get("clients", [])
+
+        if isinstance(clients, str):
+            clients = json.loads(clients)
 
         try:
             with transaction.atomic():
