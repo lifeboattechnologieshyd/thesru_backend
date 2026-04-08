@@ -1248,7 +1248,7 @@ class Webhook(APIView):
                             order=order
                         )
                     context = {
-                        "var": f"{order.order_number}|"
+                        "var": f"{order.user.name}|{order.order_number[-5:]}|"
                     }
                     trigger_notification(order.store,NotificationEvent.ORDER_PLACED, context, order.user.mobile, order.user.email)
                     trigger_notification(order.store,NotificationEvent.ADMIN_ORDER_RECEIVED, context, order.store.mobile, order.store.email)
