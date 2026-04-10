@@ -135,6 +135,7 @@ AWS_S3_REGION_NAME = os.environ.get("AWS_S3_REGION_NAME")
 AWS_S3_BUCKET = os.environ.get("AWS_S3_BUCKET")
 AWS_S3_ENDPOINT_URL = os.environ.get("AWS_S3_ENDPOINT_URL", None)  # Optional: set for MinIO
 AWS_S3_USE_SSL = os.environ.get("AWS_S3_USE_SSL", "True") == "True"  # Optional: set for MinIO
+AWS_S3_CUSTOM_DOMAIN = os.environ.get("AWS_CLOUDFRONT_DOMAIN")
 
 
 
@@ -151,6 +152,7 @@ STORAGES = {
             "bucket_name": AWS_S3_BUCKET,
             "endpoint_url": AWS_S3_ENDPOINT_URL if AWS_S3_ENDPOINT_URL else None,
             "use_ssl": AWS_S3_USE_SSL,
+            "custom_domain": AWS_S3_CUSTOM_DOMAIN,
         },
     },
     "staticfiles": {  # Static files
@@ -163,6 +165,7 @@ STORAGES = {
             "endpoint_url": AWS_S3_ENDPOINT_URL if AWS_S3_ENDPOINT_URL else None,
             "use_ssl": AWS_S3_USE_SSL,
             "location": "static",
+            "custom_domain": AWS_S3_CUSTOM_DOMAIN,
         },
     },
 }
