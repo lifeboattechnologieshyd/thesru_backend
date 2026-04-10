@@ -164,16 +164,13 @@ def generate_phonepe_payment(obj):
 
     client = get_phonepe_client()
 
-    request = StandardCheckoutPayRequest(
+    response = client.create_order(
         merchant_order_id=str(obj.id),
-        amount=10000,
-        payment_flow=PaymentFlow(
-            type="PG_CHECKOUT",
-            redirect_url=f"https://main.d2nx4g0mgnvr1s.amplifyapp.com/payment-success/{obj.id}"
-        )
+        amount=10000,  # in paisa
+        redirect_url=f"https://main.d2nx4g0mgnvr1s.amplifyapp.com/payment-success/{obj.id}",
+        callback_url="https://sru-dev-api.dhuniya.in/api/backoffice/webhook/",
+        mobile_number=obj.mobile_number
     )
-
-    response = client.pay(request)
 
     print("PhonePe Response:", response)
 
