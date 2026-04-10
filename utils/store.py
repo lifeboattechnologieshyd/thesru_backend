@@ -1,7 +1,8 @@
 import string
 import time
 import random
-
+from phonepe.sdk.pg.payments.v2.standard_checkout_client import StandardCheckoutClient
+from phonepe.sdk.pg.env import Env
 import base64
 import hashlib
 import json
@@ -140,45 +141,35 @@ def update_stock_after_order(order):
 
 
 
+def get_phonepe_client():
 
-def generate_phonepe_payment(obj):
+    env = Env.PRODUCTION if settings.PHONEPE_ENV == "PRODUCTION" else Env.SANDBOX
 
-    payload = {
-        "merchantId": settings.PHONEPE_MERCHANT_ID,
-        "merchantTransactionId": str(obj.id),
-        "merchantUserId": str(obj.id),
-        "amount": 100 * 100,  # ₹100 → paise
-        "redirectUrl": f"https://yourdomain.com/payment-success/{obj.id}",
-        "redirectMode": "POST",
-        "callbackUrl": "https://yourdomain.com/api/phonepe/webhook/",
-        "mobileNumber": obj.mobile_number,
-        "paymentInstrument": {
-            "type": "PAY_PAGE"
-        }
-    }
-
-    #  Step 1: Convert to JSON string
-    payload_json = json.dumps(payload)
-
-    #  Step 2: Base64 encode
-    payload_base64 = base64.b64encode(payload_json.encode()).decode()
-
-    #  Step 3: Create checksum
-    string_to_hash = payload_base64 + "/pg/v1/pay" + settings.PHONEPE_SALT_KEY
-    sha256 = hashlib.sha256(string_to_hash.encode()).hexdigest()
-    checksum = sha256 + "###" + settings.PHONEPE_SALT_INDEX
-
-    #  Step 4: Headers
-    headers = {
-        "Content-Type": "application/json",
-        "X-VERIFY": checksum
-    }
-
-    #  Step 5: API Call
-    response = requests.post(
-        settings.PHONEPE_BASE_URL,
-        json={"request": payload_base64},
-        headers=headers
+    client = StandardCheckoutClient.get_instance(
+        client_id=settings.PHONEPE_CLIENT_ID,
+        client_secret=settings.PHONEPE_CLIENT_SECRET,
+        client_version=int(settings.PHONEPE_CLIENT_VERSION),
+        env=env,
+        should_publish_events=False
     )
 
-    return response.json()
+    return client
+
+
+def generate_phonepe_payment(obj):
+    print(" Generating PhonePe Payment for:", obj.id)
+
+    client = get_phonepe_client()
+
+    response = client.create_payment(
+        merchant_transaction_id=str(obj.id),
+        amount=10000,  # ₹100
+        redirect_url=f"https://main.d2nx4g0mgnvr1s.amplifyapp.com/payment-success/{obj.id}",
+        callback_url="https://sru-dev-api.dhuniya.in/api/backoffice/webhook/",
+        mobile_number=obj.mobile_number
+    )
+
+    print(" PhonePe API Raw Response:", response)
+
+
+    return response

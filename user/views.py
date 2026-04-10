@@ -281,6 +281,9 @@ class ProfileUpdate(APIView):
 
 
 
+
+
+
 # class FileUploadView(APIView):
 #     permission_classes = [AllowAny]
 #     parser_classes = [MultiPartParser, FormParser]
@@ -288,36 +291,54 @@ class ProfileUpdate(APIView):
 #     def post(self, request, *args, **kwargs):
 #         files = request.FILES.getlist("files")
 #         path = request.data.get("path", "temp")
+#         store = request.store
+#
+#         if not store.aws_bucket_name:
+#             return CustomResponse().errorResponse(
+#                 description="Store S3 bucket not configured"
+#             )
 #
 #         if not files:
-#             return CustomResponse().successResponse(
-#                 {"error": "No file was provided."}, status=status.HTTP_400_BAD_REQUEST
+#             return CustomResponse().errorResponse(
+#                 description="No file was provided"
 #             )
 #
+#         storage = StoreS3Storage(bucket_name=store.aws_bucket_name)
 #         uploaded_files = []
 #
-#         try:
-#             for file_obj in files:
-#                 # Save each file to the default storage
-#                 sanitized_filename = add_unique_suffix_to_filename(sanitize_filename(file_obj.name))
-#
-#                 file_path = default_storage.save(f"{path}/{sanitized_filename}", ContentFile(file_obj.read()))
-#                 file_url = settings.MEDIA_URL + file_path
-#                 uploaded_files.append(
-#                     {"original_filename": file_obj.name, "file_url": file_url, "file_path": file_path}
-#                 )
-#
-#             return CustomResponse().successResponse(uploaded_files, status=status.HTTP_201_CREATED)
-#
-#         except Exception as e:
-#             return CustomResponse().errorResponse(
-#                 {"error": str(e)}, description="File upload failed", status=status.HTTP_400_BAD_REQUEST
+#         for file_obj in files:
+#             filename = add_unique_suffix_to_filename(
+#                 sanitize_filename(file_obj.name)
 #             )
-
+#
+#             file_path = storage.save(
+#                 f"{path}/{filename}",
+#                 ContentFile(file_obj.read())
+#             )
+#
+#             file_url = storage.url(file_path)
+#
+#             uploaded_files.append({
+#                 "original_filename": file_obj.name,
+#                 "file_path": file_path,
+#                 "file_url": file_url
+#             })
+#
+#         return CustomResponse().successResponse(
+#             data=uploaded_files,
+#             description="Files uploaded successfully"
+#         )
 
 class FileUploadView(APIView):
     permission_classes = [AllowAny]
     parser_classes = [MultiPartParser, FormParser]
+
+    def get_file_url(self, store, file_path):
+        if store.cloudfront_domain:
+            return f"https://{store.cloudfront_domain}/{file_path}"
+        elif store.aws_bucket_name:
+            return f"https://{store.aws_bucket_name}.s3.amazonaws.com/{file_path}"
+        return None
 
     def post(self, request, *args, **kwargs):
         files = request.FILES.getlist("files")
@@ -347,7 +368,7 @@ class FileUploadView(APIView):
                 ContentFile(file_obj.read())
             )
 
-            file_url = storage.url(file_path)
+            file_url = self.get_file_url(store, file_path)
 
             uploaded_files.append({
                 "original_filename": file_obj.name,

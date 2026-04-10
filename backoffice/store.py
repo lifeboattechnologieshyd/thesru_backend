@@ -33,7 +33,7 @@ from db.models import Category, Product, Banner, PinCode, Store, WebBanner, \
     FlashSaleBanner, Order, User, Cart, OrderProducts, UserOTP, StoreClient, UserSession, ProductMedia, Tag, \
     OrderTimeLines, Coupons, CouponProduct, CouponCategory, CouponTag, AddressMaster, NotificationChannelConfig, \
     NotificationTemplate, OrderShippingDetails
-from db.models.user import AppVersionConfig, Visitor, BusinessOnboarding
+from db.models.user import AppVersionConfig, Visitor, BusinessOnboarding, PaymentTransaction
 from enums.store import InventoryType, OrderStatus, NotificationChannel, NotificationEvent, PaymentStatus
 from mixins.drf_views import CustomResponse
 from rest_framework_simplejwt.tokens import RefreshToken
@@ -41,7 +41,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from utils.invoice_generator import generate_shipping_invoice
 from utils.notification import trigger_notification
 from utils.store import generate_lsin, generate_order_number, BO_STATUS_FLOW, update_stock_after_order, \
-    generate_phonepe_payment
+    generate_phonepe_payment, get_phonepe_client
 from utils.user import generate_otp, send_otp_email, generate_username, generate_referral_code, \
      create_bucket_and_upload_logo
 from django.db.models import Sum, F, DecimalField, ExpressionWrapper
@@ -1891,7 +1891,14 @@ class StoreAPIView(APIView):
         except Store.DoesNotExist:
             return CustomResponse.errorResponse(description="Store not found")
 
+
+        if isinstance(data, str):
+            data = json.loads(data)
+
         clients = data.get("clients", [])
+
+        if isinstance(clients, str):
+            clients = json.loads(clients)
 
         try:
             with transaction.atomic():
@@ -2751,7 +2758,7 @@ class OrderListAPIView(APIView):
             order.shipping_slip = shipping_slip_path
             order.save(update_fields=["shipping_slip"])
             context = {
-                "var": f"{order.order_number}|"
+                "var": f"{order.user.name}|{order.order_number[-5:]}|"
             }
 
             trigger_notification(order.store,
@@ -2766,13 +2773,6 @@ class OrderListAPIView(APIView):
             remarks=remarks
         )
         if order.status == OrderStatus.SHIPPED:
-            context = {
-                "var": f"{order.order_number}|"
-            }
-            trigger_notification(order.store,
-                                 NotificationEvent.ORDER_SHIPPED,
-                                 context,
-                                 order.user.mobile, order.user.email)
             # todo: shipping to be tested.
             osd = OrderShippingDetails()
             osd.courier_service = request.data.get("courier", "POSTOFFICE")
@@ -2782,10 +2782,18 @@ class OrderListAPIView(APIView):
             osd.remarks = request.data.get("remarks", "")
             osd.order = order
             osd.save()
+            context = {
+                "var": f"{order.user.name}|{order.order_number[-5:]}|{osd.courier_service}|{osd.tracking_id}|"
+            }
+            trigger_notification(order.store,
+                                 NotificationEvent.ORDER_SHIPPED,
+                                 context,
+                                 order.user.mobile, order.user.email)
+
 
         elif order.status == OrderStatus.DELIVERED:
             context = {
-                "var": f"{order.order_number}|"
+                "var": f"{order.user.name}|{order.order_number[-5:]}|"
             }
             trigger_notification(order.store,
                                  NotificationEvent.ORDER_DELIVERED,
@@ -2796,51 +2804,6 @@ class OrderListAPIView(APIView):
             description="Order Updated successfully"
         )
 
-
-    # def put(self, request, id):
-    #     order = Order.objects.filter(
-    #         id=id
-    #     ).first()
-    #     if not order:
-    #         return CustomResponse().errorResponse(data={}, description="No order found with provided Id")
-    #     new_status = request.data.get("status")
-    #     remarks = request.data.get("remarks")
-    #
-    #     if not new_status:
-    #         return CustomResponse().errorResponse(data={}, description="status is required")
-    #
-    #     current_status = order.status
-    #     allowed_next = BO_STATUS_FLOW.get(current_status, [])
-    #     if new_status not in allowed_next:
-    #         return CustomResponse().errorResponse( data=
-    #             {
-    #                 "message": "Invalid status transition",
-    #                 "current_status": current_status,
-    #                 "allowed_next": allowed_next
-    #             },
-    #             description="Invalid status transition",
-    #         )
-    #     order.status = new_status
-    #     order.save()
-    #     if order.status == OrderStatus.PACKED:
-    #         shipping_slip_path = generate_shipping_invoice(order)
-    #         order.shipping_slip = shipping_slip_path
-    #         order.save(update_fields=["shipping_slip"])
-    #
-    #
-    #
-    #         #todo: generate shipping slip
-    #         # pass
-    #     OrderTimeLines.objects.create(
-    #         order=order,
-    #         status=new_status,
-    #         remarks=remarks
-    #     )
-    #     return CustomResponse.successResponse(
-    #         data={},
-    #         description="Order Updated successfully"
-    #     )
-    #
 
 
 class AdminOrderDetailAPIView(APIView):
@@ -4281,17 +4244,20 @@ class BusinessOnboardingAPIView(APIView):
 
     def post(self, request):
 
+        print(" Incoming Request Data:", request.data)
+
         name = request.data.get("name")
         email = request.data.get("email")
         mobile = request.data.get("mobile")
 
-        #  Basic validation
+        # Validation
         if not name or not email or not mobile:
+            print(" Validation Failed")
             return CustomResponse.errorResponse(
                 description="name, email, mobile are required",
             )
 
-        #  Create record
+        # Create record
         obj = BusinessOnboarding.objects.create(
             business_email=email,
             business_phone=mobile,
@@ -4299,12 +4265,18 @@ class BusinessOnboardingAPIView(APIView):
             payment_status=PaymentStatus.INITIATED
         )
 
-        #  Call PhonePe
+        print(" BusinessOnboarding Created:", obj.id)
+
+        # Call PhonePe
         payment_response = generate_phonepe_payment(obj)
 
+        print(" PhonePe Response:", payment_response)
+
         try:
-            payment_url = payment_response["data"]["instrumentResponse"]["redirectInfo"]["url"]
-        except Exception:
+            payment_url = payment_response["data"]["redirectUrl"]
+            print("🔗 Payment URL:", payment_url)
+        except Exception as e:
+            print(" Payment URL Extraction Failed:", str(e))
             return CustomResponse.errorResponse(
                 description="Payment creation failed"
             )
@@ -4313,10 +4285,14 @@ class BusinessOnboardingAPIView(APIView):
         obj.payment_status = PaymentStatus.PENDING
         obj.save()
 
+        print(" Saved Payment URL & Status (PENDING)")
+
         return CustomResponse.successResponse(
-            description= "Payment link generated",
-            data= {"payment_url": payment_url}
+            description="Payment link generated",
+            data={"payment_url": payment_url}
         )
+
+
 
 
 
@@ -4325,51 +4301,74 @@ class PhonePeWebhookAPIView(APIView):
 
     def post(self, request):
 
-        data = request.data
+        print(" Webhook HIT")
+        print(" Headers:", request.headers)
+        print(" Raw Body:", request.body.decode("utf-8"))
 
-        transaction_id = data.get("merchantTransactionId")
-        phonepe_status = data.get("code")
-
-        #  Validate input
-        if not transaction_id:
-            return CustomResponse.errorResponse(
-                description="Invalid transaction_id"
-            )
+        client = get_phonepe_client()
 
         try:
-            obj = BusinessOnboarding.objects.get(id=transaction_id)
-        except BusinessOnboarding.DoesNotExist:
-            return CustomResponse.errorResponse(
-                description="Record not found"
+            callback_response = client.validate_callback(
+                username="YOUR_USERNAME",
+                password="YOUR_PASSWORD",
+                callback_header_data=request.headers.get("Authorization"),
+                callback_response_data=request.body.decode("utf-8")
             )
+            print(" Webhook Validation Success")
 
-        #  Idempotency (avoid duplicate updates)
-        if obj.payment_status == PaymentStatus.COMPLETED:
-            return CustomResponse.successResponse(
-                description="Already processed"
+        except Exception as e:
+            print(" Webhook Validation Failed:", str(e))
+            return CustomResponse.errorResponse(description="Invalid webhook")
+
+        event = callback_response.type
+        payload = callback_response.payload
+
+        print(" Event:", event)
+        print(" Payload:", payload)
+
+        merchant_txn_id = payload.originalMerchantOrderId
+        print(" Merchant Transaction ID:", merchant_txn_id)
+
+        try:
+            txn = PaymentTransaction.objects.get(
+                merchant_transaction_id=merchant_txn_id
             )
+            print(" Transaction Found:", txn.id)
 
-        # Map PhonePe → Your statuses
-        if phonepe_status == "PAYMENT_SUCCESS":
-            obj.payment_status = PaymentStatus.COMPLETED
+        except PaymentTransaction.DoesNotExist:
+            print(" Transaction NOT Found")
+            return CustomResponse.errorResponse(description="Transaction not found")
 
-        elif phonepe_status == "PAYMENT_ERROR":
-            obj.payment_status = PaymentStatus.FAILED
+        # Idempotency
+        if txn.status == PaymentStatus.COMPLETED:
+            print(" Already Completed, Skipping Update")
+            return CustomResponse.successResponse(description="Already processed")
+
+        # Update status
+        if event == "checkout.order.completed":
+            txn.status = PaymentStatus.COMPLETED
+            txn.onboarding.payment_status = PaymentStatus.COMPLETED
+            print("Payment COMPLETED")
+
+        elif event == "checkout.order.failed":
+            txn.status = PaymentStatus.FAILED
+            txn.onboarding.payment_status = PaymentStatus.FAILED
+            print(" Payment FAILED")
 
         else:
-            obj.payment_status = PaymentStatus.CANCELLED
+            txn.status = PaymentStatus.CANCELLED
+            txn.onboarding.payment_status = PaymentStatus.CANCELLED
+            print(" Payment CANCELLED")
 
-        #  (Optional) store full response
-        if hasattr(obj, "payment_response"):
-            obj.payment_response = data
+        txn.phonepe_transaction_id = getattr(payload, "orderId", None)
+        txn.response_data = request.data
 
-        obj.save()
+        txn.save()
+        txn.onboarding.save()
+
+        print("Transaction & Onboarding Updated")
 
         return CustomResponse.successResponse(
-            description="Webhook processed successfully",
-            data={
-                "transaction_id": str(obj.id),
-                "status": obj.payment_status
-            }
+            data={},
+            description="Webhook processed"
         )
-

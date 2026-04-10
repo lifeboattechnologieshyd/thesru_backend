@@ -42,6 +42,8 @@ class Store(AuditModel):
     email_login = models.BooleanField(default=True)
     mobile_login = models.BooleanField(default=True)
     aws_bucket_name = models.CharField(max_length=50, null=True, blank=True)
+    cloudfront_domain = models.CharField(max_length=50, null=True, blank=True)
+
     # bo_title = models.CharField(max_length=50, null=True, blank=True)
     # bo_subtitle = models.CharField(max_length=50, null=True, blank=True)
     # highlights = ArrayField(models.CharField(max_length=50, ), blank=True, null=True)
@@ -471,6 +473,36 @@ class BusinessOnboarding(AuditModel):
 
     class Meta:
         db_table = "business_onboarding"
+
+
+class PaymentTransaction(AuditModel):
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+
+    onboarding = models.ForeignKey(
+        BusinessOnboarding,
+        on_delete=models.CASCADE,
+        related_name="transactions"
+    )
+
+    merchant_transaction_id = models.CharField(max_length=255, unique=True)
+
+    phonepe_transaction_id = models.CharField(max_length=255, null=True, blank=True)
+
+    amount = models.IntegerField()
+
+    status = models.CharField(
+        max_length=20,
+        choices=PaymentStatus.choices,
+        default=PaymentStatus.INITIATED
+    )
+
+    payment_url = models.TextField(null=True, blank=True)
+
+    response_data = models.JSONField(null=True, blank=True)
+
+    class Meta:
+        db_table = "payment_transaction"
 
 
 
