@@ -4241,6 +4241,8 @@ class S3BucketAPIView(APIView):
 
 
 class BusinessOnboardingAPIView(APIView):
+    permission_classes = [AllowAny]
+
 
     def post(self, request):
 
