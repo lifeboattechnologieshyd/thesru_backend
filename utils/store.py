@@ -159,19 +159,42 @@ def get_phonepe_client():
     return client
 
 
+import requests
+import base64
+import json
+import hashlib
+
 def generate_phonepe_payment(obj):
-    print("Generating PhonePe Payment for:", obj.id)
+    url = "https://api-preprod.phonepe.com/apis/hermes/pg/v1/pay"
 
-    client = get_phonepe_client()
+    payload = {
+        "merchantId": settings.PHONEPE_MERCHANT_ID,
+        "merchantTransactionId": str(obj.id),
+        "amount": 10000,
+        "redirectUrl": f"https://main.d2nx4g0mgnvr1s.amplifyapp.com/payment-success/{obj.id}",
+        "redirectMode": "POST",
+        "callbackUrl": "https://sru-dev-api.dhuniya.in/api/backoffice/webhook/",
+        "mobileNumber": obj.mobile_number,
+        "paymentInstrument": {
+            "type": "PAY_PAGE"
+        }
+    }
 
-    response = client.create_order(
-        merchant_order_id=str(obj.id),
-        amount=10000,  # in paisa
-        redirect_url=f"https://main.d2nx4g0mgnvr1s.amplifyapp.com/payment-success/{obj.id}",
-        callback_url="https://sru-dev-api.dhuniya.in/api/backoffice/webhook/",
-        mobile_number=obj.mobile_number
-    )
+    payload_str = json.dumps(payload)
+    payload_base64 = base64.b64encode(payload_str.encode()).decode()
 
-    print("PhonePe Response:", response)
+    string = payload_base64 + "/pg/v1/pay" + settings.PHONEPE_SALT_KEY
+    sha256 = hashlib.sha256(string.encode()).hexdigest()
 
-    return response
+    x_verify = sha256 + "###" + settings.PHONEPE_SALT_INDEX
+
+    headers = {
+        "Content-Type": "application/json",
+        "X-VERIFY": x_verify
+    }
+
+    response = requests.post(url, json={"request": payload_base64}, headers=headers)
+
+    print("PhonePe Response:", response.json())
+
+    return response.json()
