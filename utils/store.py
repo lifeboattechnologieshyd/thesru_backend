@@ -157,19 +157,18 @@ def get_phonepe_client():
 
 
 def generate_phonepe_payment(obj):
-    print(" Generating PhonePe Payment for:", obj.id)
+    print("Generating PhonePe Payment for:", obj.id)
 
     client = get_phonepe_client()
 
-    response = client.create_payment(
-        merchant_transaction_id=str(obj.id),
-        amount=10000,  # ₹100
+    response = client.initiate_payment(
+        merchant_order_id=str(obj.id),
+        amount=10000,  # paisa
         redirect_url=f"https://main.d2nx4g0mgnvr1s.amplifyapp.com/payment-success/{obj.id}",
         callback_url="https://sru-dev-api.dhuniya.in/api/backoffice/webhook/",
         mobile_number=obj.mobile_number
     )
 
-    print(" PhonePe API Raw Response:", response)
-
+    print("PhonePe API Raw Response:", response)
 
     return response
