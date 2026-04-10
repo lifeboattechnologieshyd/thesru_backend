@@ -1,6 +1,8 @@
 import string
 import time
 import random
+
+from phonepe.sdk.pg.payments.v2.models.request.standard_checkout_pay_request import StandardCheckoutPayRequest
 from phonepe.sdk.pg.payments.v2.standard_checkout_client import StandardCheckoutClient
 from phonepe.sdk.pg.env import Env
 import base64
@@ -161,14 +163,16 @@ def generate_phonepe_payment(obj):
 
     client = get_phonepe_client()
 
-    response = client.initiate_payment(
+    request = StandardCheckoutPayRequest(
         merchant_order_id=str(obj.id),
-        amount=10000,  # paisa
+        amount=10000,  # in paisa
         redirect_url=f"https://main.d2nx4g0mgnvr1s.amplifyapp.com/payment-success/{obj.id}",
         callback_url="https://sru-dev-api.dhuniya.in/api/backoffice/webhook/",
         mobile_number=obj.mobile_number
     )
 
-    print("PhonePe API Raw Response:", response)
+    response = client.pay(request)
+
+    print("PhonePe Response:", response)
 
     return response
