@@ -4275,8 +4275,9 @@ class BusinessOnboardingAPIView(APIView):
         print(" PhonePe Response:", payment_response)
 
         try:
-            payment_url = payment_response["data"]["redirectUrl"]
+            payment_url = payment_response.redirect_url
             print("🔗 Payment URL:", payment_url)
+
         except Exception as e:
             print(" Payment URL Extraction Failed:", str(e))
             return CustomResponse.errorResponse(
