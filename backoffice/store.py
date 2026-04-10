@@ -4275,8 +4275,18 @@ class BusinessOnboardingAPIView(APIView):
         print(" PhonePe Response:", payment_response)
 
         try:
-            payment_url = payment_response.redirect_url
+            # if response is dict
+            if isinstance(payment_response, dict):
+                payment_url = payment_response.get("redirectUrl")
+
+            # if response is object
+            else:
+                payment_url = getattr(payment_response, "redirect_url", None)
+
             print("🔗 Payment URL:", payment_url)
+
+            if not payment_url:
+                raise Exception("Payment URL not found")
 
         except Exception as e:
             print(" Payment URL Extraction Failed:", str(e))
