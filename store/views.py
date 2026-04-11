@@ -2309,7 +2309,7 @@ class UserCouponListAPIView(APIView):
             store=store,
             user=request.user,
             status__in=[
-                OrderStatus.CONFIRMED,
+                # OrderStatus.CONFIRMED,
                 OrderStatus.DELIVERED
             ]
         ).exists()
