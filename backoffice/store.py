@@ -2542,6 +2542,7 @@ class OrderListAPIView(APIView):
         page_size = int(request.query_params.get("page_size", 20))
         status_filter = request.query_params.get("status")
         search = request.query_params.get("search")
+        user_id = request.query_params.get("user_id")
 
         queryset = Order.objects.filter(
             store=store
@@ -2561,6 +2562,10 @@ class OrderListAPIView(APIView):
         if search:
             queryset = queryset.filter(
                 order_number__icontains=search
+            )
+        if user_id:
+            queryset = queryset.filter(
+                user_id=user_id
             )
 
         total = queryset.count()
