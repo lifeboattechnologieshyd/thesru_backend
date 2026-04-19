@@ -1066,7 +1066,7 @@ def initiateOrder(user, amount, order, store):
         "customer_details": {
             "customer_id": str(user.id),
             "customer_phone": str(user.mobile),
-            "customer_name": str(user.username),
+            "customer_name": str(user.name),
         },
         "order_meta": {
             "notify_url": settings.CASHFREE_WEBHOOK,
@@ -2073,7 +2073,7 @@ class Reviews(APIView):
                 "review_id": review.id,
                 "user": {
                     "id": review.user.id,
-                    "name": review.user.username,
+                    "name": review.user.name,
                     "profile_image": review.user.profile_image
                 },
                 "rating": review.rating,

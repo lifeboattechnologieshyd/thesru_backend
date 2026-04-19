@@ -86,7 +86,7 @@ class User(AbstractBaseUser):
         blank=True
     )
     name = models.CharField(max_length=30, null=True)
-    username = models.CharField(max_length=30, unique=True)
+    # username = models.CharField(max_length=30, unique=True)
     user_role = ArrayField(models.CharField(max_length=50, ), blank=True, null=True)
     profile_image = models.CharField(max_length=400, null=True)
     email = models.EmailField(max_length=100, null=True)
@@ -118,7 +118,7 @@ class User(AbstractBaseUser):
 
     objects = CustomUserManager()
 
-    USERNAME_FIELD = "username"
+    USERNAME_FIELD = "id"
     REQUIRED_FIELDS = []
 
     class Meta:
