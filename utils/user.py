@@ -27,15 +27,15 @@ from mixins.drf_views import CustomResponse
 #         return generate_username(user)
 #     return username
 
-def generate_username():
-    """
-    Generates a unique username using random UUID
-    """
-    while True:
-        username = uuid.uuid4().hex[:6]   # short random string
-
-        if not User.objects.filter(username=username).exists():
-            return username
+# def generate_username():
+#     """
+#     Generates a unique username using random UUID
+#     """
+#     while True:
+#         username = uuid.uuid4().hex[:6]   # short random string
+#
+#         if not User.objects.filter(username=username).exists():
+#             return username
 
 def generate_referral_code():
     """
@@ -201,7 +201,7 @@ def send_order_created_admin_email(order):
 New order created
 
 Order Number: {order.order_number}
-Customer: {order.user.username}
+Customer: {order.user.name}
 Amount: ₹{order.amount}
 """
 

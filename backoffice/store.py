@@ -42,7 +42,7 @@ from utils.invoice_generator import generate_shipping_invoice
 from utils.notification import trigger_notification
 from utils.store import generate_lsin, generate_order_number, BO_STATUS_FLOW, update_stock_after_order, \
     generate_phonepe_payment, get_phonepe_client
-from utils.user import generate_otp, send_otp_email, generate_username, generate_referral_code, \
+from utils.user import generate_otp, send_otp_email, generate_referral_code, \
      create_bucket_and_upload_logo
 from django.db.models import Sum, F, DecimalField, ExpressionWrapper
 
@@ -141,7 +141,7 @@ class Login(APIView):
                     "user": {
                         "id": str(user.id),
                         "mobile": user.mobile,
-                        "username": user.username,
+                        "username": user.name,
                         "referral_code": user.referral_code,
                         "device_id": user.device_id,
                         "store_id": user.store.id
@@ -255,9 +255,9 @@ class EmailVerifyOTPView(APIView):
 
 
 
-        # Ensure required fields
-        if not user.username:
-            user.username = generate_username(user)
+        # # Ensure required fields
+        # if not user.name:
+        #     user.name = generate_username(user)
 
         if not user.referral_code:
             user.referral_code = generate_referral_code()
@@ -293,7 +293,7 @@ class EmailVerifyOTPView(APIView):
                 "user": {
                     "id": str(user.id),
                     "email": user.email,
-                    "username": user.username,
+                    "username": user.name,
                     "referral_code": user.referral_code,
                     "device_id": user.device_id,
                     "store_id": str(store.id)
@@ -388,7 +388,7 @@ class UserAPIView(APIView):
 
         return CustomResponse().successResponse(data={
             "id":users_qs.id,
-            "username": users_qs.username,
+            "username": users_qs.name,
             "name": users_qs.name,
             "mobile": users_qs.mobile,
             "email": users_qs.email,
@@ -2483,12 +2483,12 @@ class CartListView(APIView):
             user_ids = {cart["user_id"] for cart in carts}
 
             users = User.objects.filter(id__in=user_ids).values(
-                "id", "username", "mobile", "email"
+                "id", "name", "mobile", "email"
             )
 
             user_map = {
                 user["id"]: {
-                    "username": user["username"],
+                    "username": user["name"],
                     "mobile": user["mobile"],
                     "email": user["email"],
                 }
@@ -2542,6 +2542,7 @@ class OrderListAPIView(APIView):
         page_size = int(request.query_params.get("page_size", 20))
         status_filter = request.query_params.get("status")
         search = request.query_params.get("search")
+        user_id = request.query_params.get("user_id")
 
         queryset = Order.objects.filter(
             store=store
@@ -2561,6 +2562,10 @@ class OrderListAPIView(APIView):
         if search:
             queryset = queryset.filter(
                 order_number__icontains=search
+            )
+        if user_id:
+            queryset = queryset.filter(
+                user_id=user_id
             )
 
         total = queryset.count()

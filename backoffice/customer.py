@@ -19,13 +19,13 @@ class CustomerCreation(APIView):
         customer = User.objects.filter(mobile=data.get("mobile"), store=store).first()
         if customer:
             return CustomResponse().errorResponse(data={}, description="Customer with same mobile number already Exists")
-        username = User.objects.filter(username=data.get("name"), store=store).first()
-        if username:
-            return CustomResponse().errorResponse(data={}, description="this username is not available")
+        # username = User.objects.filter(username=data.get("name"), store=store).first()
+        # if username:
+        #     return CustomResponse().errorResponse(data={}, description="this username is not available")
         new_customer = User.objects.create(
             mobile=data.get("mobile"),
             store=request.store,
-            username=data.get("name"),
+            # username=data.get("name"),
             name=data.get("name"),
             referral_code=generate_referral_code(),
             created_by='ADMIN - '+ user.mobile,
