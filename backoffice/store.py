@@ -4287,31 +4287,25 @@ class BusinessOnboardingAPIView(APIView):
         print("SALT_INDEX:", getattr(settings, "PHONEPE_SALT_INDEX", None))
         print("ENV:", getattr(settings, "PHONEPE_ENV", None))
 
-        # 💳 Call PhonePe API
         print("\n--- Calling PhonePe ---")
-        payment_response = create_phonepe_payment(obj)
-        print(" Raw PhonePe Response:", payment_response)
-        print(" Response Type:", type(payment_response))
 
-        #  Handle API failure
-        if not payment_response or not payment_response.get("success"):
-            print(" PhonePe API Failed")
-            print("Error Code:", payment_response.get("code"))
-            print("Error Message:", payment_response.get("message"))
-
-            return CustomResponse.errorResponse(
-                description=payment_response.get("message", "Payment creation failed")
-            )
-
-        # 🔗 Extract payment URL safely
         try:
-            payment_url = payment_response["data"]["instrumentResponse"]["redirectInfo"]["url"]
-            print("🔗 Payment URL Extracted:", payment_url)
+            payment_response = create_phonepe_payment(obj)
+
+            print(" Raw PhonePe Response:", payment_response)
+
+            payment_url = payment_response.get("redirect_url")
+
+            if not payment_url:
+                print(" No redirect URL found")
+                return CustomResponse.errorResponse(
+                    description="Payment creation failed"
+                )
+
+            print("🔗 Payment URL:", payment_url)
 
         except Exception as e:
-            print(" URL Extraction Failed:", str(e))
-            print(" Full Response:", payment_response)
-
+            print(" PhonePe Exception:", str(e))
             return CustomResponse.errorResponse(
                 description="Payment creation failed"
             )

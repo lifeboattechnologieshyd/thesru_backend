@@ -200,62 +200,105 @@ def update_stock_after_order(order):
 #     return response.json()
 
 
-# payments/services/phonepe.py
 
-import requests
+# import requests
+# from django.conf import settings
+#
+#
+# def get_phonepe_token():
+#     url = "https://api-preprod.phonepe.com/apis/pg-sandbox/v1/oauth/token"
+#
+#     payload = {
+#         "client_id": settings.PHONEPE_CLIENT_ID,
+#         "client_secret": settings.PHONEPE_CLIENT_SECRET,
+#         "client_version": "1",
+#         "grant_type": "client_credentials"
+#     }
+#
+#     headers = {
+#         "Content-Type": "application/x-www-form-urlencoded"
+#     }
+#
+#     response = requests.post(url, data=payload, headers=headers)
+#
+#     print("TOKEN STATUS:", response.status_code)
+#     print("TOKEN RESPONSE:", response.text)
+#
+#     return response.json().get("access_token")
+#
+# def create_phonepe_payment(obj):
+#     token = get_phonepe_token()
+#
+#     url = "https://api-preprod.phonepe.com/apis/pg-sandbox/v2/payments"
+#
+#     headers = {
+#         "Authorization": f"O-Bearer {token}",
+#         "Content-Type": "application/json"
+#     }
+#
+#     payload = {
+#         "merchantOrderId": str(obj.id),
+#         "amount": 10000,
+#         "expireAfter": 1200,
+#         "metaInfo": {
+#             "udf1": "test"
+#         },
+#         "paymentFlow": {
+#             "type": "PG_CHECKOUT",
+#             "message": "Payment for onboarding",
+#             "merchantUrls": {
+#                 "redirectUrl": "https://google.com"
+#             }
+#         }
+#     }
+#
+#     response = requests.post(url, json=payload, headers=headers)
+#
+#     print("STATUS:", response.status_code)
+#     print("RESPONSE:", response.text)
+#
+#     return response.json()
+
+from phonepe.sdk.pg.payments.v2.standard_checkout_client import StandardCheckoutClient
+from phonepe.sdk.pg.env import Env
 from django.conf import settings
 
 
-def get_phonepe_token():
-    url = "https://api-preprod.phonepe.com/apis/pg-sandbox/v1/oauth/token"
+def get_phonepe_client():
+    client = StandardCheckoutClient.get_instance(
+        client_id=settings.PHONEPE_CLIENT_ID,
+        client_secret=settings.PHONEPE_CLIENT_SECRET,
+        client_version=int(settings.PHONEPE_CLIENT_VERSION),
+        env=Env.SANDBOX,  # change to PRODUCTION later
+        should_publish_events=False
+    )
+    return client
 
-    payload = {
-        "client_id": settings.PHONEPE_CLIENT_ID,
-        "client_secret": settings.PHONEPE_CLIENT_SECRET,
-        "client_version": "1",
-        "grant_type": "client_credentials"
-    }
+from phonepe.sdk.pg.payments.v2.models.request.standard_checkout_pay_request import StandardCheckoutPayRequest
+from phonepe.sdk.pg.common.models.request.meta_info import MetaInfo
 
-    headers = {
-        "Content-Type": "application/x-www-form-urlencoded"
-    }
-
-    response = requests.post(url, data=payload, headers=headers)
-
-    print("TOKEN STATUS:", response.status_code)
-    print("TOKEN RESPONSE:", response.text)
-
-    return response.json().get("access_token")
 
 def create_phonepe_payment(obj):
-    token = get_phonepe_token()
+    client = get_phonepe_client()
 
-    url = "https://api-preprod.phonepe.com/apis/pg-sandbox/v2/payments"
+    print("🔹 Creating PhonePe Payment for:", obj.id)
 
-    headers = {
-        "Authorization": f"O-Bearer {token}",
-        "Content-Type": "application/json"
+    meta_info = MetaInfo(udf1="onboarding")
+
+    request = StandardCheckoutPayRequest.build_request(
+        merchant_order_id=str(obj.id),
+        amount=10000,  # paisa
+        redirect_url="https://google.com",
+        meta_info=meta_info,
+        message="Payment for onboarding",
+        expire_after=3600
+    )
+
+    response = client.pay(request)
+
+    print("🔹 SDK Response:", response)
+
+    return {
+        "redirect_url": response.redirect_url,
+        "order_id": response.order_id
     }
-
-    payload = {
-        "merchantOrderId": str(obj.id),
-        "amount": 10000,
-        "expireAfter": 1200,
-        "metaInfo": {
-            "udf1": "test"
-        },
-        "paymentFlow": {
-            "type": "PG_CHECKOUT",
-            "message": "Payment for onboarding",
-            "merchantUrls": {
-                "redirectUrl": "https://google.com"
-            }
-        }
-    }
-
-    response = requests.post(url, json=payload, headers=headers)
-
-    print("STATUS:", response.status_code)
-    print("RESPONSE:", response.text)
-
-    return response.json()
