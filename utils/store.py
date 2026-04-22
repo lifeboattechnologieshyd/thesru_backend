@@ -233,7 +233,7 @@ def create_phonepe_payment(obj):
     url = "https://api-preprod.phonepe.com/apis/pg-sandbox/v1/payments"
 
     headers = {
-        "Authorization": f"Bearer {token}",
+        "Authorization": f"O-Bearer {token}",   # 🔥 FIXED
         "Content-Type": "application/json"
     }
 
@@ -241,8 +241,12 @@ def create_phonepe_payment(obj):
         "merchantOrderId": str(obj.id),
         "amount": 10000,
         "expireAfter": 1200,
+        "metaInfo": {
+            "udf1": "test"
+        },
         "paymentFlow": {
             "type": "PG_CHECKOUT",
+            "message": "Payment for onboarding",
             "merchantUrls": {
                 "redirectUrl": f"https://your-frontend.com/success/{obj.id}"
             }
@@ -251,6 +255,7 @@ def create_phonepe_payment(obj):
 
     response = requests.post(url, json=payload, headers=headers)
 
-    print("PAYMENT RESPONSE:", response.json())
+    print("STATUS:", response.status_code)
+    print("RESPONSE:", response.text)
 
     return response.json()
