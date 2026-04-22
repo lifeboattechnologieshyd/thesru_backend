@@ -207,7 +207,7 @@ from django.conf import settings
 
 
 def get_phonepe_token():
-    url = "https://api-preprod.phonepe.com/apis/pg-sandbox/v1/oauth/token"
+    url = "https://api-preprod.phonepe.com/apis/pg-sandbox/v2/payments"
 
     payload = {
         "client_id": settings.PHONEPE_CLIENT_ID,
