@@ -230,10 +230,10 @@ def get_phonepe_token():
 def create_phonepe_payment(obj):
     token = get_phonepe_token()
 
-    url = "https://api-preprod.phonepe.com/apis/pg-sandbox/v1/payments"
+    url = "https://api-preprod.phonepe.com/apis/pg-sandbox/v2/payments"
 
     headers = {
-        "Authorization": f"O-Bearer {token}",   # 🔥 FIXED
+        "Authorization": f"O-Bearer {token}",
         "Content-Type": "application/json"
     }
 
@@ -248,7 +248,7 @@ def create_phonepe_payment(obj):
             "type": "PG_CHECKOUT",
             "message": "Payment for onboarding",
             "merchantUrls": {
-                "redirectUrl": f"https://your-frontend.com/success/{obj.id}"
+                "redirectUrl": "https://google.com"
             }
         }
     }
