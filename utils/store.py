@@ -165,7 +165,7 @@ import json
 import hashlib
 
 def generate_phonepe_payment(obj):
-    url = "https://api-preprod.phonepe.com/apis/hermes/pg/v1/pay"
+    url = "https://api-preprod.phonepe.com/apis/pg-sandbox/v1/oauth/token"
 
     payload = {
         "merchantId": settings.PHONEPE_MERCHANT_ID,
