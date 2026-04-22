@@ -42,7 +42,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from utils.invoice_generator import generate_shipping_invoice
 from utils.notification import trigger_notification
 from utils.store import generate_lsin, generate_order_number, BO_STATUS_FLOW, update_stock_after_order, \
-    generate_phonepe_payment, get_phonepe_client
+     create_phonepe_payment
 from utils.user import generate_otp, send_otp_email, generate_referral_code, \
      create_bucket_and_upload_logo
 from django.db.models import Sum, F, DecimalField, ExpressionWrapper
@@ -4289,8 +4289,7 @@ class BusinessOnboardingAPIView(APIView):
 
         # 💳 Call PhonePe API
         print("\n--- Calling PhonePe ---")
-        payment_response = generate_phonepe_payment(obj)
-
+        payment_response = create_phonepe_payment(obj)
         print(" Raw PhonePe Response:", payment_response)
         print(" Response Type:", type(payment_response))
 

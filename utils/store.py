@@ -144,57 +144,113 @@ def update_stock_after_order(order):
 
 
 
-def get_phonepe_client():
+# def get_phonepe_client():
+#
+#     env = Env.PRODUCTION if settings.PHONEPE_ENV == "PRODUCTION" else Env.SANDBOX
+#
+#     client = StandardCheckoutClient.get_instance(
+#         client_id=settings.PHONEPE_CLIENT_ID,
+#         client_secret=settings.PHONEPE_CLIENT_SECRET,
+#         client_version=int(settings.PHONEPE_CLIENT_VERSION),
+#         env=env,
+#         should_publish_events=False
+#     )
+#
+#     return client
+#
+#
+# import requests
+# import base64
+# import json
+# import hashlib
+#
+# def generate_phonepe_payment(obj):
+#     url = "https://api-preprod.phonepe.com/apis/pg-sandbox/v1/oauth/token"
+#
+#     payload = {
+#         "merchantId": settings.PHONEPE_MERCHANT_ID,
+#         "merchantTransactionId": str(obj.id),
+#         "amount": 10000,
+#         "redirectUrl": f"https://main.d2nx4g0mgnvr1s.amplifyapp.com/payment-success/{obj.id}",
+#         "redirectMode": "POST",
+#         "callbackUrl": "https://sru-dev-api.dhuniya.in/api/backoffice/webhook/",
+#         "mobileNumber": obj.mobile_number,
+#         "paymentInstrument": {
+#             "type": "PAY_PAGE"
+#         }
+#     }
+#
+#     payload_str = json.dumps(payload)
+#     payload_base64 = base64.b64encode(payload_str.encode()).decode()
+#
+#     string = payload_base64 + "/pg/v1/pay" + settings.PHONEPE_SALT_KEY
+#     sha256 = hashlib.sha256(string.encode()).hexdigest()
+#
+#     x_verify = sha256 + "###" + settings.PHONEPE_SALT_INDEX
+#
+#     headers = {
+#         "Content-Type": "application/json",
+#         "X-VERIFY": x_verify
+#     }
+#
+#     response = requests.post(url, json={"request": payload_base64}, headers=headers)
+#
+#     print("PhonePe Response:", response.json())
+#
+#     return response.json()
 
-    env = Env.PRODUCTION if settings.PHONEPE_ENV == "PRODUCTION" else Env.SANDBOX
 
-    client = StandardCheckoutClient.get_instance(
-        client_id=settings.PHONEPE_CLIENT_ID,
-        client_secret=settings.PHONEPE_CLIENT_SECRET,
-        client_version=int(settings.PHONEPE_CLIENT_VERSION),
-        env=env,
-        should_publish_events=False
-    )
-
-    return client
-
+# payments/services/phonepe.py
 
 import requests
-import base64
-import json
-import hashlib
+from django.conf import settings
 
-def generate_phonepe_payment(obj):
+
+def get_phonepe_token():
     url = "https://api-preprod.phonepe.com/apis/pg-sandbox/v1/oauth/token"
 
     payload = {
-        "merchantId": settings.PHONEPE_MERCHANT_ID,
-        "merchantTransactionId": str(obj.id),
+        "client_id": settings.PHONEPE_CLIENT_ID,
+        "client_secret": settings.PHONEPE_CLIENT_SECRET,
+        "client_version": "1",
+        "grant_type": "client_credentials"
+    }
+
+    headers = {
+        "Content-Type": "application/x-www-form-urlencoded"
+    }
+
+    response = requests.post(url, data=payload, headers=headers)
+
+    print("TOKEN STATUS:", response.status_code)
+    print("TOKEN RESPONSE:", response.text)
+
+    return response.json().get("access_token")
+
+def create_phonepe_payment(obj):
+    token = get_phonepe_token()
+
+    url = "https://api-preprod.phonepe.com/apis/pg-sandbox/v1/pay"
+
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Content-Type": "application/json"
+    }
+
+    payload = {
+        "merchantOrderId": str(obj.id),
         "amount": 10000,
-        "redirectUrl": f"https://main.d2nx4g0mgnvr1s.amplifyapp.com/payment-success/{obj.id}",
-        "redirectMode": "POST",
-        "callbackUrl": "https://sru-dev-api.dhuniya.in/api/backoffice/webhook/",
-        "mobileNumber": obj.mobile_number,
-        "paymentInstrument": {
-            "type": "PAY_PAGE"
+        "expireAfter": 1200,
+        "paymentFlow": {
+            "type": "PG_CHECKOUT",
+            "merchantUrls": {
+                "redirectUrl": f"https://your-frontend.com/success/{obj.id}"
+            }
         }
     }
 
-    payload_str = json.dumps(payload)
-    payload_base64 = base64.b64encode(payload_str.encode()).decode()
+    response = requests.post(url, json=payload, headers=headers)
 
-    string = payload_base64 + "/pg/v1/pay" + settings.PHONEPE_SALT_KEY
-    sha256 = hashlib.sha256(string.encode()).hexdigest()
-
-    x_verify = sha256 + "###" + settings.PHONEPE_SALT_INDEX
-
-    headers = {
-        "Content-Type": "application/json",
-        "X-VERIFY": x_verify
-    }
-
-    response = requests.post(url, json={"request": payload_base64}, headers=headers)
-
-    print("PhonePe Response:", response.json())
+    print("PAYMENT RESPONSE:", response.json())
 
     return response.json()
