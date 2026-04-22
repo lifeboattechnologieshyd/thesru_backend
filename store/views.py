@@ -24,7 +24,7 @@ from db.models import AddressMaster, PinCode, Product, Order, OrderProducts, Pay
     Banner, Category, Cart, CouponUsage, Wishlist, CouponProduct, CouponCategory, CouponTag, WebBanner, FlashSaleBanner, \
     ProductReviews, ContactMessage, Tag, Coupons, ProductReviewMedia, Store, InventoryBatch, \
     InventoryTransaction, ShippingPlan
-from db.models.user import WebhookLog
+from db.models.user import WebhookLog, User
 from enums.store import OrderStatus, PaymentStatus, NotificationEvent
 from mixins.drf_views import CustomResponse
 from utils.notification import trigger_notification
@@ -1066,7 +1066,7 @@ def initiateOrder(user, amount, order, store):
         "customer_details": {
             "customer_id": str(user.id),
             "customer_phone": str(user.mobile),
-            "customer_name": str(user.username),
+            "customer_name": str(user.name),
         },
         "order_meta": {
             "notify_url": settings.CASHFREE_WEBHOOK,
@@ -1251,7 +1251,9 @@ class Webhook(APIView):
                         "var": f"{order.user.name}|{order.order_number[-5:]}|"
                     }
                     trigger_notification(order.store,NotificationEvent.ORDER_PLACED, context, order.user.mobile, order.user.email)
-                    trigger_notification(order.store,NotificationEvent.ADMIN_ORDER_RECEIVED, context, order.store.mobile, order.store.email)
+                    admins = User.objects.filter(store=order.store, user_role__contains=["ADMIN"])
+                    for admin in admins:
+                        trigger_notification(order.store,NotificationEvent.ADMIN_ORDER_RECEIVED, context, admin.mobile, admin.email)
                     remove_cart_items(order.user, order.store)
                 elif event_type == "PAYMENT_FAILED_WEBHOOK":
                     payment.status = PaymentStatus.FAILED
@@ -2071,7 +2073,7 @@ class Reviews(APIView):
                 "review_id": review.id,
                 "user": {
                     "id": review.user.id,
-                    "name": review.user.username,
+                    "name": review.user.name,
                     "profile_image": review.user.profile_image
                 },
                 "rating": review.rating,

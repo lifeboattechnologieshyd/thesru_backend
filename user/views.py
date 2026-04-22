@@ -21,14 +21,13 @@ from db.models import User, UserOTP, TempUser, Store, UserSession, NotificationC
 from db.models.user import AppVersionConfig, Visitor, Enrollments
 from enums.store import NotificationEvent
 from mixins.drf_views import CustomResponse
-from serializers.user import UserMasterSerializer
 
 from rest_framework import status
 
 from utils.invoice_generator import generate_shipping_invoice
 from utils.notification import trigger_notification
 from utils.storage import add_unique_suffix_to_filename, sanitize_filename, StoreS3Storage
-from utils.user import generate_username, generate_referral_code, generate_otp, version_to_tuple, \
+from utils.user import generate_referral_code, generate_otp, version_to_tuple, \
     send_otp_email, get_email_connection_from_config
 
 
@@ -111,7 +110,7 @@ class CreateAdmin(APIView):
             mobile="9014083090",
             device_id="123456",
         )
-        user.username = generate_username(user)
+        # user.username = generate_username(user)
         user.user_role = ['SUPERADMIN']
         user.referral_code = generate_referral_code()
         user.save()
@@ -177,7 +176,7 @@ class MobileVerifyOTPView(APIView):
             user = User.objects.create(
                 mobile=mobile,
                 device_id=device_id,
-                username = generate_username(),
+                # username = generate_username(),
                 referral_code = generate_referral_code(),
                 store=request.store,
                 last_login=timezone.now(),
@@ -189,8 +188,8 @@ class MobileVerifyOTPView(APIView):
             if device_id and user.device_id != device_id:
                 user.device_id = device_id
 
-            if not user.username:
-                user.username = generate_username(user)
+            # if not user.username:
+            #     user.username = generate_username(user)
 
             if not user.referral_code:
                 user.referral_code = generate_referral_code()
@@ -224,7 +223,7 @@ class MobileVerifyOTPView(APIView):
                 "user": {
                     "id": str(user.id),
                     "mobile": user.mobile,
-                    "username": user.username,
+                    "username": user.name,
                     "name": user.name,
                     "referral_code": user.referral_code,
                     "device_id": user.device_id,
@@ -542,9 +541,9 @@ class EmailVerifyOTPView(APIView):
         if device_id and user.device_id != device_id:
             user.device_id = device_id
 
-        # Ensure required fields exist
-        if not user.username:
-            user.username = generate_username(user)
+        # # Ensure required fields exist
+        # if not user.username:
+        #     user.username = generate_username(user)
 
         if not user.referral_code:
             user.referral_code = generate_referral_code()
@@ -581,7 +580,7 @@ class EmailVerifyOTPView(APIView):
                 "user": {
                     "id": str(user.id),
                     "email": user.email,
-                    "username": user.username,
+                    "username": user.name,
                     "referral_code": user.referral_code,
                     "device_id": user.device_id,
                     "store_id": str(user.store.id)
