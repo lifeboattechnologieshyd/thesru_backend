@@ -12,6 +12,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 
+
 from django.core.files.storage import default_storage
 from django.db.models import Q, F
 
@@ -45,6 +46,7 @@ from utils.store import generate_lsin, generate_order_number, BO_STATUS_FLOW, up
 from utils.user import generate_otp, send_otp_email, generate_referral_code, \
      create_bucket_and_upload_logo
 from django.db.models import Sum, F, DecimalField, ExpressionWrapper
+from django.conf import settings
 
 
 
@@ -4251,23 +4253,24 @@ class S3BucketAPIView(APIView):
 class BusinessOnboardingAPIView(APIView):
     permission_classes = [AllowAny]
 
-
     def post(self, request):
-
-        print(" Incoming Request Data:", request.data)
+        print("\n========== NEW REQUEST ==========")
+        print("Incoming Data:", request.data)
 
         name = request.data.get("name")
         email = request.data.get("email")
         mobile = request.data.get("mobile")
 
-        # Validation
+        # 🔍 Validate input
         if not name or not email or not mobile:
             print(" Validation Failed")
             return CustomResponse.errorResponse(
                 description="name, email, mobile are required",
             )
 
-        # Create record
+        print(" Validation Passed")
+
+        #  Create onboarding record
         obj = BusinessOnboarding.objects.create(
             business_email=email,
             business_phone=mobile,
@@ -4277,27 +4280,49 @@ class BusinessOnboardingAPIView(APIView):
 
         print(" BusinessOnboarding Created:", obj.id)
 
-        # Call PhonePe
+        #  DEBUG ENV VARIABLES
+        print("\n--- PhonePe Config ---")
+        print("MERCHANT_ID:", getattr(settings, "PHONEPE_MERCHANT_ID", None))
+        print("SALT_KEY:", getattr(settings, "PHONEPE_SALT_KEY", None))
+        print("SALT_INDEX:", getattr(settings, "PHONEPE_SALT_INDEX", None))
+        print("ENV:", getattr(settings, "PHONEPE_ENV", None))
+
+        # 💳 Call PhonePe API
+        print("\n--- Calling PhonePe ---")
         payment_response = generate_phonepe_payment(obj)
 
-        print(" PhonePe Response:", payment_response)
+        print(" Raw PhonePe Response:", payment_response)
+        print(" Response Type:", type(payment_response))
 
+        #  Handle API failure
+        if not payment_response or not payment_response.get("success"):
+            print(" PhonePe API Failed")
+            print("Error Code:", payment_response.get("code"))
+            print("Error Message:", payment_response.get("message"))
+
+            return CustomResponse.errorResponse(
+                description=payment_response.get("message", "Payment creation failed")
+            )
+
+        # 🔗 Extract payment URL safely
         try:
             payment_url = payment_response["data"]["instrumentResponse"]["redirectInfo"]["url"]
-
-            print("🔗 Payment URL:", payment_url)
+            print("🔗 Payment URL Extracted:", payment_url)
 
         except Exception as e:
-            print("❌ Payment URL Extraction Failed:", str(e))
+            print(" URL Extraction Failed:", str(e))
+            print(" Full Response:", payment_response)
+
             return CustomResponse.errorResponse(
                 description="Payment creation failed"
             )
 
+        #  Save data
         obj.payment_url = payment_url
         obj.payment_status = PaymentStatus.PENDING
         obj.save()
 
-        print(" Saved Payment URL & Status (PENDING)")
+        print(" Payment URL Saved & Status Updated to PENDING")
 
         return CustomResponse.successResponse(
             description="Payment link generated",
