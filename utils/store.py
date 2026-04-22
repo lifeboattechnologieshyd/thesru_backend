@@ -230,7 +230,7 @@ def get_phonepe_token():
 def create_phonepe_payment(obj):
     token = get_phonepe_token()
 
-    url = "https://api-preprod.phonepe.com/apis/pg-sandbox/v1/pay"
+    url = "https://api-preprod.phonepe.com/apis/pg-sandbox/v1/oauth/token"
 
     headers = {
         "Authorization": f"Bearer {token}",
