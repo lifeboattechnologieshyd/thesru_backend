@@ -4393,19 +4393,25 @@ class PhonePeWebhookAPIView(APIView):
             return CustomResponse.successResponse(data={},description="Already processed")
 
         # Update status
-        if event == "checkout.order.completed":
+        state = getattr(payload, "state", None)
+
+        print("Payment State:", state)
+
+        if state == "COMPLETED":
             txn.status = PaymentStatus.COMPLETED
             txn.onboarding.payment_status = PaymentStatus.COMPLETED
+            print("Payment COMPLETED")
 
-        elif event == "checkout.order.failed":
+        elif state == "FAILED":
             txn.status = PaymentStatus.FAILED
             txn.onboarding.payment_status = PaymentStatus.FAILED
+            print("Payment FAILED")
 
         else:
             txn.status = PaymentStatus.CANCELLED
             txn.onboarding.payment_status = PaymentStatus.CANCELLED
-
-        txn.phonepe_transaction_id = getattr(payload, "orderId", None)
+            print("Payment CANCELLED")
+        txn.phonepe_transaction_id = getattr(payload, "order_id", None)
         txn.response_data = request.data
 
         txn.save()
