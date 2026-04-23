@@ -104,6 +104,8 @@ class StoreMiddleware:
             "/user/register",
             "/user/booking",
             "/user/booking/status/update",
+            "/store/business/onboarding",
+            "/store/webhook",
 
 
             "/backoffice/superadmin/send-otp",

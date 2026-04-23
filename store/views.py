@@ -24,11 +24,12 @@ from db.models import AddressMaster, PinCode, Product, Order, OrderProducts, Pay
     Banner, Category, Cart, CouponUsage, Wishlist, CouponProduct, CouponCategory, CouponTag, WebBanner, FlashSaleBanner, \
     ProductReviews, ContactMessage, Tag, Coupons, ProductReviewMedia, Store, InventoryBatch, \
     InventoryTransaction, ShippingPlan
-from db.models.user import WebhookLog, User
+from db.models.user import WebhookLog, User, PaymentTransaction, BusinessOnboarding
 from enums.store import OrderStatus, PaymentStatus, NotificationEvent
 from mixins.drf_views import CustomResponse
 from utils.notification import trigger_notification
-from utils.store import generate_order_number, time_ago, update_stock_after_order
+from utils.store import generate_order_number, time_ago, update_stock_after_order, get_phonepe_client, \
+    create_phonepe_payment
 from utils.user import send_order_created_admin_email
 
 
@@ -2477,3 +2478,175 @@ class ShippingDetails(APIView):
         return CustomResponse().successResponse(
             data=shipping_details.first(),
         )
+
+class BusinessOnboardingAPIView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        print("\n========== NEW REQUEST ==========")
+        print("Incoming Data:", request.data)
+
+        name = request.data.get("name")
+        email = request.data.get("email")
+        mobile = request.data.get("mobile")
+        amount = request.data.get("amount")
+
+        #  Validate input
+        if not name or not email or not mobile or not amount:
+            print(" Validation Failed")
+            return CustomResponse.errorResponse(
+                description="name, email, mobile, amount are required",
+            )
+
+        print(" Validation Passed")
+
+        #  Convert amount FIRST
+        amount_rupees = int(amount)
+        amount_paisa = amount_rupees * 100
+
+        print("Amount ₹:", amount_rupees)
+        print("Amount paisa:", amount_paisa)
+
+        #  Create onboarding record
+        obj = BusinessOnboarding.objects.create(
+            business_email=email,
+            business_phone=mobile,
+            mobile_number=mobile,
+            payment_status=PaymentStatus.INITIATED
+        )
+
+        print(" BusinessOnboarding Created:", obj.id)
+
+        print("\n--- Calling PhonePe ---")
+
+        try:
+            #  CALL ONLY ONCE
+            payment_response = create_phonepe_payment(obj, amount_paisa)
+
+            print(" Raw PhonePe Response:", payment_response)
+
+            payment_url = payment_response.get("redirect_url")
+            order_id = payment_response.get("order_id")
+
+            if not payment_url:
+                print(" No redirect URL found")
+                return CustomResponse.errorResponse(
+                    description="Payment creation failed"
+                )
+
+            print("🔗 Payment URL:", payment_url)
+
+        except Exception as e:
+            print(" PhonePe Exception:", str(e))
+            return CustomResponse.errorResponse(
+                description="Payment creation failed"
+            )
+
+        #  CREATE TRANSACTION
+        PaymentTransaction.objects.create(
+            merchant_transaction_id=str(obj.id),
+            phonepe_transaction_id=order_id,
+            onboarding=obj,
+            amount=amount_paisa,
+            status=PaymentStatus.INITIATED,
+            payment_url=payment_url
+        )
+
+        print(" PaymentTransaction Created")
+
+        #  Save onboarding
+        obj.payment_url = payment_url
+        obj.payment_status = PaymentStatus.PENDING
+        obj.save()
+
+        print(" Payment URL Saved & Status Updated to PENDING")
+
+        return CustomResponse.successResponse(
+            description="Payment link generated",
+            data={"payment_url": payment_url}
+        )
+
+
+
+
+
+
+class PhonePeWebhookAPIView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+
+        print(" Webhook HIT")
+        print("Headers:", request.headers)
+        print("Raw Body:", request.body.decode("utf-8"))
+
+        client = get_phonepe_client()
+
+        try:
+            callback_response = client.validate_callback(
+                username="charan",
+                password="Password123",
+                callback_header_data=request.headers.get("Authorization"),
+                callback_response_data=request.body.decode("utf-8")
+            )
+            print(" Webhook Validation Success")
+
+        except Exception as e:
+            print(" Webhook Validation Failed:", str(e))
+            return CustomResponse.successResponse(data={},description="Ignored")
+
+        #  IMPORTANT FIX
+        if not callback_response.payload:
+            print(" Webhook validation ping received")
+            return CustomResponse.successResponse(data={},description="Validation success")
+
+        event = callback_response.type
+        payload = callback_response.payload
+
+        print("Event:", event)
+        print("Payload:", payload)
+
+        merchant_txn_id = getattr(payload, "merchant_order_id", None)
+        if not merchant_txn_id:
+            print(" No merchantOrderId")
+            return CustomResponse.successResponse(data={},description="Ignored")
+
+        try:
+            txn = PaymentTransaction.objects.get(
+                merchant_transaction_id=merchant_txn_id
+            )
+        except PaymentTransaction.DoesNotExist:
+            return CustomResponse.successResponse(data={},description="Transaction not found")
+
+        # Idempotency
+        if txn.status == PaymentStatus.COMPLETED:
+            return CustomResponse.successResponse(data={},description="Already processed")
+
+        # Update status
+        state = getattr(payload, "state", None)
+
+        print("Payment State:", state)
+
+        if state == "COMPLETED":
+            txn.status = PaymentStatus.COMPLETED
+            txn.onboarding.payment_status = PaymentStatus.COMPLETED
+            print("Payment COMPLETED")
+
+        elif state == "FAILED":
+            txn.status = PaymentStatus.FAILED
+            txn.onboarding.payment_status = PaymentStatus.FAILED
+            print("Payment FAILED")
+
+        else:
+            txn.status = PaymentStatus.CANCELLED
+            txn.onboarding.payment_status = PaymentStatus.CANCELLED
+            print("Payment CANCELLED")
+        txn.phonepe_transaction_id = getattr(payload, "order_id", None)
+        txn.response_data = request.data
+
+        txn.save()
+        txn.onboarding.save()
+
+        print(" Transaction updated")
+
+        return CustomResponse.successResponse(data={},description="Webhook processed")

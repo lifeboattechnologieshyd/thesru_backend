@@ -131,7 +131,7 @@ urlpatterns = [
     path("subscription/plan",CreateSubscriptionPlanAPI.as_view()),
     path("create/bucket",S3BucketAPIView.as_view()),
 
-    path("business/onboarding",BusinessOnboardingAPIView.as_view()),
-    path("webhook",PhonePeWebhookAPIView.as_view()),
+    # path("business/onboarding",BusinessOnboardingAPIView.as_view()),
+    # path("webhook",PhonePeWebhookAPIView.as_view()),
 
 ]

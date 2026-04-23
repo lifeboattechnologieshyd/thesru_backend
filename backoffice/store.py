@@ -4271,7 +4271,7 @@ class BusinessOnboardingAPIView(APIView):
 
         print(" Validation Passed")
 
-        # ✅ Convert amount FIRST
+        #  Convert amount FIRST
         amount_rupees = int(amount)
         amount_paisa = amount_rupees * 100
 
