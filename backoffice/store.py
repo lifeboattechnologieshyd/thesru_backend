@@ -4328,6 +4328,8 @@ class BusinessOnboardingAPIView(APIView):
 
 
 class PhonePeWebhookAPIView(APIView):
+    permission_classes = [AllowAny]
+
 
     def post(self, request):
 

@@ -115,6 +115,7 @@ class StoreMiddleware:
             "/backoffice/bulk/stock-in",
             "/backoffice/create/bucket",
             "/backoffice/business/onboarding",
+            "/backoffice/webhook",
         )
 
     def __call__(self, request):
