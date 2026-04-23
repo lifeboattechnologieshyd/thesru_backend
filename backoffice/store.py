@@ -4260,12 +4260,13 @@ class BusinessOnboardingAPIView(APIView):
         name = request.data.get("name")
         email = request.data.get("email")
         mobile = request.data.get("mobile")
+        amount = request.data.get("amount")
 
         # 🔍 Validate input
-        if not name or not email or not mobile:
+        if not name or not email or not mobile or not amount:
             print(" Validation Failed")
             return CustomResponse.errorResponse(
-                description="name, email, mobile are required",
+                description="name, email, mobile ,amount are required",
             )
 
         print(" Validation Passed")
@@ -4313,10 +4314,12 @@ class BusinessOnboardingAPIView(APIView):
 
         #  CREATE TRANSACTION HERE
         PaymentTransaction.objects.create(
-            merchant_transaction_id=str(obj.id),  # must match webhook
-            phonepe_order_id=order_id,  # useful for tracking
+            merchant_transaction_id=str(obj.id),  # matches webhook
+            phonepe_transaction_id=order_id,  # SDK order_id
             onboarding=obj,
-            status=PaymentStatus.INITIATED
+            amount=amount,  # required field
+            status=PaymentStatus.INITIATED,
+            payment_url=payment_url
         )
 
         print(" PaymentTransaction Created")
