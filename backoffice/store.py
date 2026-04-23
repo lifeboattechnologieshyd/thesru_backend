@@ -4266,10 +4266,17 @@ class BusinessOnboardingAPIView(APIView):
         if not name or not email or not mobile or not amount:
             print(" Validation Failed")
             return CustomResponse.errorResponse(
-                description="name, email, mobile ,amount are required",
+                description="name, email, mobile, amount are required",
             )
 
         print(" Validation Passed")
+
+        # ✅ Convert amount FIRST
+        amount_rupees = int(amount)
+        amount_paisa = amount_rupees * 100
+
+        print("Amount ₹:", amount_rupees)
+        print("Amount paisa:", amount_paisa)
 
         #  Create onboarding record
         obj = BusinessOnboarding.objects.create(
@@ -4281,22 +4288,16 @@ class BusinessOnboardingAPIView(APIView):
 
         print(" BusinessOnboarding Created:", obj.id)
 
-        #  DEBUG ENV VARIABLES
-        print("\n--- PhonePe Config ---")
-        print("MERCHANT_ID:", getattr(settings, "PHONEPE_MERCHANT_ID", None))
-        print("SALT_KEY:", getattr(settings, "PHONEPE_SALT_KEY", None))
-        print("SALT_INDEX:", getattr(settings, "PHONEPE_SALT_INDEX", None))
-        print("ENV:", getattr(settings, "PHONEPE_ENV", None))
-
         print("\n--- Calling PhonePe ---")
 
         try:
-            payment_response = create_phonepe_payment(obj)
+            #  CALL ONLY ONCE
+            payment_response = create_phonepe_payment(obj, amount_paisa)
 
             print(" Raw PhonePe Response:", payment_response)
 
             payment_url = payment_response.get("redirect_url")
-            order_id = payment_response.get("order_id")  #  ADD THIS
+            order_id = payment_response.get("order_id")
 
             if not payment_url:
                 print(" No redirect URL found")
@@ -4312,12 +4313,12 @@ class BusinessOnboardingAPIView(APIView):
                 description="Payment creation failed"
             )
 
-        #  CREATE TRANSACTION HERE
+        #  CREATE TRANSACTION
         PaymentTransaction.objects.create(
-            merchant_transaction_id=str(obj.id),  # matches webhook
-            phonepe_transaction_id=order_id,  # SDK order_id
+            merchant_transaction_id=str(obj.id),
+            phonepe_transaction_id=order_id,
             onboarding=obj,
-            amount=amount,  # required field
+            amount=amount_paisa,
             status=PaymentStatus.INITIATED,
             payment_url=payment_url
         )

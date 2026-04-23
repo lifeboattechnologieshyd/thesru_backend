@@ -278,7 +278,7 @@ from phonepe.sdk.pg.payments.v2.models.request.standard_checkout_pay_request imp
 from phonepe.sdk.pg.common.models.request.meta_info import MetaInfo
 
 
-def create_phonepe_payment(obj):
+def create_phonepe_payment(obj,amount_paisa):
     client = get_phonepe_client()
 
     print("🔹 Creating PhonePe Payment for:", obj.id)
@@ -287,7 +287,7 @@ def create_phonepe_payment(obj):
 
     request = StandardCheckoutPayRequest.build_request(
         merchant_order_id=str(obj.id),
-        amount=10000,  # paisa
+        amount=amount_paisa,  # paisa
         redirect_url="https://google.com",
         meta_info=meta_info,
         message="Payment for onboarding",
