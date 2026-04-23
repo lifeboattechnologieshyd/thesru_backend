@@ -4295,6 +4295,7 @@ class BusinessOnboardingAPIView(APIView):
             print(" Raw PhonePe Response:", payment_response)
 
             payment_url = payment_response.get("redirect_url")
+            order_id = payment_response.get("order_id")  #  ADD THIS
 
             if not payment_url:
                 print(" No redirect URL found")
@@ -4310,7 +4311,17 @@ class BusinessOnboardingAPIView(APIView):
                 description="Payment creation failed"
             )
 
-        #  Save data
+        #  CREATE TRANSACTION HERE
+        PaymentTransaction.objects.create(
+            merchant_transaction_id=str(obj.id),  # must match webhook
+            phonepe_order_id=order_id,  # useful for tracking
+            onboarding=obj,
+            status=PaymentStatus.INITIATED
+        )
+
+        print(" PaymentTransaction Created")
+
+        #  Save onboarding
         obj.payment_url = payment_url
         obj.payment_status = PaymentStatus.PENDING
         obj.save()
