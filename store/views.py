@@ -2543,7 +2543,7 @@ class BusinessOnboardingAPIView(APIView):
             )
 
         #  CREATE TRANSACTION
-        PaymentTransaction.objects.create(
+        txn = PaymentTransaction.objects.create(
             merchant_transaction_id=str(obj.id),
             phonepe_transaction_id=order_id,
             onboarding=obj,
@@ -2563,7 +2563,8 @@ class BusinessOnboardingAPIView(APIView):
 
         return CustomResponse.successResponse(
             description="Payment link generated",
-            data={"payment_url": payment_url}
+            data={"payment_url": payment_url,
+                  "amount": txn.amount / 100}
         )
 
 
