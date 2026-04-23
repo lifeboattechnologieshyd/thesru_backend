@@ -281,7 +281,7 @@ from phonepe.sdk.pg.common.models.request.meta_info import MetaInfo
 def create_phonepe_payment(obj,amount_paisa):
     client = get_phonepe_client()
 
-    print("🔹 Creating PhonePe Payment for:", obj.id)
+    print(" Creating PhonePe Payment for:", obj.id)
 
     meta_info = MetaInfo(udf1="onboarding")
 
@@ -296,7 +296,7 @@ def create_phonepe_payment(obj,amount_paisa):
 
     response = client.pay(request)
 
-    print("🔹 SDK Response:", response)
+    print(" SDK Response:", response)
 
     return {
         "redirect_url": response.redirect_url,
