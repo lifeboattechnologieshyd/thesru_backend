@@ -4362,8 +4362,7 @@ class PhonePeWebhookAPIView(APIView):
         print("Event:", event)
         print("Payload:", payload)
 
-        merchant_txn_id = getattr(payload, "merchantOrderId", None)
-
+        merchant_txn_id = getattr(payload, "merchant_order_id", None)
         if not merchant_txn_id:
             print(" No merchantOrderId")
             return CustomResponse.successResponse(data={},description="Ignored")
