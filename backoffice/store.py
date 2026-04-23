@@ -4339,8 +4339,8 @@ class PhonePeWebhookAPIView(APIView):
 
         try:
             callback_response = client.validate_callback(
-                username="YOUR_USERNAME",
-                password="YOUR_PASSWORD",
+                username="charan",
+                password="Password123",
                 callback_header_data=request.headers.get("Authorization"),
                 callback_response_data=request.body.decode("utf-8")
             )
