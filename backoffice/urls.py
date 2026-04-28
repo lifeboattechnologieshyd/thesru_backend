@@ -13,6 +13,7 @@ from backoffice.store import ProductAPIView, CategoriesAPIView, BannerAPIView, \
     DashboardStatsAPIView, PinCodeStatesAPIView, PinCodeDistrictAPIView, S3BucketAPIView, BusinessOnboardingAPIView, \
     PhonePeWebhookAPIView
 from backoffice.subscriptions import CreateSubscriptionPlanAPI
+from backoffice.superadmin import StorePaymentGatewayCreateAPIView
 
 urlpatterns = [
 
@@ -133,5 +134,9 @@ urlpatterns = [
 
     # path("business/onboarding",BusinessOnboardingAPIView.as_view()),
     # path("webhook",PhonePeWebhookAPIView.as_view()),
+
+
+    path("config/payment-gateway",StorePaymentGatewayCreateAPIView.as_view()),
+    path("config/payment-gateway/<uuid:gateway_id>/",StorePaymentGatewayCreateAPIView.as_view()),
 
 ]

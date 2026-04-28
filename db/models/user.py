@@ -43,16 +43,36 @@ class Store(AuditModel):
     mobile_login = models.BooleanField(default=True)
     aws_bucket_name = models.CharField(max_length=50, null=True, blank=True)
     cloudfront_domain = models.CharField(max_length=50, null=True, blank=True)
-
-    # bo_title = models.CharField(max_length=50, null=True, blank=True)
-    # bo_subtitle = models.CharField(max_length=50, null=True, blank=True)
-    # highlights = ArrayField(models.CharField(max_length=50, ), blank=True, null=True)
     is_active = models.BooleanField(default=True)
 
 
     class Meta:
         db_table = "store"
 
+class StorePaymentGateway(AuditModel):
+    PAYMENT_GATEWAY_CHOICES = (
+        ("razorpay", "Razorpay"),
+        ("phonepe", "PhonePe"),
+        ("cashfree", "CashFree"),
+    )
+    store = models.ForeignKey(
+        Store,
+        on_delete=models.CASCADE,
+        related_name="payment_gateway"
+    )
+    provider = models.CharField(max_length=20, choices=PAYMENT_GATEWAY_CHOICES)
+    # Credentials
+    client_id = models.CharField(max_length=255, null=True)
+    client_secret = models.CharField(max_length=255, null=True)
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        db_table = "store_payment_gateway"
+        indexes = [
+            models.Index(fields=["store"]),
+            models.Index(fields=["is_active", "store"]),
+            models.Index(fields=["is_active"]),
+        ]
 
 class StoreClient(models.Model):
     store = models.ForeignKey(Store, on_delete=models.CASCADE, related_name="clients")
