@@ -122,7 +122,7 @@ urlpatterns = [
     path("store/<str:id>", StoreAPIView.as_view()),
 
     path("config/payment-gateway", StorePaymentGatewayCreateAPIView.as_view()),
-    path("config/payment-gateway/<uuid:gateway_id>/", StorePaymentGatewayCreateAPIView.as_view()),
+    path("config/payment-gateway/<int:gateway_id>/", StorePaymentGatewayCreateAPIView.as_view()),
 
     path("notification/config", NotificationConfig.as_view()),
     path("notification/config/<str:id>", NotificationConfig.as_view()),
