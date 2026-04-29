@@ -118,6 +118,10 @@ class StoreMiddleware:
             "/backoffice/create/bucket",
             "/backoffice/business/onboarding",
             "/backoffice/webhook",
+
+
+            "/backoffice/config/payment-gateway",
+            "/backoffice/config/payment-gateway/*",
         )
 
     def __call__(self, request):
