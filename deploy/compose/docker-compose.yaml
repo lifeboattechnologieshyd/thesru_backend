@@ -73,9 +73,6 @@ services:
       - "6000:8000"
     networks:
       - thesru-network
-    depends_on:
-      db:
-        condition: service_healthy
 
 volumes:
   pgdata:
