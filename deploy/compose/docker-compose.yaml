@@ -69,10 +69,7 @@ services:
     restart: unless-stopped
     env_file:
       - ../../.env
-    ports:
-      - "6000:8000"
-    networks:
-      - thesru-network
+    network_mode: host
 
 volumes:
   pgdata:
