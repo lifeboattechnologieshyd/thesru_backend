@@ -28,7 +28,7 @@ jobs:
           git pull
           docker network create thesru-network || true
           # Only redeploy the backend on production
-          docker compose -f ./deploy/compose/docker-compose.yaml up -d --build --remove-orphans backend
+          sudo docker compose -f ./deploy/compose/docker-compose.yaml up -d --build --remove-orphans backend
           # Clean up dangling images to save space without breaking cache
-          docker image prune -f
+          sudo docker image prune -f
           EOF
