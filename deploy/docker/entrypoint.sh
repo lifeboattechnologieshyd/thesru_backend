@@ -55,10 +55,18 @@ echo "Running migrations..."
 python manage.py migrate
 
 echo "Collecting static files..."
-python manage.py collectstatic --noinput
+python manage.py collectstatic --noinput || true
 
 echo "Cleaning stale cron locks..."
 python manage.py remove_cronjob_locks || true
+
+############################################
+# Start Alloy in the background
+############################################
+echo "Starting Alloy..."
+alloy run --server.http.listen-addr=0.0.0.0:12345 --storage.path=/var/lib/alloy/data "${PROJECT_ROOT_DIR}/config.alloy" &
+ALLOY_PID=$!
+echo "Alloy started with PID: $ALLOY_PID"
 
 ############################################
 # Cron handling
