@@ -26,7 +26,7 @@ def create_phonepe_payment(user,obj,amount_paisa, gateway):
     request = StandardCheckoutPayRequest.build_request(
         merchant_order_id=str(obj.order_number),
         amount=amount_paisa,  # paisa
-        redirect_url="http://localhost:5173/payment-success",
+        redirect_url=f"http://localhost:5173/payment-success?{obj.order_number}",
         meta_info=meta_info,
         message="Payment for onboarding",
         expire_after=3600,
