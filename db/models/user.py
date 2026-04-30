@@ -471,7 +471,7 @@ class WebhookLog(AuditModel):
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     event_type = models.CharField(max_length=100)
-    gateway = models.CharField(max_length=100) # phonepe or cashfree
+    gateway = models.CharField(max_length=100, null=True) # phonepe or cashfree
     payload = models.JSONField()
     processed = models.BooleanField(default=False)
 

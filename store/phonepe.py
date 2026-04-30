@@ -9,11 +9,10 @@ from django.conf import settings
 from rest_framework.permissions import AllowAny
 from rest_framework.views import APIView
 
-from db.models import Payment, Order, OrderTimeLines, CouponUsage
+from db.models import Payment, Order, OrderTimeLines, CouponUsage, Cart
 from db.models.user import WebhookLog, User
 from enums.store import PaymentStatus, OrderStatus, NotificationEvent
 from mixins.drf_views import CustomResponse
-from store.views import remove_cart_items
 from utils.notification import trigger_notification
 from utils.store import update_stock_after_order
 from utils.user import send_order_created_admin_email
@@ -159,7 +158,7 @@ class PhonePeWebhookAPIView(APIView):
                 for admin in admins:
                     trigger_notification(order.store, NotificationEvent.ADMIN_ORDER_RECEIVED, context, admin.mobile,
                                          admin.email)
-                remove_cart_items(order.user, order.store)
+                Cart.objects.filter(user=order.user, store=order.store).delete()
 
             elif state == "FAILED":
                 txn.status = PaymentStatus.FAILED

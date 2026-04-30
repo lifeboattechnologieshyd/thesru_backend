@@ -1,11 +1,12 @@
 from django.urls import path
 
+from store.phonepe import PhonePeWebhookAPIView
 from store.views import PinListView, AddressAPIView, ProductDetailAPIView, ProductListAPIView, InitiateOrder, OrderView, \
     BannerListView, CategoryListView, AddToCartAPIView, CartListAPIView, UpdateCartAPIView, RemoveFromCartAPIView, \
     AddToWishlistAPIView, WishlistListAPIView, RemoveFromWishlistAPIView, CartTotalAPIView, \
     FlashSaleBannerListView, WebBannerListView, Webhook, PaymentStatusAPIView, Reviews, ContactMessageAPIView, \
     TagsListView, UserCouponListAPIView, CheckoutPreview, TestTriggerNotificationAPIView, FirebaseTestPushAPIView, \
-    ShippingDetails, IshuCategories, PhonePeWebhookAPIView
+    ShippingDetails, IshuCategories
 
 urlpatterns = [
     path("category", CategoryListView.as_view()),
