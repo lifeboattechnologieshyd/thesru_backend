@@ -45,6 +45,9 @@ class Store(AuditModel):
     cloudfront_domain = models.CharField(max_length=50, null=True, blank=True)
     is_active = models.BooleanField(default=True)
 
+    @property
+    def active_payment_gateway(self):
+        return self.payment_gateway.filter(is_active=True).first()
 
     class Meta:
         db_table = "store"

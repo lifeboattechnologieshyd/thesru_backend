@@ -24,12 +24,13 @@ from db.models import AddressMaster, PinCode, Product, Order, OrderProducts, Pay
     Banner, Category, Cart, CouponUsage, Wishlist, CouponProduct, CouponCategory, CouponTag, WebBanner, FlashSaleBanner, \
     ProductReviews, ContactMessage, Tag, Coupons, ProductReviewMedia, Store, InventoryBatch, \
     InventoryTransaction, ShippingPlan
-from db.models.user import WebhookLog, User, PaymentTransaction, BusinessOnboarding
+from db.models.user import WebhookLog, User, PaymentTransaction, BusinessOnboarding, StorePaymentGateway
 from enums.store import OrderStatus, PaymentStatus, NotificationEvent
 from mixins.drf_views import CustomResponse
+from store.phonepe import create_phonepe_payment
 from utils.notification import trigger_notification
-from utils.store import generate_order_number, time_ago, update_stock_after_order, get_phonepe_client, \
-    create_phonepe_payment
+from utils.store import generate_order_number, time_ago, update_stock_after_order
+
 from utils.user import send_order_created_admin_email
 
 
@@ -1000,13 +1001,13 @@ class InitiateOrder(APIView):
                 status=OrderStatus.INITIATED,
                 remarks="Order initiated"
             )
-
+            gateway = store.active_payment_gateway
             # ---------- Create Payment ----------
             payment = Payment.objects.create(
                 store=store,
                 user=user,
                 order=order,
-                gateway="CASHFREE",
+                gateway=gateway.provider,
                 amount=final_amount,
                 status=PaymentStatus.INITIATED,
                 remarks="Payment Initiated"
@@ -1015,23 +1016,42 @@ class InitiateOrder(APIView):
                 user=user,
                 amount=final_amount,
                 order=order,
-                store=store
+                store=store,
+                gateway=gateway
             )
             if payment_resp["success"]:
-                payment.session_id = payment_resp["payment_session_id"]
-                payment.cf_order_id = payment_resp["cf_order_id"]
-                payment.save(
-                    update_fields=["session_id", "cf_order_id"]
-                )
-                return CustomResponse.successResponse(
-                    data={
-                        "order_number": order.order_number,
-                        "payment_session_id": payment.session_id,
-                        "cf_order_id": payment.cf_order_id,
-                        "amount": str(final_amount)
-                    },
-                    description="Order initiated successfully"
-                )
+                if gateway.provider == 'phonepe':
+                    payment.ph_redirect_url = payment_resp["payment_payment_url"]
+                    payment.ph_order_id = payment_resp["ph_order_id"]
+                    payment.save(
+                        update_fields=["ph_order_id", "ph_redirect_url"]
+                    )
+                    return CustomResponse.successResponse(
+                        data={
+                            "order_number": order.order_number,
+                            "redirect_url": payment.ph_redirect_url,
+                            "ph_order_id": payment.ph_order_id,
+                            "amount": str(final_amount),
+                            "gateway": "phonepe"
+                        },
+                        description="Order initiated successfully"
+                    )
+                else:
+                    payment.session_id = payment_resp["payment_session_id"]
+                    payment.cf_order_id = payment_resp["cf_order_id"]
+                    payment.save(
+                        update_fields=["session_id", "cf_order_id"]
+                    )
+                    return CustomResponse.successResponse(
+                        data={
+                            "order_number": order.order_number,
+                            "payment_session_id": payment.session_id,
+                            "cf_order_id": payment.cf_order_id,
+                            "amount": str(final_amount),
+                            "gateway": "cashfree"
+                        },
+                        description="Order initiated successfully"
+                    )
             else:
                 payment.status = PaymentStatus.FAILED
                 payment.remarks = str(payment.remarks) + "==" + "PaymentStatus.FAILED" + ": " + payment_resp[
@@ -1049,16 +1069,9 @@ class InitiateOrder(APIView):
             return CustomResponse().errorResponse(
                 description=str(e) or "Failed to initiate order"
             )
-
-def initiateOrder(user, amount, order, store):
-    """
-    Initiate payment using school-specific CashFree credentials from the database.
-    """
-    print("DEBUG CASHFREE CLIENT ID:", store.client_id)
-    print("DEBUG CASHFREE CLIENT SECRET:", store.client_secret)
-    print("DEBUG CASHFREE URL:", settings.CASHFREE_URL)
-    print("DEBUG CASHFREE WEBHOOK:", settings.CASHFREE_WEBHOOK)
-
+def init_cashfree(user, amount, order, store, gateway):
+    print("DEBUG PG URL:", settings.CASHFREE_URL)
+    print("DEBUG PG WEBHOOK:", settings.CASHFREE_WEBHOOK)
     # --- Prepare payload ---
     payload = {
         "order_currency": "INR",
@@ -1077,31 +1090,26 @@ def initiateOrder(user, amount, order, store):
     # --- Prepare headers ---
     headers = {
         "x-api-version": settings.CASHFREE_API_VERSION,
-        "x-client-id": store.client_id,
-        "x-client-secret": store.client_secret,
+        "x-client-id": gateway.client_id,
+        "x-client-secret": gateway.client_secret,
         "Content-Type": "application/json",
     }
-    print("headers",headers)
-    print("payload",payload)
-
-
+    print("headers", headers)
+    print("payload", payload)
     try:
         # --- Send request to CashFree ---
         response = requests.post(settings.CASHFREE_URL, json=payload, headers=headers, timeout=15)
-
-
         # --- Validate response ---
         if response.status_code == 200:
             resp_json = response.json()
             order_id = resp_json.get("cf_order_id")
             session_id = resp_json.get("payment_session_id")
-
             if order_id and session_id:
                 return {
                     "success": True,
                     "cf_order_id": order_id,
                     "payment_session_id": session_id,
-                    "order_number":order.order_number
+                    "order_number": order.order_number
                 }
             else:
                 return {
@@ -1118,6 +1126,53 @@ def initiateOrder(user, amount, order, store):
             "success": False,
             "description": "Exception occurred"
         }
+
+def init_phonepe(user, amount, order, store, gateway):
+    amount_rupees = int(amount)
+    amount_in_paise = amount_rupees * 100
+    try:
+        payment_response = create_phonepe_payment(user,order, amount_in_paise, gateway)
+        print(" Raw PhonePe Response:", payment_response)
+        payment_url = payment_response.get("redirect_url")
+        order_id = payment_response.get("order_id")
+        if not payment_url:
+            print(" No redirect URL found")
+            return {
+                "success": False,
+                "description": "No redirect URL found",
+            }
+        return {
+            "success": True,
+            "ph_order_id": order_id,
+            "payment_payment_url": payment_url,
+            "order_number": order.order_number
+        }
+    except Exception as e:
+        print(" PhonePe Exception:", str(e))
+        return {
+            "success": False,
+            "description": "PhonePe Exception:",
+        }
+
+
+def initiateOrder(user, amount, order, store, gateway):
+    """
+    Initiate payment using school-specific CashFree credentials from the database.
+    """
+    print("DEBUG PG CLIENT ID:", gateway.client_id)
+    print("DEBUG PG CLIENT SECRET:", gateway.client_secret)
+    if gateway.provider == 'cashfree':
+        return init_cashfree(user, amount, order, store, gateway)
+    elif gateway.provider == 'phonepe':
+        return init_phonepe(user, amount,order, store, gateway)
+    else:
+        return {
+            "success": False,
+            "description": "Exception occurred. No Payment Gateway configured"
+        }
+
+
+
 
 
 SYSTEM_UPDATED_BY = "CASHFREE_WEBHOOK"
