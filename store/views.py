@@ -1,3 +1,4 @@
+import json
 import uuid
 from tokenize import Double
 from unicodedata import category
@@ -2572,7 +2573,7 @@ class PhonePeWebhookAPIView(APIView):
         print("Webhook HIT")
         print("Headers:", request.headers)
         print("Raw Body:", request.body.decode("utf-8"))
-        body = request.body.decode("utf-8")
+        body = json.loads(request.body.decode("utf-8"))
         payload = body["payload"]
         try:
             txn = Payment.objects.filter(ph_order_id=payload.get("orderId", None)).first()
