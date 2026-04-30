@@ -38,3 +38,10 @@ def create_phonepe_payment(user,obj,amount_paisa, gateway):
         "redirect_url": response.redirect_url,
         "order_id": response.order_id
     }
+
+def get_status(obj,gateway):
+    client = get_phonepe_client(gateway)
+    merchant_order_id = obj.order_number
+    response = client.get_order_status(merchant_order_id, details=False)
+    state = response.state
+    return state
