@@ -118,7 +118,7 @@ class PhonePeWebhookAPIView(APIView):
                 return CustomResponse.successResponse(data={},description="Already processed")
 
             # Update status
-            state = getattr(payload, "state", None)
+            state = payload["state"]
 
             print("Payment State:", state)
 
