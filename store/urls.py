@@ -5,7 +5,7 @@ from store.views import PinListView, AddressAPIView, ProductDetailAPIView, Produ
     AddToWishlistAPIView, WishlistListAPIView, RemoveFromWishlistAPIView, CartTotalAPIView, \
     FlashSaleBannerListView, WebBannerListView, Webhook, PaymentStatusAPIView, Reviews, ContactMessageAPIView, \
     TagsListView, UserCouponListAPIView, CheckoutPreview, TestTriggerNotificationAPIView, FirebaseTestPushAPIView, \
-    ShippingDetails, IshuCategories
+    ShippingDetails, IshuCategories, PhonePeWebhookAPIView
 
 urlpatterns = [
     path("category", CategoryListView.as_view()),
@@ -52,7 +52,7 @@ urlpatterns = [
 
     path("shipping/details",ShippingDetails.as_view()),
 
-    # path("webhook",PhonePeWebhookAPIView.as_view()),
+    path("webhook",PhonePeWebhookAPIView.as_view()),
 
 
 ]

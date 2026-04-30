@@ -2564,82 +2564,77 @@ class ShippingDetails(APIView):
         )
 
 
-# class PhonePeWebhookAPIView(APIView):
-#     permission_classes = [AllowAny]
-#
-#     def post(self, request):
-#
-#         print("Webhook HIT")
-#         print("Headers:", request.headers)
-#         print("Raw Body:", request.body.decode("utf-8"))
-#
-#         client = get_phonepe_client()
-#
-#         try:
-#             callback_response = client.validate_callback(
-#                 username="charan",
-#                 password="Password123",
-#                 callback_header_data=request.headers.get("Authorization"),
-#                 callback_response_data=request.body.decode("utf-8")
-#             )
-#             print(" Webhook Validation Success")
-#
-#         except Exception as e:
-#             print(" Webhook Validation Failed:", str(e))
-#             return CustomResponse.successResponse(data={},description="Ignored")
-#
-#         #  IMPORTANT FIX
-#         if not callback_response.payload:
-#             print(" Webhook validation ping received")
-#             return CustomResponse.successResponse(data={},description="Validation success")
-#
-#         event = callback_response.type
-#         payload = callback_response.payload
-#
-#         print("Event:", event)
-#         print("Payload:", payload)
-#
-#         merchant_txn_id = getattr(payload, "merchant_order_id", None)
-#         if not merchant_txn_id:
-#             print(" No merchantOrderId")
-#             return CustomResponse.successResponse(data={},description="Ignored")
-#
-#         try:
-#             txn = PaymentTransaction.objects.get(
-#                 merchant_transaction_id=merchant_txn_id
-#             )
-#         except PaymentTransaction.DoesNotExist:
-#             return CustomResponse.successResponse(data={},description="Transaction not found")
-#
-#         # Idempotency
-#         if txn.status == PaymentStatus.COMPLETED:
-#             return CustomResponse.successResponse(data={},description="Already processed")
-#
-#         # Update status
-#         state = getattr(payload, "state", None)
-#
-#         print("Payment State:", state)
-#
-#         if state == "COMPLETED":
-#             txn.status = PaymentStatus.COMPLETED
-#             txn.onboarding.payment_status = PaymentStatus.COMPLETED
-#             print("Payment COMPLETED")
-#
-#         elif state == "FAILED":
-#             txn.status = PaymentStatus.FAILED
-#             txn.onboarding.payment_status = PaymentStatus.FAILED
-#             print("Payment FAILED")
-#
-#         else:
-#             txn.status = PaymentStatus.CANCELLED
-#             txn.onboarding.payment_status = PaymentStatus.CANCELLED
-#             print("Payment CANCELLED")
-#         txn.phonepe_transaction_id = getattr(payload, "order_id", None)
-#         txn.response_data = request.data
-#
-#         txn.save()
-#         txn.onboarding.save()
-#
-#         print(" Transaction updated")
-#
-#         return CustomResponse.successResponse(data={},description="Webhook processed")
+class PhonePeWebhookAPIView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+
+        print("Webhook HIT")
+        print("Headers:", request.headers)
+        print("Raw Body:", request.body.decode("utf-8"))
+
+        client = get_phonepe_client()
+
+        try:
+            callback_response = client.validate_callback(
+                username="charan",
+                password="Password123",
+                callback_header_data=request.headers.get("Authorization"),
+                callback_response_data=request.body.decode("utf-8")
+            )
+            print(" Webhook Validation Success")
+
+        except Exception as e:
+            print(" Webhook Validation Failed:", str(e))
+            return CustomResponse.successResponse(data={},description="Ignored")
+
+        #  IMPORTANT FIX
+        if not callback_response.payload:
+            print(" Webhook validation ping received")
+            return CustomResponse.successResponse(data={},description="Validation success")
+
+        event = callback_response.type
+        payload = callback_response.payload
+
+        print("Event:", event)
+        print("Payload:", payload)
+
+        merchant_txn_id = getattr(payload, "merchant_order_id", None)
+        if not merchant_txn_id:
+            print(" No merchantOrderId")
+            return CustomResponse.successResponse(data={},description="Ignored")
+
+        try:
+            txn = Payment.objects.filter().first()
+
+        except PaymentTransaction.DoesNotExist:
+            return CustomResponse.successResponse(data={},description="Transaction not found")
+
+        # Idempotency
+        if txn.status == PaymentStatus.COMPLETED:
+            return CustomResponse.successResponse(data={},description="Already processed")
+
+        # Update status
+        state = getattr(payload, "state", None)
+
+        print("Payment State:", state)
+
+        if state == "COMPLETED":
+            txn.status = PaymentStatus.COMPLETED
+            txn.onboarding.payment_status = PaymentStatus.COMPLETED
+            print("Payment COMPLETED")
+
+        elif state == "FAILED":
+            txn.status = PaymentStatus.FAILED
+            txn.onboarding.payment_status = PaymentStatus.FAILED
+            print("Payment FAILED")
+        else:
+            txn.status = PaymentStatus.CANCELLED
+            txn.onboarding.payment_status = PaymentStatus.CANCELLED
+            print("Payment CANCELLED")
+        txn.phonepe_transaction_id = getattr(payload, "order_id", None)
+        txn.response_data = request.data
+        txn.save()
+        txn.onboarding.save()
+        print(" Transaction updated")
+        return CustomResponse.successResponse(data={},description="Webhook processed")
