@@ -2572,8 +2572,16 @@ class PhonePeWebhookAPIView(APIView):
         print("Webhook HIT")
         print("Headers:", request.headers)
         print("Raw Body:", request.body.decode("utf-8"))
+        body = request.body.decode("utf-8")
+        payload = body["payload"]
+        try:
+            txn = Payment.objects.filter(ph_order_id=payload.get("orderId", None)).first()
+        except PaymentTransaction.DoesNotExist:
+            return CustomResponse.successResponse(data={},description="Transaction not found")
 
-        client = get_phonepe_client()
+
+
+        client = get_phonepe_client(txn.order.store.active_payment_gateway)
 
         try:
             callback_response = client.validate_callback(
@@ -2588,10 +2596,6 @@ class PhonePeWebhookAPIView(APIView):
             print(" Webhook Validation Failed:", str(e))
             return CustomResponse.successResponse(data={},description="Ignored")
 
-        #  IMPORTANT FIX
-        if not callback_response.payload:
-            print(" Webhook validation ping received")
-            return CustomResponse.successResponse(data={},description="Validation success")
 
         event = callback_response.type
         payload = callback_response.payload
@@ -2599,13 +2603,13 @@ class PhonePeWebhookAPIView(APIView):
         print("Event:", event)
         print("Payload:", payload)
 
-        merchant_txn_id = getattr(payload, "merchant_order_id", None)
-        if not merchant_txn_id:
-            print(" No merchantOrderId")
-            return CustomResponse.successResponse(data={},description="Ignored")
+        # merchant_txn_id = getattr(payload, "merchant_order_id", None)
+        # if not merchant_txn_id:
+        #     print(" No merchantOrderId")
+        #     return CustomResponse.successResponse(data={},description="Ignored")
 
         try:
-            txn = Payment.objects.filter().first()
+            txn = Payment.objects.filter(ph_order_id=payload.get("orderId", None)).first()
 
         except PaymentTransaction.DoesNotExist:
             return CustomResponse.successResponse(data={},description="Transaction not found")
