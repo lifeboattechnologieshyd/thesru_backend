@@ -299,15 +299,13 @@ CRONJOBS = [
      "user.tasks.cleanup_expired_otps",
      f">> {BASE_DIR}/cleanup_expired_otps.log 2>&1 "
      )
-
-
-
 ]
-PHONEPE_MERCHANT_ID = os.getenv("PHONEPE_MERCHANT_ID")
-PHONEPE_SALT_KEY = os.getenv("PHONEPE_SALT_KEY")
-PHONEPE_SALT_INDEX = os.getenv("PHONEPE_SALT_INDEX")
+
+
 
 PHONEPE_ENV = os.getenv("PHONEPE_ENV", "SANDBOX")
+PHONEPE_CLIENT_VERSION = 1
+
+# super admin payment details to be added in env.
 PHONEPE_CLIENT_ID = os.getenv("PHONEPE_CLIENT_ID")
 PHONEPE_CLIENT_SECRET = os.getenv("PHONEPE_CLIENT_SECRET")
-PHONEPE_CLIENT_VERSION = 1
