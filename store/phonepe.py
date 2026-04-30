@@ -1,7 +1,22 @@
+import json
+
+from django.core.exceptions import ImproperlyConfigured
+from django.db import transaction
 from phonepe.sdk.pg.payments.v2.models.request.prefill_user_login_details import PrefillUserLoginDetails
 from phonepe.sdk.pg.payments.v2.standard_checkout_client import StandardCheckoutClient
 from phonepe.sdk.pg.env import Env
 from django.conf import settings
+from rest_framework.permissions import AllowAny
+from rest_framework.views import APIView
+
+from db.models import Payment, Order, OrderTimeLines, CouponUsage
+from db.models.user import WebhookLog, User
+from enums.store import PaymentStatus, OrderStatus, NotificationEvent
+from mixins.drf_views import CustomResponse
+from store.views import remove_cart_items
+from utils.notification import trigger_notification
+from utils.store import update_stock_after_order
+from utils.user import send_order_created_admin_email
 
 
 def get_phonepe_client(gateway):
@@ -45,3 +60,113 @@ def get_status(obj,gateway):
     response = client.get_order_status(merchant_order_id, details=False)
     state = response.state
     return state
+
+
+class PhonePeWebhookAPIView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        print("Webhook HIT")
+        print("Headers:", request.headers)
+        print("Raw Body:", request.body.decode("utf-8"))
+        body = json.loads(request.body.decode("utf-8"))
+        payload = body["payload"]
+        # logs of webhook just for records...
+        log = WebhookLog()
+        log.event_type = "ORDER_PAYMENT_WEBHOOK"
+        log.gateway = "phonepe"
+        log.payload = payload
+        log.save()
+        with transaction.atomic():
+            order = Order.objects.select_for_update().filter(order_number=payload["merchantOrderId"]).first()
+            if not order:
+                print("No Order Found with Order Number")
+                return CustomResponse().successResponse(data={},
+                                                        description="No Order Found with Order Number"
+                                                        )
+            payment = Payment.objects.filter(order=order).first()
+            # If no DB records → still return 200
+            if not payment:
+                print("Order/Payment not found for order_id:")
+                return CustomResponse().successResponse(data={},
+                                                        description="Webhook received"
+                                                        )
+            try:
+                txn = Payment.objects.filter(ph_order_id=payload.get("orderId", None)).first()
+            except Exception as e:
+                return CustomResponse.successResponse(data={}, description="Transaction not found")
+
+
+            client = get_phonepe_client(txn.order.store.active_payment_gateway)
+            try:
+                callback_response = client.validate_callback(
+                    username="charan",
+                    password="Password123",
+                    callback_header_data=request.headers.get("Authorization"),
+                    callback_response_data=request.body.decode("utf-8")
+                )
+                print(" Webhook Validation Success")
+
+            except Exception as e:
+                print(" Webhook Validation Failed:", str(e))
+                return CustomResponse.successResponse(data={}, description="Ignored")
+            event = callback_response.type
+            print("Event:", event)
+            print("Payload:", payload)
+
+            # Idempotency
+            if txn.status == PaymentStatus.COMPLETED:
+                return CustomResponse.successResponse(data={},description="Already processed")
+
+            # Update status
+            state = getattr(payload, "state", None)
+
+            print("Payment State:", state)
+
+            if state == "COMPLETED":
+                txn.status = PaymentStatus.COMPLETED
+                print("Payment COMPLETED")
+                update_stock_after_order(order)
+                payment.status = PaymentStatus.COMPLETED
+                payment.updated_by = event
+                payment.save(update_fields=["status", "updated_by"])
+                order.status = OrderStatus.CREATED
+                order.paid_online = order.amount
+                order.updated_by = event
+                order.save(update_fields=["status", "paid_online", "updated_by"])
+                OrderTimeLines.objects.create(
+                    order=order,
+                    status=OrderStatus.CREATED,
+                    remarks="Order Placed"
+                )
+                try:
+                    send_order_created_admin_email(order)
+                    print("send_order_created_admin_email")
+                except ImproperlyConfigured as e:
+                    pass
+                if order.coupon is not None:
+                    CouponUsage.objects.create(
+                        coupon=order.coupon,
+                        user=order.user,
+                        order=order
+                    )
+                context = {
+                    "var": f"{order.user.name}|{order.order_number[-5:]}|"
+                }
+                trigger_notification(order.store, NotificationEvent.ORDER_PLACED, context, order.user.mobile,
+                                     order.user.email)
+                admins = User.objects.filter(store=order.store, user_role__contains=["ADMIN"])
+                for admin in admins:
+                    trigger_notification(order.store, NotificationEvent.ADMIN_ORDER_RECEIVED, context, admin.mobile,
+                                         admin.email)
+                remove_cart_items(order.user, order.store)
+
+            elif state == "FAILED":
+                txn.status = PaymentStatus.FAILED
+                print("Payment FAILED")
+            else:
+                txn.status = PaymentStatus.PENDING
+                print("Payment CANCELLED")
+            txn.save()
+            print(" Transaction updated")
+            return CustomResponse.successResponse(data={},description="Webhook processed")
