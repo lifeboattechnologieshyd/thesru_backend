@@ -7,7 +7,7 @@ from django.conf import settings
 def get_phonepe_client(gateway):
     client = StandardCheckoutClient.get_instance(
         client_id=gateway.client_id,
-        client_secret=gateway.client_secrete,
+        client_secret=gateway.client_secret,
         client_version=int(settings.PHONEPE_CLIENT_VERSION),
         env=settings.PHONEPE_ENV,  # change to PRODUCTION later
         should_publish_events=False
@@ -20,11 +20,11 @@ from phonepe.sdk.pg.common.models.request.meta_info import MetaInfo
 
 def create_phonepe_payment(user,obj,amount_paisa, gateway):
     client = get_phonepe_client(gateway)
-    print(" Creating PhonePe Payment for:", obj.id)
+    print(" Creating PhonePe Payment for:", obj.order_number)
     meta_info = MetaInfo()
     prefill_user_login_details = PrefillUserLoginDetails(phone_number=user.mobile)
     request = StandardCheckoutPayRequest.build_request(
-        merchant_order_id=str(obj.id),
+        merchant_order_id=str(obj.order_number),
         amount=amount_paisa,  # paisa
         redirect_url="https://google.com",
         meta_info=meta_info,
