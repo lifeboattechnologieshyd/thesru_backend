@@ -1419,7 +1419,14 @@ class PaymentStatusAPIView(APIView):
             elif ph_status.upper() == "PENDING":
                 pass
             else:
-                pass
+                order.status = OrderStatus.CANCELLED
+                order.updated_by = "PAYMENT STATUS"
+                order.save(update_fields=["status", "updated_by"])
+                OrderTimeLines.objects.create(
+                    order=order,
+                    status=OrderStatus.CANCELLED,
+                    remarks="Order Cancelled"
+                )
         else:
             cf_response = fetch_cashfree_payment_status(order_number, request.store)
             cf_order_status = cf_response.get("order_status")  # PAID / ACTIVE / FAILED
