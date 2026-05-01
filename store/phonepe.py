@@ -138,11 +138,6 @@ class PhonePeWebhookAPIView(APIView):
                     status=OrderStatus.CREATED,
                     remarks="Order Placed"
                 )
-                try:
-                    send_order_created_admin_email(order)
-                    print("send_order_created_admin_email")
-                except ImproperlyConfigured as e:
-                    pass
                 if order.coupon is not None:
                     CouponUsage.objects.create(
                         coupon=order.coupon,
@@ -155,6 +150,9 @@ class PhonePeWebhookAPIView(APIView):
                 trigger_notification(order.store, NotificationEvent.ORDER_PLACED, context, order.user.mobile,
                                      order.user.email)
                 admins = User.objects.filter(store=order.store, user_role__contains=["ADMIN"])
+                context = {
+                    "var": f"#{order.order_number[-5:]}|"
+                }
                 for admin in admins:
                     trigger_notification(order.store, NotificationEvent.ADMIN_ORDER_RECEIVED, context, admin.mobile,
                                          admin.email)
