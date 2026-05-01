@@ -31,18 +31,25 @@ def get_phonepe_client(gateway):
 from phonepe.sdk.pg.payments.v2.models.request.standard_checkout_pay_request import StandardCheckoutPayRequest
 from phonepe.sdk.pg.common.models.request.meta_info import MetaInfo
 
+def get_base_url(client_identifier: str) -> str:
+    if not client_identifier:
+        raise ValueError(f"Unknown client_identifier: {client_identifier}")
+    return client_identifier.rstrip("/")
 
-def create_phonepe_payment(user,obj,amount_paisa, gateway):
+def create_phonepe_payment(user,obj,amount_paisa, gateway, identifier):
     client = get_phonepe_client(gateway)
     print(" Creating PhonePe Payment for:", obj.order_number)
+
+    base_url = get_base_url(identifier)
+    redirect_url = f"{base_url}/payment-success?{obj.order_number}"
     meta_info = MetaInfo()
     prefill_user_login_details = PrefillUserLoginDetails(phone_number=user.mobile)
     request = StandardCheckoutPayRequest.build_request(
         merchant_order_id=str(obj.order_number),
         amount=amount_paisa,  # paisa
-        redirect_url=f"http://localhost:5173/payment-success?{obj.order_number}",
+        redirect_url=redirect_url,
         meta_info=meta_info,
-        message="Payment for onboarding",
+        message="Payment for your order",
         expire_after=3600,
         prefill_user_login_details=prefill_user_login_details
     )

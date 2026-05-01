@@ -1018,7 +1018,8 @@ class InitiateOrder(APIView):
                 amount=final_amount,
                 order=order,
                 store=store,
-                gateway=gateway
+                gateway=gateway,
+                request=request
             )
             if payment_resp["success"]:
                 if gateway.provider == 'phonepe':
@@ -1128,11 +1129,13 @@ def init_cashfree(user, amount, order, store, gateway):
             "description": "Exception occurred"
         }
 
-def init_phonepe(user, amount, order, store, gateway):
+def init_phonepe(user, amount, order, store, gateway, request):
     amount_rupees = int(amount)
     amount_in_paise = amount_rupees * 100
     try:
-        payment_response = create_phonepe_payment(user,order, amount_in_paise, gateway)
+        client_identifier = request.headers.get("X-Client-Identifier")
+
+        payment_response = create_phonepe_payment(user,order, amount_in_paise, gateway, client_identifier)
         print(" Raw PhonePe Response:", payment_response)
         payment_url = payment_response.get("redirect_url")
         order_id = payment_response.get("order_id")
@@ -1156,7 +1159,7 @@ def init_phonepe(user, amount, order, store, gateway):
         }
 
 
-def initiateOrder(user, amount, order, store, gateway):
+def initiateOrder(user, amount, order, store, gateway, request):
     """
     Initiate payment using school-specific CashFree credentials from the database.
     """
@@ -1165,7 +1168,7 @@ def initiateOrder(user, amount, order, store, gateway):
     if gateway.provider == 'cashfree':
         return init_cashfree(user, amount, order, store, gateway)
     elif gateway.provider == 'phonepe':
-        return init_phonepe(user, amount,order, store, gateway)
+        return init_phonepe(user, amount,order, store, gateway, request)
     else:
         return {
             "success": False,
