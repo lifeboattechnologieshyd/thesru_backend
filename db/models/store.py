@@ -512,7 +512,7 @@ class Payment(AuditModel):
     cf_order_id = models.CharField(max_length=20, null=True) #cf_order_id
     session_id = models.CharField(max_length=200, null=True) # cf session id
     ph_order_id = models.CharField(max_length=64, null=True) # phone pe order id
-    ph_redirect_url = models.CharField(max_length=500, null=True) #phone pe URL
+    ph_redirect_url = models.TextField(null=True) #phone pe URL
     amount = models.DecimalField(decimal_places=2, max_digits=10, default=0)
     status = models.CharField(choices=PaymentStatus.choices)
     remarks = models.TextField(default="")
