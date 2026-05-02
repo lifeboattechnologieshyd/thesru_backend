@@ -3,13 +3,28 @@ from phonepe.sdk.pg.payments.v2.standard_checkout_client import StandardCheckout
 from phonepe.sdk.pg.env import Env
 from django.conf import settings
 
+from phonepe.sdk.pg.env import Env
 
 def get_phonepe_client(gateway):
+    # Normalize env safely
+    env_str = str(settings.PHONEPE_ENV).upper().strip()
+
+    if env_str == "SANDBOX":
+        env = Env.SANDBOX
+    elif env_str == "PRODUCTION":
+        env = Env.PRODUCTION
+    else:
+        raise ValueError(f"Invalid PHONEPE_ENV: {settings.PHONEPE_ENV}")
+
+    # Optional debug (remove in prod)
+    print("PHONEPE ENV:", env_str)
+    print("CLIENT_ID:", gateway.client_id)
+
     client = StandardCheckoutClient.get_instance(
         client_id=gateway.client_id,
-        client_secret=gateway.client_secrete,
+        client_secret=gateway.client_secret,
         client_version=int(settings.PHONEPE_CLIENT_VERSION),
-        env=settings.PHONEPE_ENV,  # change to PRODUCTION later
+        env=env,
         should_publish_events=False
     )
     return client
