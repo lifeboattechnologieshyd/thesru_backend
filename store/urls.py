@@ -1,5 +1,6 @@
 from django.urls import path
 
+from store.phonepe import PhonePeWebhookAPIView
 from store.views import PinListView, AddressAPIView, ProductDetailAPIView, ProductListAPIView, InitiateOrder, OrderView, \
     BannerListView, CategoryListView, AddToCartAPIView, CartListAPIView, UpdateCartAPIView, RemoveFromCartAPIView, \
     AddToWishlistAPIView, WishlistListAPIView, RemoveFromWishlistAPIView, CartTotalAPIView, \
@@ -52,7 +53,7 @@ urlpatterns = [
 
     path("shipping/details",ShippingDetails.as_view()),
 
-    # path("webhook",PhonePeWebhookAPIView.as_view()),
+    path("webhook",PhonePeWebhookAPIView.as_view()),
 
 
 ]

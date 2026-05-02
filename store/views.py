@@ -1,3 +1,4 @@
+import json
 import uuid
 from tokenize import Double
 from unicodedata import category
@@ -27,7 +28,7 @@ from db.models import AddressMaster, PinCode, Product, Order, OrderProducts, Pay
 from db.models.user import WebhookLog, User, PaymentTransaction, BusinessOnboarding, StorePaymentGateway
 from enums.store import OrderStatus, PaymentStatus, NotificationEvent
 from mixins.drf_views import CustomResponse
-from store.phonepe import create_phonepe_payment, get_phonepe_client
+from store.phonepe import create_phonepe_payment, get_phonepe_client, get_status
 from utils.notification import trigger_notification
 from utils.store import generate_order_number, time_ago, update_stock_after_order
 
@@ -1017,7 +1018,8 @@ class InitiateOrder(APIView):
                 amount=final_amount,
                 order=order,
                 store=store,
-                gateway=gateway
+                gateway=gateway,
+                request=request
             )
             if payment_resp["success"]:
                 if gateway.provider == 'phonepe':
@@ -1127,11 +1129,13 @@ def init_cashfree(user, amount, order, store, gateway):
             "description": "Exception occurred"
         }
 
-def init_phonepe(user, amount, order, store, gateway):
+def init_phonepe(user, amount, order, store, gateway, request):
     amount_rupees = int(amount)
     amount_in_paise = amount_rupees * 100
     try:
-        payment_response = create_phonepe_payment(user,order, amount_in_paise, gateway)
+        client_identifier = request.headers.get("X-Client-Identifier")
+
+        payment_response = create_phonepe_payment(user,order, amount_in_paise, gateway, client_identifier)
         print(" Raw PhonePe Response:", payment_response)
         payment_url = payment_response.get("redirect_url")
         order_id = payment_response.get("order_id")
@@ -1155,7 +1159,7 @@ def init_phonepe(user, amount, order, store, gateway):
         }
 
 
-def initiateOrder(user, amount, order, store, gateway):
+def initiateOrder(user, amount, order, store, gateway, request):
     """
     Initiate payment using school-specific CashFree credentials from the database.
     """
@@ -1164,7 +1168,7 @@ def initiateOrder(user, amount, order, store, gateway):
     if gateway.provider == 'cashfree':
         return init_cashfree(user, amount, order, store, gateway)
     elif gateway.provider == 'phonepe':
-        return init_phonepe(user, amount,order, store, gateway)
+        return init_phonepe(user, amount,order, store, gateway, request)
     else:
         return {
             "success": False,
@@ -1370,7 +1374,8 @@ class PaymentStatusAPIView(APIView):
             return CustomResponse().errorResponse(
                 description="Order Details Mismatched"
             )
-        payment = Payment.objects.filter(cf_order_id=cf_order_id).first()
+        payment = Payment.objects.filter(order=order).first()
+        # payment = Payment.objects.filter(cf_order_id=cf_order_id).first()
         if not payment:
             return CustomResponse().errorResponse(
                 description="Payment not found"
@@ -1383,74 +1388,104 @@ class PaymentStatusAPIView(APIView):
                 },
                 description="Payment status verified with Cashfree and updated"
             )
-
-
-        # 🔥 FETCH CASHFREE STATUS
-        cf_response = fetch_cashfree_payment_status(order_number, request.store)
-
-        cf_order_status = cf_response.get("order_status")  # PAID / ACTIVE / FAILED
-        verified_status = map_cashfree_status(cf_order_status)
-
-        with transaction.atomic():
-
-            payment.status = verified_status
-            payment.save(update_fields=["status"])
-
-            if verified_status == PaymentStatus.COMPLETED:
-                update_stock_after_order(order)
-
-                order.status = OrderStatus.CREATED
-                order.paid_online = payment.amount
-                order.updated_by = "PAYMENT STATUS BY FE"
-                order.save(update_fields=["status", "paid_online"])
-                OrderTimeLines.objects.create(
-                    order=order,
-                    status=OrderStatus.CREATED,
-                    remarks="Order Placed"
-                )
-                if order.coupon is not None:
-                    CouponUsage.objects.create(
-                        coupon=order.coupon,
-                        user=order.user,
-                        order=order
+        if payment.gateway == 'phonepe':
+            ph_status = get_status(order, order.store.active_payment_gateway)
+            with transaction.atomic():
+                payment.status = ph_status.upper()
+                payment.save(update_fields=["status"])
+                if ph_status.upper() == "COMPLETED":
+                    update_stock_after_order(order)
+                    order.status = OrderStatus.CREATED
+                    order.paid_online = payment.amount
+                    order.updated_by = "PAYMENT STATUS BY FE"
+                    order.save(update_fields=["status", "paid_online"])
+                    OrderTimeLines.objects.create(
+                        order=order,
+                        status=OrderStatus.CREATED,
+                        remarks="Order Placed"
                     )
-                context = {
-                    "var" : f"{order.order_number}|"
-                }
+                    if order.coupon is not None:
+                        CouponUsage.objects.create(
+                            coupon=order.coupon,
+                            user=order.user,
+                            order=order
+                        )
+                    context = {
+                        "var": f"{order.order_number}|"
+                    }
+                    trigger_notification(order.store,
+                                         NotificationEvent.ORDER_PLACED,
+                                         context,
+                                         order.user.mobile, order.user.email)
+                    # todo:  send an email to admin also.
+                    # todo: send a sms n whatsapp to admin also.
+                    remove_cart_items(order.user, order.store)
+                elif ph_status.upper() == "PENDING":
+                    pass
+                else:
+                    order.status = OrderStatus.CANCELLED
+                    order.updated_by = "PAYMENT STATUS"
+                    order.save(update_fields=["status", "updated_by"])
+                    OrderTimeLines.objects.create(
+                        order=order,
+                        status=OrderStatus.CANCELLED,
+                        remarks="Order Cancelled"
+                    )
 
-                trigger_notification(order.store,
-                                     NotificationEvent.ORDER_PLACED,
-                                     context,
-                                     order.user.mobile, order.user.email)
-                # send_push_notification(
-                #     store=order.store,
-                #     token=order.user.fcm_token,
-                #     title="Order Placed",
-                #     body="Your order has been placed successfully",
-                #     data={"order_id": order.order_number}
-                # )
-                # todo: send an email to admin also.
-                # todo: send a sms n whatsapp to admin also.
-                remove_cart_items(order.user, order.store)
-            elif verified_status == PaymentStatus.FAILED:
-                order.status = OrderStatus.FAILED
-                order.updated_by = "PAYMENT STATUS BY FE"
-                order.save(update_fields=["status", "updated_by"])
-                OrderTimeLines.objects.create(
-                    order=order,
-                    status=OrderStatus.FAILED,
-                    remarks="Order failed"
-                )
 
-            elif verified_status == PaymentStatus.CANCELLED:
-                order.status = OrderStatus.CANCELLED
-                order.updated_by = "PAYMENT STATUS BY FE"
-                order.save(update_fields=["status", "updated_by"])
-                OrderTimeLines.objects.create(
-                    order=order,
-                    status=OrderStatus.CANCELLED,
-                    remarks="Order Cancelled"
-                )
+        else:
+            cf_response = fetch_cashfree_payment_status(order_number, request.store)
+            cf_order_status = cf_response.get("order_status")  # PAID / ACTIVE / FAILED
+            verified_status = map_cashfree_status(cf_order_status)
+            with transaction.atomic():
+                payment.status = verified_status
+                payment.save(update_fields=["status"])
+                if verified_status == PaymentStatus.COMPLETED:
+                    update_stock_after_order(order)
+                    order.status = OrderStatus.CREATED
+                    order.paid_online = payment.amount
+                    order.updated_by = "PAYMENT STATUS BY FE"
+                    order.save(update_fields=["status", "paid_online"])
+                    OrderTimeLines.objects.create(
+                        order=order,
+                        status=OrderStatus.CREATED,
+                        remarks="Order Placed"
+                    )
+                    if order.coupon is not None:
+                        CouponUsage.objects.create(
+                            coupon=order.coupon,
+                            user=order.user,
+                            order=order
+                        )
+                    context = {
+                        "var": f"{order.order_number}|"
+                    }
+                    trigger_notification(order.store,
+                                         NotificationEvent.ORDER_PLACED,
+                                         context,
+                                         order.user.mobile, order.user.email)
+                    # todo: send an email to admin also.
+                    # todo: send a sms n whatsapp to admin also.
+                    remove_cart_items(order.user, order.store)
+                elif verified_status == PaymentStatus.FAILED:
+                    order.status = OrderStatus.FAILED
+                    order.updated_by = "PAYMENT STATUS BY FE"
+                    order.save(update_fields=["status", "updated_by"])
+                    OrderTimeLines.objects.create(
+                        order=order,
+                        status=OrderStatus.FAILED,
+                        remarks="Order failed"
+                    )
+
+                elif verified_status == PaymentStatus.CANCELLED:
+                    order.status = OrderStatus.CANCELLED
+                    order.updated_by = "PAYMENT STATUS BY FE"
+                    order.save(update_fields=["status", "updated_by"])
+                    OrderTimeLines.objects.create(
+                        order=order,
+                        status=OrderStatus.CANCELLED,
+                        remarks="Order Cancelled"
+                    )
         print("Payment Status api response")
         return CustomResponse().successResponse(
             data={
@@ -2535,82 +2570,3 @@ class ShippingDetails(APIView):
         )
 
 
-# class PhonePeWebhookAPIView(APIView):
-#     permission_classes = [AllowAny]
-#
-#     def post(self, request):
-#
-#         print("Webhook HIT")
-#         print("Headers:", request.headers)
-#         print("Raw Body:", request.body.decode("utf-8"))
-#
-#         client = get_phonepe_client()
-#
-#         try:
-#             callback_response = client.validate_callback(
-#                 username="charan",
-#                 password="Password123",
-#                 callback_header_data=request.headers.get("Authorization"),
-#                 callback_response_data=request.body.decode("utf-8")
-#             )
-#             print(" Webhook Validation Success")
-#
-#         except Exception as e:
-#             print(" Webhook Validation Failed:", str(e))
-#             return CustomResponse.successResponse(data={},description="Ignored")
-#
-#         #  IMPORTANT FIX
-#         if not callback_response.payload:
-#             print(" Webhook validation ping received")
-#             return CustomResponse.successResponse(data={},description="Validation success")
-#
-#         event = callback_response.type
-#         payload = callback_response.payload
-#
-#         print("Event:", event)
-#         print("Payload:", payload)
-#
-#         merchant_txn_id = getattr(payload, "merchant_order_id", None)
-#         if not merchant_txn_id:
-#             print(" No merchantOrderId")
-#             return CustomResponse.successResponse(data={},description="Ignored")
-#
-#         try:
-#             txn = PaymentTransaction.objects.get(
-#                 merchant_transaction_id=merchant_txn_id
-#             )
-#         except PaymentTransaction.DoesNotExist:
-#             return CustomResponse.successResponse(data={},description="Transaction not found")
-#
-#         # Idempotency
-#         if txn.status == PaymentStatus.COMPLETED:
-#             return CustomResponse.successResponse(data={},description="Already processed")
-#
-#         # Update status
-#         state = getattr(payload, "state", None)
-#
-#         print("Payment State:", state)
-#
-#         if state == "COMPLETED":
-#             txn.status = PaymentStatus.COMPLETED
-#             txn.onboarding.payment_status = PaymentStatus.COMPLETED
-#             print("Payment COMPLETED")
-#
-#         elif state == "FAILED":
-#             txn.status = PaymentStatus.FAILED
-#             txn.onboarding.payment_status = PaymentStatus.FAILED
-#             print("Payment FAILED")
-#
-#         else:
-#             txn.status = PaymentStatus.CANCELLED
-#             txn.onboarding.payment_status = PaymentStatus.CANCELLED
-#             print("Payment CANCELLED")
-#         txn.phonepe_transaction_id = getattr(payload, "order_id", None)
-#         txn.response_data = request.data
-#
-#         txn.save()
-#         txn.onboarding.save()
-#
-#         print(" Transaction updated")
-#
-#         return CustomResponse.successResponse(data={},description="Webhook processed")
