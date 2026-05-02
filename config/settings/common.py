@@ -303,8 +303,8 @@ CRONJOBS = [
 
 
 
-PHONEPE_ENV = os.getenv("PHONEPE_ENV", "SANDBOX")
-PHONEPE_CLIENT_VERSION = 1
+PHONEPE_ENV = os.getenv("PHONEPE_ENV", "SANDBOX").upper().strip()
+PHONEPE_CLIENT_VERSION = int(os.getenv("PHONEPE_CLIENT_VERSION", 1))
 
 # super admin payment details to be added in env.
 PHONEPE_CLIENT_ID = os.getenv("PHONEPE_CLIENT_ID")
