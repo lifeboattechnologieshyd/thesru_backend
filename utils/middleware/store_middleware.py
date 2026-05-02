@@ -104,6 +104,8 @@ class StoreMiddleware:
             "/user/register",
             "/user/booking",
             "/user/booking/status/update",
+            "/store/business/onboarding",
+            "/store/webhook",
 
 
             "/backoffice/superadmin/send-otp",
@@ -115,6 +117,11 @@ class StoreMiddleware:
             "/backoffice/bulk/stock-in",
             "/backoffice/create/bucket",
             "/backoffice/business/onboarding",
+            "/backoffice/webhook",
+
+
+            "/backoffice/config/payment-gateway",
+            "/backoffice/config/payment-gateway/*",
         )
 
     def __call__(self, request):

@@ -12,6 +12,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 
+
 from django.core.files.storage import default_storage
 from django.db.models import Q, F
 
@@ -33,18 +34,18 @@ from db.models import Category, Product, Banner, PinCode, Store, WebBanner, \
     FlashSaleBanner, Order, User, Cart, OrderProducts, UserOTP, StoreClient, UserSession, ProductMedia, Tag, \
     OrderTimeLines, Coupons, CouponProduct, CouponCategory, CouponTag, AddressMaster, NotificationChannelConfig, \
     NotificationTemplate, OrderShippingDetails
-from db.models.user import AppVersionConfig, Visitor, BusinessOnboarding, PaymentTransaction
+from db.models.user import AppVersionConfig, Visitor, BusinessOnboarding, PaymentTransaction, StorePaymentGateway
 from enums.store import InventoryType, OrderStatus, NotificationChannel, NotificationEvent, PaymentStatus
 from mixins.drf_views import CustomResponse
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from utils.invoice_generator import generate_shipping_invoice
 from utils.notification import trigger_notification
-from utils.store import generate_lsin, generate_order_number, BO_STATUS_FLOW, update_stock_after_order, \
-    generate_phonepe_payment, get_phonepe_client
+from utils.store import generate_lsin, generate_order_number, BO_STATUS_FLOW, update_stock_after_order
 from utils.user import generate_otp, send_otp_email, generate_referral_code, \
      create_bucket_and_upload_logo
 from django.db.models import Sum, F, DecimalField, ExpressionWrapper
+from django.conf import settings
 
 
 
@@ -625,8 +626,8 @@ class ProductAPIView(APIView):
         # ------------------ Update product fields ------------------
         updatable_fields = [
             "name", "size", "colour", "mrp", "is_free_shipping",
-            "selling_price", "gst_percentage", "description",
-            "gst_amount", "is_active","group_code"
+            "selling_price", "gst_percentage", "description","size",
+            "gst_amount", "is_active","group_code", "sku", "description"
         ]
 
         for field in updatable_fields:
@@ -1772,240 +1773,6 @@ class PinCodeDistrictAPIView(APIView):
 #                 description=f"Database integrity error {error}"
 #             )
 
-class StoreAPIView(APIView):
-    permission_classes = [AllowAny]
-
-    def post(self, request):
-        data = request.data
-
-        import json
-        clients = json.loads(request.data.get("clients", "[]"))
-
-        bucket_name = data.get("aws_bucket_name")
-        logo_file = request.FILES.get("logo")
-
-        #  STEP 1: CREATE BUCKET + UPLOAD LOGO FIRST
-        success, result = create_bucket_and_upload_logo(bucket_name, logo_file)
-
-        if not success:
-            return CustomResponse.errorResponse(
-                description="S3 bucket creation failed",
-                data={"error": result}
-            )
-
-        logo_url = result
-
-        #  STEP 2: CREATE STORE ONLY IF S3 SUCCESS
-        try:
-            store = Store.objects.create(
-                name=data.get("name"),
-                mobile=data.get("mobile"),
-                email=data.get("email"),
-                address=data.get("address"),
-                logo=logo_url,
-                aws_bucket_name=bucket_name,
-                product_code=data.get("product_code"),
-                email_login=data.get("email_login"),
-                mobile_login=data.get("mobile_login"),
-                primary_color=data.get("primary_color"),
-                secondary_color=data.get("secondary_color"),
-                client_id=data.get("client_id"),
-                client_secret=data.get("client_secret"),
-            )
-
-            for item in clients:
-                StoreClient.objects.create(
-                    store=store,
-                    identifier=item.get("identifier"),
-                    client_type=item.get("client_type"),
-                    is_active=True
-                )
-
-            return CustomResponse.successResponse(
-                data={
-                    "bucket_name": bucket_name,
-                    "logo_url": logo_url
-                },
-                description="Store and bucket created successfully"
-            )
-
-        except Exception as e:
-            return CustomResponse.errorResponse(
-                description="Store creation failed",
-                data={"error": str(e)}
-            )
-    # ---------------- GET STORE / LIST ----------------
-    def get(self, request, id=None):
-        # ---------- SINGLE STORE ----------
-        if id:
-            store = Store.objects.filter(id=id).values().first()
-            if not store:
-                return CustomResponse.errorResponse(
-                    description="store not found"
-                )
-
-            return CustomResponse.successResponse(
-                data=[store],
-                total=1
-            )
-
-        # ---------- PAGINATION ----------
-        page = int(request.query_params.get("page", 1))
-        page_size = int(request.query_params.get("page_size", 10))
-
-        if page < 1 or page_size < 1:
-            return CustomResponse.errorResponse(
-                description="page and page_size must be positive integers"
-            )
-        queryset = Store.objects.prefetch_related("clients").all().order_by("-created_at")
-        total = queryset.count()
-        offset = (page - 1) * page_size
-        queryset = queryset[offset: offset + page_size]
-        data = []
-        for query in queryset:
-            client_list = []
-            for client in query.clients.all():
-                client_list.append({
-                    "id": client.id,
-                    "client_type": client.client_type,
-                    "identifier": client.identifier,
-                    "is_active": client.is_active
-                })
-            resp = model_to_dict(query)
-            resp["id"] = str(query.id)
-            data.append({
-                "client": client_list,
-                "store": resp
-            })
-        return CustomResponse.successResponse(
-            data=data,
-            total=total
-        )
-
-    # ---------------- UPDATE STORE ----------------
-    def put(self, request, id=None):
-        store_id = id
-        data = request.data
-        if not store_id:
-            return CustomResponse.errorResponse(description="store_id required")
-
-        try:
-            store = Store.objects.get(id=store_id)
-        except Store.DoesNotExist:
-            return CustomResponse.errorResponse(description="Store not found")
-
-
-        if isinstance(data, str):
-            data = json.loads(data)
-
-        clients = data.get("clients", [])
-
-        if isinstance(clients, str):
-            clients = json.loads(clients)
-
-        try:
-            with transaction.atomic():
-
-                # ---------------- UPDATE STORE ----------------
-
-                store.name = data.get("name", store.name)
-                store.mobile = data.get("mobile", store.mobile)
-                store.email = data.get("email", store.email)
-                store.address = data.get("address", store.address)
-                store.product_code = data.get("product_code", store.product_code)
-                store.aws_bucket_name = data.get("aws_bucket_name", store.aws_bucket_name)
-                store.email_login = data.get("email_login", store.email_login)
-                store.mobile_login = data.get("mobile_login", store.mobile_login)
-                store.primary_color = data.get("primary_color", store.primary_color)
-                store.secondary_color = data.get("secondary_color", store.secondary_color)
-                store.client_id = data.get("client_id", store.client_id)
-                store.client_secret = data.get("client_secret", store.client_secret)
-
-                store.save()
-
-                # ---------------- CLEAN CLIENTS (remove duplicates) ----------------
-
-                clean_clients = []
-                seen = set()
-
-                for c in clients:
-                    identifier = str(c.get("identifier", "")).strip()
-                    client_type = c.get("client_type")
-
-                    if not identifier:
-                        continue
-
-                    if identifier in seen:
-                        continue
-
-                    seen.add(identifier)
-                    clean_clients.append({
-                        "identifier": identifier,
-                        "client_type": client_type
-                    })
-                clients = clean_clients
-                # ---------------- EXISTING ----------------
-                existing_qs = StoreClient.objects.filter(store=store)
-                existing_map = {
-                    x.identifier: x for x in existing_qs
-                }
-                request_identifiers = set()
-                # ---------------- UPSERT ----------------
-                for item in clients:
-                    identifier = item["identifier"]
-                    client_type = item.get("client_type")
-                    request_identifiers.add(identifier)
-                    if identifier in existing_map:
-                        obj = existing_map[identifier]
-                        obj.client_type = client_type
-                        obj.is_active = True
-                        obj.save()
-                    else:
-                        StoreClient.objects.create(
-                            store=store,
-                            identifier=identifier,
-                            client_type=client_type,
-                            is_active=True
-                        )
-
-                # ---------------- DELETE REMOVED ----------------
-
-                existing_identifiers = set(existing_map.keys())
-
-                delete_ids = existing_identifiers - request_identifiers
-
-                if delete_ids:
-                    StoreClient.objects.filter(
-                        store=store,
-                        identifier__in=delete_ids
-                    ).delete()
-
-            return CustomResponse.successResponse(data={},description="Store updated successfully")
-
-        except IntegrityError as error:
-            return CustomResponse.errorResponse(
-                description=f"Database error {error}"
-            )
-
-    # ---------------- DELETE STORE ----------------
-    def delete(self, request, id=None):
-        if not id:
-            return CustomResponse.errorResponse(
-                description="store id required"
-            )
-
-        store = Store.objects.filter(id=id)
-        if not store.exists():
-            return CustomResponse.errorResponse(
-                description="store not found"
-            )
-
-        store.delete()
-
-        return CustomResponse.successResponse(
-            data={},
-            description="store deleted successfully"
-        )
 
 
 class WebBannerAPIView(APIView):
@@ -4251,23 +4018,32 @@ class S3BucketAPIView(APIView):
 class BusinessOnboardingAPIView(APIView):
     permission_classes = [AllowAny]
 
-
     def post(self, request):
-
-        print(" Incoming Request Data:", request.data)
+        print("\n========== NEW REQUEST ==========")
+        print("Incoming Data:", request.data)
 
         name = request.data.get("name")
         email = request.data.get("email")
         mobile = request.data.get("mobile")
+        amount = request.data.get("amount")
 
-        # Validation
-        if not name or not email or not mobile:
+        # 🔍 Validate input
+        if not name or not email or not mobile or not amount:
             print(" Validation Failed")
             return CustomResponse.errorResponse(
-                description="name, email, mobile are required",
+                description="name, email, mobile, amount are required",
             )
 
-        # Create record
+        print(" Validation Passed")
+
+        #  Convert amount FIRST
+        amount_rupees = int(amount)
+        amount_paisa = amount_rupees * 100
+
+        print("Amount ₹:", amount_rupees)
+        print("Amount paisa:", amount_paisa)
+
+        #  Create onboarding record
         obj = BusinessOnboarding.objects.create(
             business_email=email,
             business_phone=mobile,
@@ -4277,27 +4053,49 @@ class BusinessOnboardingAPIView(APIView):
 
         print(" BusinessOnboarding Created:", obj.id)
 
-        # Call PhonePe
-        payment_response = generate_phonepe_payment(obj)
-
-        print(" PhonePe Response:", payment_response)
+        print("\n--- Calling PhonePe ---")
 
         try:
-            payment_url = payment_response["data"]["instrumentResponse"]["redirectInfo"]["url"]
+            #  CALL ONLY ONCE
+            payment_response = create_phonepe_payment(obj, amount_paisa)
+
+            print(" Raw PhonePe Response:", payment_response)
+
+            payment_url = payment_response.get("redirect_url")
+            order_id = payment_response.get("order_id")
+
+            if not payment_url:
+                print(" No redirect URL found")
+                return CustomResponse.errorResponse(
+                    description="Payment creation failed"
+                )
 
             print("🔗 Payment URL:", payment_url)
 
         except Exception as e:
-            print("❌ Payment URL Extraction Failed:", str(e))
+            print(" PhonePe Exception:", str(e))
             return CustomResponse.errorResponse(
                 description="Payment creation failed"
             )
 
+        #  CREATE TRANSACTION
+        PaymentTransaction.objects.create(
+            merchant_transaction_id=str(obj.id),
+            phonepe_transaction_id=order_id,
+            onboarding=obj,
+            amount=amount_paisa,
+            status=PaymentStatus.INITIATED,
+            payment_url=payment_url
+        )
+
+        print(" PaymentTransaction Created")
+
+        #  Save onboarding
         obj.payment_url = payment_url
         obj.payment_status = PaymentStatus.PENDING
         obj.save()
 
-        print(" Saved Payment URL & Status (PENDING)")
+        print(" Payment URL Saved & Status Updated to PENDING")
 
         return CustomResponse.successResponse(
             description="Payment link generated",
@@ -4310,19 +4108,20 @@ class BusinessOnboardingAPIView(APIView):
 
 
 class PhonePeWebhookAPIView(APIView):
+    permission_classes = [AllowAny]
 
     def post(self, request):
 
         print(" Webhook HIT")
-        print(" Headers:", request.headers)
-        print(" Raw Body:", request.body.decode("utf-8"))
+        print("Headers:", request.headers)
+        print("Raw Body:", request.body.decode("utf-8"))
 
         client = get_phonepe_client()
 
         try:
             callback_response = client.validate_callback(
-                username="YOUR_USERNAME",
-                password="YOUR_PASSWORD",
+                username="charan",
+                password="Password123",
                 callback_header_data=request.headers.get("Authorization"),
                 callback_response_data=request.body.decode("utf-8")
             )
@@ -4330,57 +4129,60 @@ class PhonePeWebhookAPIView(APIView):
 
         except Exception as e:
             print(" Webhook Validation Failed:", str(e))
-            return CustomResponse.errorResponse(description="Invalid webhook")
+            return CustomResponse.successResponse(data={},description="Ignored")
+
+        #  IMPORTANT FIX
+        if not callback_response.payload:
+            print(" Webhook validation ping received")
+            return CustomResponse.successResponse(data={},description="Validation success")
 
         event = callback_response.type
         payload = callback_response.payload
 
-        print(" Event:", event)
-        print(" Payload:", payload)
+        print("Event:", event)
+        print("Payload:", payload)
 
-        merchant_txn_id = payload.originalMerchantOrderId
-        print(" Merchant Transaction ID:", merchant_txn_id)
+        merchant_txn_id = getattr(payload, "merchant_order_id", None)
+        if not merchant_txn_id:
+            print(" No merchantOrderId")
+            return CustomResponse.successResponse(data={},description="Ignored")
 
         try:
             txn = PaymentTransaction.objects.get(
                 merchant_transaction_id=merchant_txn_id
             )
-            print(" Transaction Found:", txn.id)
-
         except PaymentTransaction.DoesNotExist:
-            print(" Transaction NOT Found")
-            return CustomResponse.errorResponse(description="Transaction not found")
+            return CustomResponse.successResponse(data={},description="Transaction not found")
 
         # Idempotency
         if txn.status == PaymentStatus.COMPLETED:
-            print(" Already Completed, Skipping Update")
-            return CustomResponse.successResponse(description="Already processed")
+            return CustomResponse.successResponse(data={},description="Already processed")
 
         # Update status
-        if event == "checkout.order.completed":
+        state = getattr(payload, "state", None)
+
+        print("Payment State:", state)
+
+        if state == "COMPLETED":
             txn.status = PaymentStatus.COMPLETED
             txn.onboarding.payment_status = PaymentStatus.COMPLETED
             print("Payment COMPLETED")
 
-        elif event == "checkout.order.failed":
+        elif state == "FAILED":
             txn.status = PaymentStatus.FAILED
             txn.onboarding.payment_status = PaymentStatus.FAILED
-            print(" Payment FAILED")
+            print("Payment FAILED")
 
         else:
             txn.status = PaymentStatus.CANCELLED
             txn.onboarding.payment_status = PaymentStatus.CANCELLED
-            print(" Payment CANCELLED")
-
-        txn.phonepe_transaction_id = getattr(payload, "orderId", None)
+            print("Payment CANCELLED")
+        txn.phonepe_transaction_id = getattr(payload, "order_id", None)
         txn.response_data = request.data
 
         txn.save()
         txn.onboarding.save()
 
-        print("Transaction & Onboarding Updated")
+        print(" Transaction updated")
 
-        return CustomResponse.successResponse(
-            data={},
-            description="Webhook processed"
-        )
+        return CustomResponse.successResponse(data={},description="Webhook processed")

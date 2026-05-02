@@ -2,10 +2,10 @@ from django.urls import path
 
 from backoffice.customer import CustomerCreation, UserAddress, BackofficeCustomerListAPI, CustomerDetails, \
     UpdateUserDetails
-from backoffice.inventory import StockInAPIView, BulkInventory
+from backoffice.inventory import StockInAPIView, BulkInventory, StockOutAPI
 from backoffice.shipping import  ShippingPlanAPIView, ShippinPlanCrud
 from backoffice.store import ProductAPIView, CategoriesAPIView, BannerAPIView, \
-    PinCodeAPIView, StoreAPIView, WebBannerAPIView, FlashSaleBannerAPIView, OrderStatsAPIView, \
+    PinCodeAPIView, WebBannerAPIView, FlashSaleBannerAPIView, OrderStatsAPIView, \
     CartListView, OrderListAPIView, AbandonedOrderListAPIView, Login, SendOTP, TagsAPIView, AdminOrderDetailAPIView, \
     AdminCreateCouponAPIView, UserAPIView, CreateAppVersionConfigAPI, OrderShippingSlipAPIView, \
     StoreAnalyticsAPIView, EmailSendOTPView, EmailVerifyOTPView, ClientInfo, NotificationConfig, \
@@ -13,6 +13,7 @@ from backoffice.store import ProductAPIView, CategoriesAPIView, BannerAPIView, \
     DashboardStatsAPIView, PinCodeStatesAPIView, PinCodeDistrictAPIView, S3BucketAPIView, BusinessOnboardingAPIView, \
     PhonePeWebhookAPIView
 from backoffice.subscriptions import CreateSubscriptionPlanAPI
+from backoffice.superadmin import StorePaymentGatewayCreateAPIView, StoreAPIView
 
 urlpatterns = [
 
@@ -43,12 +44,7 @@ urlpatterns = [
     path("merchant/customer/update", UpdateUserDetails.as_view()),
     path("merchant/users", BackofficeCustomerListAPI.as_view()),
 
-    #####################################
-    ## Store  API's                    ##
-    #####################################
 
-    path("store", StoreAPIView.as_view()),
-    path("store/<str:id>", StoreAPIView.as_view()),
 
     #####################################
     ## Product  API's                    ##
@@ -72,7 +68,7 @@ urlpatterns = [
     path("banner/<str:id>",BannerAPIView.as_view()),
 
     #####################################
-    ## Pincode  API's            ##
+    ##    -- Pincode -- API's          ##
     #####################################
 
     path("pin",PinCodeAPIView.as_view()),
@@ -112,15 +108,21 @@ urlpatterns = [
     ## stock related apis -- INVENTORY ##
     #####################################
     path("stock-in",StockInAPIView.as_view()),
+    path("stock-out",StockOutAPI.as_view()),
     path("bulk/stock-in",BulkInventory.as_view()),
-
-
 
     #####################################
     ## SUPER ADMIN                     ##
     #####################################
     path("superadmin/send-otp", SuperAdminSendOTPAPIView.as_view()),
     path("superadmin/verify-otp", SuperAdminVerifyOTPAPIView.as_view()),
+
+
+    path("store", StoreAPIView.as_view()),
+    path("store/<str:id>", StoreAPIView.as_view()),
+
+    path("config/payment-gateway", StorePaymentGatewayCreateAPIView.as_view()),
+    path("config/payment-gateway/<int:gateway_id>/", StorePaymentGatewayCreateAPIView.as_view()),
 
     path("notification/config", NotificationConfig.as_view()),
     path("notification/config/<str:id>", NotificationConfig.as_view()),
@@ -131,7 +133,9 @@ urlpatterns = [
     path("subscription/plan",CreateSubscriptionPlanAPI.as_view()),
     path("create/bucket",S3BucketAPIView.as_view()),
 
-    path("business/onboarding",BusinessOnboardingAPIView.as_view()),
-    path("webhook",PhonePeWebhookAPIView.as_view()),
+    # path("business/onboarding",BusinessOnboardingAPIView.as_view()),
+    # path("webhook",PhonePeWebhookAPIView.as_view()),
+
+
 
 ]

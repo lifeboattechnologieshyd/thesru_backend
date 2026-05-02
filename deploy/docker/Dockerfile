@@ -51,13 +51,7 @@ ENV PYTHONDONTWRITEBYTECODE=1
 
 WORKDIR /project/
 
-# copy code
-COPY . /project/
-
-# make scripts executable
-RUN chmod +x /project/scripts/*
-
-# Install system dependencies required for running
+# 1. Install system dependencies required for running (Static)
 RUN apt-get update && apt-get install --no-install-recommends -y \
     cron \
     libpq5 \
@@ -83,30 +77,34 @@ RUN apt-get update && apt-get install --no-install-recommends -y \
     libxrandr2 \
     libxkbcommon0 \
     xdg-utils \
-    \
+    && apt-get purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false \
     && rm -rf /var/lib/apt/lists/*
 
-
-
-
-# All absolute dir copies ignore workdir instruction. All relative dir copies are wrt to the workdir instruction
-# copy python dependency wheels from python-build-stage
+# 2. Copy and install python dependencies (Only changes on requirements change)
 COPY --from=python-build-stage /usr/src/app/wheels  /wheels/
-
-# use wheels to install python dependencies
 RUN pip install --no-cache-dir --no-index --find-links=/wheels/ /wheels/* \
     && rm -rf /wheels/
 
 RUN playwright install chromium
 
-# Copy Grafana Alloy binary from alloy-download-stage
+# 3. Setup non-code tools and scripts (Alloy, entrypoints)
+# These change less frequently than the application code.
 COPY --from=alloy-download-stage /tmp/alloy /usr/local/bin/alloy
-
-# Make alloy binary executable
 RUN chmod +x /usr/local/bin/alloy
 
-# Expose port
+COPY deploy/docker/entrypoint.sh /usr/local/bin/entrypoint.sh
+COPY deploy/docker/prestop.sh /usr/local/bin/prestop.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh /usr/local/bin/prestop.sh || true
+
+# 4. Copy actual project code (Finally)
+# This layer is most likely to change, so it's kept at the end.
+COPY . /project/
+
+# Make project scripts executable (depends on project code)
+RUN chmod +x /project/scripts/* || true
+
+# Expose ports
 EXPOSE 8000 12345
 
-# Run the application
-CMD ["/project/scripts/start.sh"]
+# Use the entrypoint to run migrations, start cron, and launch Gunicorn
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]

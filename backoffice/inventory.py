@@ -100,6 +100,73 @@ class StockInAPIView(APIView):
         )
 
 
+class StockOutAPI(APIView):
+    permission_classes = [IsAuthenticated]
+    def post(self, request):
+        store = request.store
+        user = request.user
+        product_id = request.data.get("product_id")
+        quantity = request.data.get("quantity")
+        sell_price = request.data.get("sell_price")
+        # ---- Basic Validations ----
+        if not product_id:
+            return CustomResponse().errorResponse(data={}, description="product_id is required")
+        if not quantity or int(quantity) <= 0:
+            return CustomResponse().errorResponse(data={}, description="quantity must be greater than 0")
+        if not sell_price:
+            return CustomResponse().errorResponse(data={}, description="sell_price is required")
+        try:
+            product = Product.objects.get(id=product_id, store=store)
+        except Product.DoesNotExist:
+            return CustomResponse().errorResponse(data={}, description="Invalid product_id")
+
+        quantity = int(quantity)
+        # cost_per_unit = Decimal(cost_per_unit)
+        sell_price = Decimal(sell_price)
+
+        updated = Product.objects.filter(
+            id=product.id,
+            current_stock__gte=quantity
+        ).update(
+            current_stock=F("current_stock") - quantity
+        )
+
+        if updated == 0:
+            raise Exception(f"Insufficient stock for {product.name}")
+
+        # stock-out from inventory also.
+        batches = InventoryBatch.objects.select_for_update().filter(
+            product=product,
+            remaining_quantity__gt=0
+        ).order_by("created_at")
+        qty_to_deduct = quantity
+        total_cost = 0
+        for batch in batches:
+            if qty_to_deduct <= 0:
+                break
+            deduct_qty = min(batch.remaining_quantity, qty_to_deduct)
+            total_cost += batch.cost_per_unit * deduct_qty
+            batch.remaining_quantity -= deduct_qty
+            batch.save(update_fields=["remaining_quantity"])
+
+            InventoryTransaction.objects.create(
+                store=product.store,
+                product=product,
+                batch=batch,
+                transaction_type=request.data.get("transaction_type"),
+                quantity=deduct_qty,
+                cost_price=batch.cost_per_unit,
+                selling_price=sell_price
+            )
+            qty_to_deduct -= deduct_qty
+        if qty_to_deduct > 0:
+            raise Exception(f"Insufficient stock for {product.name}")
+        cost_price_at_sale = total_cost / quantity
+        gross_profit = (sell_price * quantity) - total_cost
+        return CustomResponse().successResponse(data={}, description="Stock OUT added successfully")
+
+
+
 
 
 class BulkInventory(APIView, CustomResponse):

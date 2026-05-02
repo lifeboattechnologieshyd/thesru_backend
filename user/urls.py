@@ -26,5 +26,4 @@ urlpatterns = [
     path("test",TestSMTPView.as_view()),
     path("generate-invoice", GenerateInvoiceAPIView.as_view()),
 
-
 ]
