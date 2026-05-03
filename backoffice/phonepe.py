@@ -13,6 +13,8 @@ from utils.store import update_stock_after_order
 
 
 def get_phonepe_client(gateway):
+    print(gateway.client_id)
+    print(gateway.client_secret)
     client = StandardCheckoutClient.get_instance(
         client_id=gateway.client_id,
         client_secret=gateway.client_secret,
