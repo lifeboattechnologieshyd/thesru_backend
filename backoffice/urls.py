@@ -3,6 +3,7 @@ from django.urls import path
 from backoffice.customer import CustomerCreation, UserAddress, BackofficeCustomerListAPI, CustomerDetails, \
     UpdateUserDetails
 from backoffice.inventory import StockInAPIView, BulkInventory, StockOutAPI
+from backoffice.phonepe import UpdateOrderStatus
 from backoffice.shipping import  ShippingPlanAPIView, ShippinPlanCrud
 from backoffice.store import ProductAPIView, CategoriesAPIView, BannerAPIView, \
     PinCodeAPIView, WebBannerAPIView, FlashSaleBannerAPIView, OrderStatsAPIView, \
@@ -136,6 +137,6 @@ urlpatterns = [
     # path("business/onboarding",BusinessOnboardingAPIView.as_view()),
     # path("webhook",PhonePeWebhookAPIView.as_view()),
 
-
+    path("payment/update", UpdateOrderStatus.as_view()),
 
 ]
