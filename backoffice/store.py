@@ -504,7 +504,7 @@ class ProductAPIView(APIView):
 
         # ---------- Query params ----------
         search = request.query_params.get("search")
-        category_id = request.query_params.get("category")
+        category_id = request.query_params.get("category_id")
         tags = request.query_params.get("tags")  # comma-separated
         lsin = request.query_params.get("lsin")
 
