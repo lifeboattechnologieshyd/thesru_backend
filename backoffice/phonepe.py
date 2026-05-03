@@ -18,7 +18,6 @@ def get_phonepe_client(gateway):
         client_secret=gateway.client_secret,
         client_version=int(settings.PHONEPE_CLIENT_VERSION),
         env=settings.PHONEPE_ENV,  # change to PRODUCTION later
-        should_publish_events=False
     )
     return client
 
@@ -42,7 +41,9 @@ class UpdateOrderStatus(APIView):
                 },
                 description="Payment status verified with Cashfree"
             )
+        print("everything is fine, go to connect Phone pe")
         client = get_phonepe_client(order.store.active_payment_gateway)
+        print("initiated phonepe client-- go to get status")
         response = client.get_order_status(order_num, details=False)
         print(response)
         state = response.state
