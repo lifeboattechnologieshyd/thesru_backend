@@ -137,6 +137,6 @@ urlpatterns = [
     # path("business/onboarding",BusinessOnboardingAPIView.as_view()),
     # path("webhook",PhonePeWebhookAPIView.as_view()),
 
-    path("payment/update", UpdateOrderStatus.as_view()),
+    path("update/payment", UpdateOrderStatus.as_view()),
 
 ]
