@@ -39,6 +39,7 @@ from enums.store import InventoryType, OrderStatus, NotificationChannel, Notific
 from mixins.drf_views import CustomResponse
 from rest_framework_simplejwt.tokens import RefreshToken
 
+from store.phonepe import get_phonepe_client
 from utils.invoice_generator import generate_shipping_invoice
 from utils.notification import trigger_notification
 from utils.store import generate_lsin, generate_order_number, BO_STATUS_FLOW, update_stock_after_order
@@ -4015,92 +4016,92 @@ class S3BucketAPIView(APIView):
 
 
 
-class BusinessOnboardingAPIView(APIView):
-    permission_classes = [AllowAny]
-
-    def post(self, request):
-        print("\n========== NEW REQUEST ==========")
-        print("Incoming Data:", request.data)
-
-        name = request.data.get("name")
-        email = request.data.get("email")
-        mobile = request.data.get("mobile")
-        amount = request.data.get("amount")
-
-        # 🔍 Validate input
-        if not name or not email or not mobile or not amount:
-            print(" Validation Failed")
-            return CustomResponse.errorResponse(
-                description="name, email, mobile, amount are required",
-            )
-
-        print(" Validation Passed")
-
-        #  Convert amount FIRST
-        amount_rupees = int(amount)
-        amount_paisa = amount_rupees * 100
-
-        print("Amount ₹:", amount_rupees)
-        print("Amount paisa:", amount_paisa)
-
-        #  Create onboarding record
-        obj = BusinessOnboarding.objects.create(
-            business_email=email,
-            business_phone=mobile,
-            mobile_number=mobile,
-            payment_status=PaymentStatus.INITIATED
-        )
-
-        print(" BusinessOnboarding Created:", obj.id)
-
-        print("\n--- Calling PhonePe ---")
-
-        try:
-            #  CALL ONLY ONCE
-            payment_response = create_phonepe_payment(obj, amount_paisa)
-
-            print(" Raw PhonePe Response:", payment_response)
-
-            payment_url = payment_response.get("redirect_url")
-            order_id = payment_response.get("order_id")
-
-            if not payment_url:
-                print(" No redirect URL found")
-                return CustomResponse.errorResponse(
-                    description="Payment creation failed"
-                )
-
-            print("🔗 Payment URL:", payment_url)
-
-        except Exception as e:
-            print(" PhonePe Exception:", str(e))
-            return CustomResponse.errorResponse(
-                description="Payment creation failed"
-            )
-
-        #  CREATE TRANSACTION
-        PaymentTransaction.objects.create(
-            merchant_transaction_id=str(obj.id),
-            phonepe_transaction_id=order_id,
-            onboarding=obj,
-            amount=amount_paisa,
-            status=PaymentStatus.INITIATED,
-            payment_url=payment_url
-        )
-
-        print(" PaymentTransaction Created")
-
-        #  Save onboarding
-        obj.payment_url = payment_url
-        obj.payment_status = PaymentStatus.PENDING
-        obj.save()
-
-        print(" Payment URL Saved & Status Updated to PENDING")
-
-        return CustomResponse.successResponse(
-            description="Payment link generated",
-            data={"payment_url": payment_url}
-        )
+# class BusinessOnboardingAPIView(APIView):
+#     permission_classes = [AllowAny]
+#
+#     def post(self, request):
+#         print("\n========== NEW REQUEST ==========")
+#         print("Incoming Data:", request.data)
+#
+#         name = request.data.get("name")
+#         email = request.data.get("email")
+#         mobile = request.data.get("mobile")
+#         amount = request.data.get("amount")
+#
+#         # 🔍 Validate input
+#         if not name or not email or not mobile or not amount:
+#             print(" Validation Failed")
+#             return CustomResponse.errorResponse(
+#                 description="name, email, mobile, amount are required",
+#             )
+#
+#         print(" Validation Passed")
+#
+#         #  Convert amount FIRST
+#         amount_rupees = int(amount)
+#         amount_paisa = amount_rupees * 100
+#
+#         print("Amount ₹:", amount_rupees)
+#         print("Amount paisa:", amount_paisa)
+#
+#         #  Create onboarding record
+#         obj = BusinessOnboarding.objects.create(
+#             business_email=email,
+#             business_phone=mobile,
+#             mobile_number=mobile,
+#             payment_status=PaymentStatus.INITIATED
+#         )
+#
+#         print(" BusinessOnboarding Created:", obj.id)
+#
+#         print("\n--- Calling PhonePe ---")
+#
+#         try:
+#             #  CALL ONLY ONCE
+#             payment_response = create_phonepe_payment(obj, amount_paisa)
+#
+#             print(" Raw PhonePe Response:", payment_response)
+#
+#             payment_url = payment_response.get("redirect_url")
+#             order_id = payment_response.get("order_id")
+#
+#             if not payment_url:
+#                 print(" No redirect URL found")
+#                 return CustomResponse.errorResponse(
+#                     description="Payment creation failed"
+#                 )
+#
+#             print("🔗 Payment URL:", payment_url)
+#
+#         except Exception as e:
+#             print(" PhonePe Exception:", str(e))
+#             return CustomResponse.errorResponse(
+#                 description="Payment creation failed"
+#             )
+#
+#         #  CREATE TRANSACTION
+#         PaymentTransaction.objects.create(
+#             merchant_transaction_id=str(obj.id),
+#             phonepe_transaction_id=order_id,
+#             onboarding=obj,
+#             amount=amount_paisa,
+#             status=PaymentStatus.INITIATED,
+#             payment_url=payment_url
+#         )
+#
+#         print(" PaymentTransaction Created")
+#
+#         #  Save onboarding
+#         obj.payment_url = payment_url
+#         obj.payment_status = PaymentStatus.PENDING
+#         obj.save()
+#
+#         print(" Payment URL Saved & Status Updated to PENDING")
+#
+#         return CustomResponse.successResponse(
+#             description="Payment link generated",
+#             data={"payment_url": payment_url}
+#         )
 
 
 
