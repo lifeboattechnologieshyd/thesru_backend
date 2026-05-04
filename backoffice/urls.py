@@ -22,8 +22,7 @@ urlpatterns = [
     ## User Authentication API's       ##
     #####################################
 
-    path("update/payment", UpdateOrderStatus.as_view()),
-    path("update/payment/", UpdateOrderStatus.as_view()),
+
 
     path("send-otp",SendOTP.as_view()),
     path("verify-otp",Login.as_view()),
@@ -139,6 +138,9 @@ urlpatterns = [
 
     # path("business/onboarding",BusinessOnboardingAPIView.as_view()),
     # path("webhook",PhonePeWebhookAPIView.as_view()),
+
+    path("update/payment", UpdateOrderStatus.as_view()),
+    path("update/payment/", UpdateOrderStatus.as_view()),
 
 
 
