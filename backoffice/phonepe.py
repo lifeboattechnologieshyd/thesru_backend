@@ -28,6 +28,7 @@ class UpdateOrderStatus(APIView):
 
 
     def post(self, request):
+        print(" API HIT: UpdateOrderStatus")
         order_num = request.data.get("order_number")
         order = Order.objects.filter(order_number=order_num).first()
         if not order:
