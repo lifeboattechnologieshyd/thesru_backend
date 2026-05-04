@@ -39,6 +39,7 @@ from enums.store import InventoryType, OrderStatus, NotificationChannel, Notific
 from mixins.drf_views import CustomResponse
 from rest_framework_simplejwt.tokens import RefreshToken
 
+from store.phonepe import get_phonepe_client
 from utils.invoice_generator import generate_shipping_invoice
 from utils.notification import trigger_notification
 from utils.store import generate_lsin, generate_order_number, BO_STATUS_FLOW, update_stock_after_order
