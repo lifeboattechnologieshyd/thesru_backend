@@ -11,7 +11,7 @@ from backoffice.store import ProductAPIView, CategoriesAPIView, BannerAPIView, \
     AdminCreateCouponAPIView, UserAPIView, CreateAppVersionConfigAPI, OrderShippingSlipAPIView, \
     StoreAnalyticsAPIView, EmailSendOTPView, EmailVerifyOTPView, ClientInfo, NotificationConfig, \
     NotificationTemplateConfig, SuperAdminSendOTPAPIView, SuperAdminVerifyOTPAPIView, StoreListAPIView, \
-    DashboardStatsAPIView, PinCodeStatesAPIView, PinCodeDistrictAPIView, S3BucketAPIView, BusinessOnboardingAPIView, \
+    DashboardStatsAPIView, PinCodeStatesAPIView, PinCodeDistrictAPIView, S3BucketAPIView, \
     PhonePeWebhookAPIView
 from backoffice.subscriptions import CreateSubscriptionPlanAPI
 from backoffice.superadmin import StorePaymentGatewayCreateAPIView, StoreAPIView
@@ -138,5 +138,6 @@ urlpatterns = [
     # path("webhook",PhonePeWebhookAPIView.as_view()),
 
     path("update/payment", UpdateOrderStatus.as_view()),
+    path("update/payment/", UpdateOrderStatus.as_view()),
 
 ]
