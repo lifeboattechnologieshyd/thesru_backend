@@ -2561,20 +2561,20 @@ class OrderListAPIView(APIView):
             context = {
                 "var": f"{order.user.name}|{order.order_number[-5:]}|{osd.courier_service}|{osd.tracking_id}|"
             }
-            trigger_notification(order.store,
-                                 NotificationEvent.ORDER_SHIPPED,
-                                 context,
-                                 order.user.mobile, order.user.email)
+            # trigger_notification(order.store,
+            #                      NotificationEvent.ORDER_SHIPPED,
+            #                      context,
+            #                      order.user.mobile, order.user.email)
 
 
         elif order.status == OrderStatus.DELIVERED:
             context = {
                 "var": f"{order.user.name}|{order.order_number[-5:]}|"
             }
-            trigger_notification(order.store,
-                                 NotificationEvent.ORDER_DELIVERED,
-                                 context,
-                                 order.user.mobile, order.user.email)
+            # trigger_notification(order.store,
+            #                      NotificationEvent.ORDER_DELIVERED,
+            #                      context,
+            #                      order.user.mobile, order.user.email)
         return CustomResponse.successResponse(
             data={},
             description="Order Updated successfully"
