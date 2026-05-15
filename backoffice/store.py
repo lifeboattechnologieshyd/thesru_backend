@@ -61,7 +61,7 @@ class SendOTP(APIView):
         if user:
             otp = generate_otp()
             if data.get("mobile") in ["9014083090", '9381023090']:
-                otp = "1234"
+                otp = "2341"
             context = {
                 "var": f"{otp}|"
             }
