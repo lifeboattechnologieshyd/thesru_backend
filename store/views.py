@@ -163,6 +163,7 @@ class ProductListAPIView(APIView):
             queryset = queryset.filter(
                 categories__id=category_id
             )
+            # add unique group code
 
         if product_id:
             queryset = queryset.filter(id=product_id)
@@ -175,8 +176,9 @@ class ProductListAPIView(APIView):
             queryset = queryset.filter(
                 tags__id__in=tag_ids
             )
+        queryset = queryset.order_by("group_code").distinct("group_code")
 
-        queryset = queryset.distinct()
+        # queryset = queryset.distinct()
 
         # ---------- Pagination ----------
         total = queryset.count()
