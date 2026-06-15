@@ -82,9 +82,9 @@ def generate_order_number(store, prefix):
 
 
 BO_STATUS_FLOW = {
-    OrderStatus.CREATED: [OrderStatus.PACKED],
-    OrderStatus.PACKED: [OrderStatus.SHIPPED],
-    OrderStatus.SHIPPED: [OrderStatus.DELIVERED],
+    OrderStatus.CREATED: [OrderStatus.PACKED, OrderStatus.CANCELLED],
+    OrderStatus.PACKED: [OrderStatus.SHIPPED, OrderStatus.CANCELLED],
+    OrderStatus.SHIPPED: [OrderStatus.DELIVERED, OrderStatus.CANCELLED],
 }
 
 from django.db import transaction

@@ -291,10 +291,10 @@ EMAIL_HOST_PASSWORD='gwxtjvkyzjoppaqp'
 DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
 
 CRONJOBS = [
-    (f"0 */1 * * * cd {BASE_DIR} && ",
-     "store.tasks.cron_run",
-     f">> {BASE_DIR}/cron_run.log 2>&1 "
-     ),
+    # (f"0 */1 * * * cd {BASE_DIR} && ",
+    #  "store.tasks.cron_run",
+    #  f">> {BASE_DIR}/cron_run.log 2>&1 "
+    #  ),
      (f"0 0 * * * cd {BASE_DIR} && ",
      "user.tasks.cleanup_expired_otps",
      f">> {BASE_DIR}/cleanup_expired_otps.log 2>&1 "
