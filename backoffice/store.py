@@ -2473,23 +2473,18 @@ class OrderListAPIView(APIView):
         )
     def put(self, request, id):
         order = Order.objects.filter(id=id).first()
-
         if not order:
             return CustomResponse().errorResponse(
                 description="No order found with provided Id"
             )
-
         new_status = request.data.get("status")
         remarks = request.data.get("remarks")
-
         if not new_status:
             return CustomResponse().errorResponse(
                 description="status is required"
             )
-
         current_status = order.status
         allowed_next = BO_STATUS_FLOW.get(current_status, [])
-
         if new_status not in allowed_next:
             return CustomResponse().errorResponse(
                 data={
@@ -2561,10 +2556,10 @@ class OrderListAPIView(APIView):
             context = {
                 "var": f"{order.user.name}|{order.order_number[-5:]}|{osd.courier_service}|{osd.tracking_id}|"
             }
-            # trigger_notification(order.store,
-            #                      NotificationEvent.ORDER_SHIPPED,
-            #                      context,
-            #                      order.user.mobile, order.user.email)
+            trigger_notification(order.store,
+                                 NotificationEvent.ORDER_SHIPPED,
+                                 context,
+                                 order.user.mobile, order.user.email)
 
 
         elif order.status == OrderStatus.DELIVERED:
