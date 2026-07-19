@@ -1589,7 +1589,8 @@ class PinCodeAPIView(APIView):
                 city = data.get("city"),
                 country = data.get("country")
             )
-            return CustomResponse.successResponse(data={},description="pincode created successfully")
+            return CustomResponse.successResponse(data={},
+                                                  description="pincode created successfully")
 
         except IntegrityError as e:
             if "pin" in str(e).lower():
