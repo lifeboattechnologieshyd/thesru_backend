@@ -2462,6 +2462,11 @@ class OrderListAPIView(APIView):
                 status=OrderStatus.CREATED,
                 remarks="Admin Created this order. contacted from instagram"
             )
+            context = {
+                "var": f"{order.user.name}|{order.order_number[-5:]}|"
+            }
+            trigger_notification(order.store, NotificationEvent.ORDER_PLACED, context, order.user.mobile,
+                                 order.user.email)
 
         return CustomResponse.successResponse(
             data={
