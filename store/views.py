@@ -149,7 +149,7 @@ class ProductListAPIView(APIView):
             "categories",
             "tags",
             "media"
-        ).order_by("-updated_at")
+        ).order_by("priority")
 
         # ---------- Search ----------
         if search:
