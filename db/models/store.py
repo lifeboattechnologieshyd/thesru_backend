@@ -79,6 +79,7 @@ class Product(AuditModel):
         db_index=True,
         help_text="Lifeboat Standard Identification Number"
     )
+    priority = models.PositiveIntegerField(default=1)
     #  Group identifier for variants
     group_code = models.CharField(
         max_length=30,
