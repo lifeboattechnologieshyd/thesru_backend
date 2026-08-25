@@ -176,7 +176,7 @@ class ProductListAPIView(APIView):
             queryset = queryset.filter(
                 tags__id__in=tag_ids
             )
-        queryset = queryset.order_by("group_code").distinct("group_code")
+        queryset = queryset.order_by("group_code", "priority").distinct("group_code")
 
         # queryset = queryset.distinct()
 
