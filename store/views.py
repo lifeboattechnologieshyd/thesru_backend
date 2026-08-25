@@ -202,6 +202,7 @@ class ProductListAPIView(APIView):
                 "selling_price": str(p.selling_price),
                 "mrp": str(p.mrp),
                 "current_stock": p.current_stock,
+                "priority": p.priority,
 
                 "description": p.description,
                 "highlights": p.highlights,
