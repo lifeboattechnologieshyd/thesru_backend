@@ -567,6 +567,7 @@ class ProductAPIView(APIView):
                 "name": product.name,
                 "colour": product.colour,
                 "size": product.size,
+                "priority": product.priority,
                 "gst_amount": product.gst_amount,
                 "gst_percentage": product.gst_percentage,
                 "description": product.description,
@@ -628,13 +629,12 @@ class ProductAPIView(APIView):
         updatable_fields = [
             "name", "size", "colour", "mrp", "is_free_shipping",
             "selling_price", "gst_percentage", "description","size",
-            "gst_amount", "is_active","group_code", "sku", "description"
+            "gst_amount", "is_active","group_code", "sku", "description", "priority"
         ]
 
         for field in updatable_fields:
             if field in data:
                 setattr(product, field, data.get(field))
-
         product.updated_by = request.user.mobile
         product.save()
 
@@ -1589,7 +1589,8 @@ class PinCodeAPIView(APIView):
                 city = data.get("city"),
                 country = data.get("country")
             )
-            return CustomResponse.successResponse(data={},description="pincode created successfully")
+            return CustomResponse.successResponse(data={},
+                                                  description="pincode created successfully")
 
         except IntegrityError as e:
             if "pin" in str(e).lower():
@@ -2461,6 +2462,11 @@ class OrderListAPIView(APIView):
                 status=OrderStatus.CREATED,
                 remarks="Admin Created this order. contacted from instagram"
             )
+            context = {
+                "var": f"{order.user.name}|{order.order_number[-5:]}|"
+            }
+            trigger_notification(order.store, NotificationEvent.ORDER_PLACED, context, order.user.mobile,
+                                 order.user.email)
 
         return CustomResponse.successResponse(
             data={

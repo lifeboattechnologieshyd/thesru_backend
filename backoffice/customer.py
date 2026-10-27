@@ -203,6 +203,7 @@ class BackofficeCustomerListAPI(APIView):
                 "mobile": u.mobile,
                 "state": u.state_name,
                 "district": u.district_name,
+                "created_at": u.created_at,
                 "is_paid_user": (u.total_orders or 0) > 0,
                 "total_orders": u.total_orders or 0,
                 "total_amount_paid": u.total_amount_paid or 0,

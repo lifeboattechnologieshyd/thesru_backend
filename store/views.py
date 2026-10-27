@@ -6,9 +6,10 @@ import requests
 from django.contrib.admin.templatetags.admin_list import results
 from django.db import transaction
 from django.db import IntegrityError
-from django.db.models import Q, Count, Avg
+from django.db.models import Q, Count, Avg, Window, F
 from decimal import Decimal
 from django.core.exceptions import ImproperlyConfigured
+from django.db.models.functions import RowNumber
 
 from django.utils.timesince import timesince
 from django.utils.timezone import now
@@ -149,7 +150,9 @@ class ProductListAPIView(APIView):
             "categories",
             "tags",
             "media"
-        ).order_by("-created_at")
+        ).order_by("priority")
+
+
 
         # ---------- Search ----------
         if search:
@@ -176,9 +179,20 @@ class ProductListAPIView(APIView):
             queryset = queryset.filter(
                 tags__id__in=tag_ids
             )
-        queryset = queryset.order_by("group_code").distinct("group_code")
+        #queryset = queryset.order_by("group_code", "priority").distinct("group_code")
 
-        # queryset = queryset.distinct()
+        queryset = queryset.distinct()
+        queryset = (
+            queryset.annotate(
+                rn=Window(
+                    expression=RowNumber(),
+                    partition_by=[F("group_code")],
+                    order_by=[F("priority").asc(), F("id").asc()],
+                )
+            )
+            .filter(rn=1)
+            .order_by("priority", "id")
+        )
 
         # ---------- Pagination ----------
         total = queryset.count()
@@ -202,6 +216,7 @@ class ProductListAPIView(APIView):
                 "selling_price": str(p.selling_price),
                 "mrp": str(p.mrp),
                 "current_stock": p.current_stock,
+                "priority": p.priority,
 
                 "description": p.description,
                 "highlights": p.highlights,
