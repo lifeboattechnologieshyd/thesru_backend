@@ -1,3 +1,190 @@
+<!--<!DOCTYPE html>-->
+<!--<html>-->
+<!--<head>-->
+<!--  <meta charset="UTF-8">-->
+<!--  <title>Shipping Invoice</title>-->
+
+<!--  <style>-->
+<!--    {% if is_thermal %}-->
+<!--    @page { size: 6in 4in; margin: 0mm; }-->
+
+<!--    html, body {-->
+<!--      width: 6in;-->
+<!--      height: 4in;-->
+<!--      overflow: hidden;-->
+<!--    }-->
+<!--    {% else %}-->
+<!--    @page { size: A4; margin: 10mm; }-->
+<!--    {% endif %}-->
+
+<!--    html {-->
+<!--      margin: 0;-->
+<!--      padding: 0;-->
+<!--    }-->
+
+<!--    body {-->
+<!--      font-family: Arial, sans-serif;-->
+<!--      font-size: 13px; /* ✅ slightly reduced for A4 fit */-->
+<!--      margin: 0;-->
+<!--    }-->
+
+<!--    .page {-->
+<!--      border: 1px solid #000;-->
+<!--      padding: 6px;-->
+<!--      page-break-inside: avoid;   /* ✅ prevents split */-->
+<!--      break-inside: avoid;-->
+<!--    }-->
+
+<!--    .divider {-->
+<!--      border-bottom: 1px solid #000;-->
+<!--      margin: 4px -6px;-->
+<!--    }-->
+
+<!--    .row {-->
+<!--      display: flex;-->
+<!--      justify-content: space-between;-->
+<!--      gap: 10px;-->
+<!--    }-->
+
+<!--    .col {-->
+<!--      width: 50%;-->
+<!--      line-height: 1.3;-->
+<!--    }-->
+
+<!--    .title {-->
+<!--      font-weight: bold;-->
+<!--      font-size: 13px;-->
+<!--      margin-bottom: 3px;-->
+<!--    }-->
+
+<!--    table {-->
+<!--      width: 100%;-->
+<!--      border-collapse: collapse;-->
+<!--      margin-top: 4px;-->
+<!--      font-size: 11px; /* ✅ reduced to prevent overflow */-->
+<!--    }-->
+
+<!--    th, td {-->
+<!--      border-bottom: 1px solid #000;-->
+<!--      padding: 4px; /* ✅ reduced spacing */-->
+<!--      text-align: left;-->
+<!--    }-->
+
+<!--    th { font-weight: bold; }-->
+
+<!--    .totals {-->
+<!--      display: flex;-->
+<!--      justify-content: space-between;-->
+<!--      margin-top: 5px;-->
+<!--      font-weight: bold;-->
+<!--      font-size: 13px;-->
+<!--    }-->
+
+<!--    img { max-height: 40px; }-->
+<!--  </style>-->
+<!--</head>-->
+
+<!--<body>-->
+<!--<div class="page">-->
+
+<!--  &lt;!&ndash; SHIP TO + LOGO &ndash;&gt;-->
+<!--  <div class="row">-->
+<!--    <div class="col">-->
+<!--      <div class="title">Ship To</div>-->
+
+<!--      <strong>{{ address.name }}</strong><br>-->
+<!--      Mobile: {{ address.mobile }}<br>-->
+
+<!--      {% if address.house_number %}{{ address.house_number }}, {% endif %}-->
+<!--      {{ address.area }}, {{ address.district }}<br>-->
+<!--      {{ address.state }}, {{ address.country }} - {{ address.pincode }}<br>-->
+<!--    </div>-->
+
+<!--    <div class="col" style="text-align:right;">-->
+<!--      {% if order.store.logo %}-->
+<!--        <img src="{{ order.store.logo }}" alt="Store Logo">-->
+<!--      {% endif %}-->
+<!--    </div>-->
+<!--  </div>-->
+
+<!--  <div class="divider"></div>-->
+
+<!--  &lt;!&ndash; PAYMENT + SHIPPED &ndash;&gt;-->
+<!--  <div class="row">-->
+<!--    <div class="col">-->
+<!--      <div class="title">Payment Details</div>-->
+<!--      Payment Mode: <strong>PREPAID</strong><br>-->
+<!--&lt;!&ndash;      Wallet Paid: ₹{{ order.wallet_paid }}<br>&ndash;&gt;-->
+<!--      Paid Online: ₹{{ order.paid_online }}<br>-->
+<!--&lt;!&ndash;      COD: ₹{{ order.cash_on_delivery }}&ndash;&gt;-->
+<!--    </div>-->
+
+<!--    <div class="col">-->
+<!--      <div class="title">Shipped By</div>-->
+<!--      {{ order.store.name }}<br>-->
+<!--      {{ order.store.address }}<br>-->
+<!--      Mobile: {{ order.store.mobile }}<br>-->
+<!--&lt;!&ndash;      GST: {{ order.store.gst_number|default:"" }}&ndash;&gt;-->
+<!--    </div>-->
+<!--  </div>-->
+
+<!--  <div class="divider"></div>-->
+
+<!--  &lt;!&ndash; ORDER INFO &ndash;&gt;-->
+<!--  <div>-->
+<!--    Order#: {{ order.order_number }} |-->
+<!--    Date: {{ order.created_at|date:"d/m/Y" }} |-->
+<!--    Weight: {{ order.weight }} kg |-->
+<!--    Dim (L×B×H): {{ order.length }} × {{ order.breadth }} × {{ order.height }} cm-->
+<!--  </div>-->
+
+<!--  <div class="divider"></div>-->
+
+<!--  &lt;!&ndash; ITEMS &ndash;&gt;-->
+<!--  <table>-->
+<!--    <thead>-->
+<!--      <tr>-->
+<!--        <th>Item</th>-->
+<!--        <th>Qty</th>-->
+<!--        <th>Unit Price</th>-->
+<!--        <th>Total</th>-->
+<!--      </tr>-->
+<!--    </thead>-->
+<!--    <tbody>-->
+<!--      {% for item in items %}-->
+<!--      <tr>-->
+<!--        <td>{{ item.name }}</td>-->
+<!--        <td>{{ item.qty }}</td>-->
+<!--        <td>₹{{ item.unit_price }}</td>-->
+<!--        <td>₹{{ item.total_price|floatformat:2 }}</td>-->
+<!--      </tr>-->
+<!--      {% endfor %}-->
+
+<!--      {% if remaining_count > 0 %}-->
+<!--      <tr>-->
+<!--        <td colspan="4" style="text-align:center; font-weight:bold;">-->
+<!--          + {{ remaining_count }} more items-->
+<!--        </td>-->
+<!--      </tr>-->
+<!--      {% endif %}-->
+<!--    </tbody>-->
+<!--  </table>-->
+
+<!--  <div class="totals">-->
+<!--    <div>Total Amount:</div>-->
+<!--    <div>₹{{ order.amount }}</div>-->
+<!--  </div>-->
+
+<!--  <div class="divider"></div>-->
+
+<!--  <div style="font-size:10px;">-->
+<!--    This is an auto-generated shipping label.-->
+<!--  </div>-->
+
+<!--</div>-->
+<!--</body>-->
+<!--</html>-->
+
 <!DOCTYPE html>
 <html>
 <head>
@@ -5,17 +192,8 @@
   <title>Shipping Invoice</title>
 
   <style>
-    {% if is_thermal %}
-    @page { size: 6in 4in; margin: 0mm; }
-
-    html, body {
-      width: 6in;
-      height: 4in;
-      overflow: hidden;
-    }
-    {% else %}
-    @page { size: A4; margin: 10mm; }
-    {% endif %}
+    @page { size: 6in 4in;
+    margin: 0mm; }
 
     html {
       margin: 0;
@@ -24,15 +202,14 @@
 
     body {
       font-family: Arial, sans-serif;
-      font-size: 13px; /* ✅ slightly reduced for A4 fit */
+      font-size: 12px;
       margin: 0;
     }
 
     .page {
       border: 1px solid #000;
       padding: 6px;
-      page-break-inside: avoid;   /* ✅ prevents split */
-      break-inside: avoid;
+      margin-top: 0;
     }
 
     .divider {
@@ -53,7 +230,7 @@
 
     .title {
       font-weight: bold;
-      font-size: 13px;
+      font-size: 12px;
       margin-bottom: 3px;
     }
 
@@ -61,12 +238,12 @@
       width: 100%;
       border-collapse: collapse;
       margin-top: 4px;
-      font-size: 11px; /* ✅ reduced to prevent overflow */
+      font-size: 10px;
     }
 
     th, td {
       border-bottom: 1px solid #000;
-      padding: 4px; /* ✅ reduced spacing */
+      padding: 4px;
       text-align: left;
     }
 
@@ -77,7 +254,6 @@
       justify-content: space-between;
       margin-top: 5px;
       font-weight: bold;
-      font-size: 13px;
     }
 
     img { max-height: 40px; }
@@ -93,11 +269,16 @@
       <div class="title">Ship To</div>
 
       <strong>{{ address.name }}</strong><br>
-      Mobile: {{ address.mobile }}<br>
-
       {% if address.house_number %}{{ address.house_number }}, {% endif %}
+      {{ address.full_address }}<br>
+
       {{ address.area }}, {{ address.district }}<br>
       {{ address.state }}, {{ address.country }} - {{ address.pincode }}<br>
+      Mobile: {{ address.mobile }}<br>
+
+      <span style="font-size:9px;">
+        ({{ address.address_type|default:"Home" }})
+      </span>
     </div>
 
     <div class="col" style="text-align:right;">
@@ -114,9 +295,9 @@
     <div class="col">
       <div class="title">Payment Details</div>
       Payment Mode: <strong>PREPAID</strong><br>
-<!--      Wallet Paid: ₹{{ order.wallet_paid }}<br>-->
+      Wallet Paid: ₹{{ order.wallet_paid }}<br>
       Paid Online: ₹{{ order.paid_online }}<br>
-<!--      COD: ₹{{ order.cash_on_delivery }}-->
+      COD: ₹{{ order.cash_on_delivery }}
     </div>
 
     <div class="col">
@@ -124,7 +305,7 @@
       {{ order.store.name }}<br>
       {{ order.store.address }}<br>
       Mobile: {{ order.store.mobile }}<br>
-<!--      GST: {{ order.store.gst_number|default:"" }}-->
+      GST: {{ order.store.gst_number|default:"" }}
     </div>
   </div>
 
@@ -151,23 +332,23 @@
       </tr>
     </thead>
     <tbody>
-      {% for item in items %}
-      <tr>
-        <td>{{ item.name }}</td>
-        <td>{{ item.qty }}</td>
-        <td>₹{{ item.unit_price }}</td>
-        <td>₹{{ item.total_price|floatformat:2 }}</td>
-      </tr>
-      {% endfor %}
+  {% for item in items %}
+  <tr>
+    <td>{{ item.name }}</td>
+    <td>{{ item.qty }}</td>
+    <td>₹{{ item.unit_price }}</td>
+    <td>₹{{ item.total_price|floatformat:2 }}</td>
+  </tr>
+  {% endfor %}
 
-      {% if remaining_count > 0 %}
-      <tr>
-        <td colspan="4" style="text-align:center; font-weight:bold;">
-          + {{ remaining_count }} more items
-        </td>
-      </tr>
-      {% endif %}
-    </tbody>
+  {% if remaining_count > 0 %}
+  <tr>
+  <td colspan="4" style="text-align:right; font-size:9px;">
+    +{{ remaining_count }} more item{{ remaining_count|pluralize }}
+  </td>
+</tr>
+  {% endif %}
+</tbody>
   </table>
 
   <div class="totals">
@@ -177,10 +358,11 @@
 
   <div class="divider"></div>
 
-  <div style="font-size:10px;">
+  <div style="font-size:8px;">
     This is an auto-generated shipping label.
   </div>
 
 </div>
 </body>
 </html>
+
