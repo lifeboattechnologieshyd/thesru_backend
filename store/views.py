@@ -962,7 +962,21 @@ class InitiateOrder(APIView):
                         coupon_code=coupon_code
                     )
             # ---------- Charges (future ready) ----------
-            shipping_charge = calculate_shipping(store, subtotal, address.get("pincode"), cart_items)
+            # shipping_charge = calculate_shipping(store, subtotal, address.get("pincode"), cart_items)
+            has_free_shipping = any(
+                item["product"].is_free_shipping
+                for item in products_data
+            )
+
+            if has_free_shipping:
+                shipping_charge = Decimal("0.00")
+            else:
+                shipping_charge = calculate_shipping(
+                    store,
+                    subtotal,
+                    address.get("pincode"),
+                    cart_items
+                )
             platform_fee = Decimal("0.00")
 
             final_amount = subtotal - coupon_discount + shipping_charge + platform_fee
