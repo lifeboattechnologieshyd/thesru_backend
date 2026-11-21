@@ -338,13 +338,16 @@ def generate_shipping_invoice(orders):
             else:
                 page.pdf(
                     path=str(pdf_path),
-                    format="A4",
+                    width="6in",
+                    height="4in",
                     print_background=True,
+                    prefer_css_page_size=True,
+                    scale=1,
                     margin={
-                        "top": "10mm",
-                        "bottom": "10mm",
-                        "left": "10mm",
-                        "right": "10mm",
+                        "top": "0",
+                        "bottom": "0",
+                        "left": "0",
+                        "right": "0",
                     },
                 )
 
