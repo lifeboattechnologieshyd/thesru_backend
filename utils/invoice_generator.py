@@ -324,7 +324,10 @@ def generate_shipping_invoice(orders):
             browser = p.chromium.launch(
                 args=["--no-sandbox", "--disable-dev-shm-usage"]
             )
-            page = browser.new_page()
+            # CHANGED: force light mode so nothing renders dark
+            page = browser.new_page(color_scheme="light")
+            # ADDED: render with print styles in light mode
+            page.emulate_media(media="print", color_scheme="light")
 
             page.goto(f"file://{html_path}", wait_until="networkidle")
 
@@ -334,6 +337,14 @@ def generate_shipping_invoice(orders):
                     width="6in",
                     height="4in",
                     print_background=True,
+                    # ADDED: same page settings as the normal invoice
+                    prefer_css_page_size=True,
+                    margin={
+                        "top": "0",
+                        "bottom": "0",
+                        "left": "0",
+                        "right": "0",
+                    },
                 )
             else:
                 page.pdf(
