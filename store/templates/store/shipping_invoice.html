@@ -196,9 +196,10 @@
   <title>Shipping Invoice</title>
 
   <style>
+    /* Safe margin so printers don't cut the edges */
     @page {
       size: 6in 4in;
-      margin: 0;
+      margin: 0.2in;
     }
 
     * {
@@ -208,8 +209,6 @@
     }
 
     html, body {
-      width: 6in;
-      height: 4in;
       margin: 0;
       padding: 0;
       background: #ffffff !important;
@@ -218,20 +217,17 @@
     }
 
     body {
-      font-family: Arial, Helvetica, sans-serif;
+      font-family: Arial, "Liberation Sans", "Noto Sans", "DejaVu Sans", sans-serif;
       font-size: 10px;
     }
 
+    /* Fits inside the margins; height follows content (no empty gap) */
     .page {
-      width: 6in;
-      height: 4in;
-      overflow: hidden;
+      width: 100%;
       margin: 0;
       padding: 5px;
       border: 1px solid #000;
       background: #ffffff;
-      display: flex;
-      flex-direction: column;
     }
 
     .divider {
@@ -270,7 +266,6 @@
       border-collapse: collapse;
       margin-top: 2px;
       font-size: 9px;
-      background: #ffffff;
     }
 
     th, td {
@@ -278,11 +273,6 @@
       padding: 3px;
       text-align: left;
       vertical-align: top;
-      background: #ffffff;
-    }
-
-    th {
-      font-weight: bold;
     }
 
     td.num, th.num {
@@ -304,7 +294,6 @@
     }
 
     .footer {
-      margin-top: auto;
       font-size: 8px;
     }
 
@@ -324,10 +313,10 @@
     <div class="col">
       <div class="title">Ship To</div>
       <strong>{{ address.name }}</strong><br>
+      Mobile: {{ address.mobile }}<br>
       {% if address.house_number %}{{ address.house_number }}, {% endif %}{{ address.full_address }}<br>
       {{ address.area }}, {{ address.district }}<br>
-      {{ address.state }}, {{ address.country }} - {{ address.pincode }}<br>
-      Mobile: {{ address.mobile }}
+      {{ address.state }}, {{ address.country }} - {{ address.pincode }}
     </div>
 
     <div class="col right">
@@ -344,9 +333,7 @@
     <div class="col">
       <div class="title">Payment Details</div>
       Payment Mode: <strong>PREPAID</strong><br>
-      Wallet Paid: &#8377;{{ order.wallet_paid }}<br>
-      Paid Online: &#8377;{{ order.paid_online }}<br>
-      COD: &#8377;{{ order.cash_on_delivery }}
+      Paid Online: &#8377;{{ order.paid_online }}
     </div>
 
     <div class="col">
@@ -364,8 +351,8 @@
   <div class="order-info">
     Order#: <strong>{{ order.order_number }}</strong> |
     Date: {{ order.created_at|date:"d/m/Y" }} |
-    Weight: {{ order.weight }} kg |
-    Dim (L&times;B&times;H): {{ order.length }} &times; {{ order.breadth }} &times; {{ order.height }} cm
+    Weight: {{ order.weight|default:"-" }} kg |
+    Dim (L&times;B&times;H): {{ order.length|default:"-" }} &times; {{ order.breadth|default:"-" }} &times; {{ order.height|default:"-" }} cm
   </div>
 
   <div class="divider"></div>
@@ -405,13 +392,13 @@
     <div>&#8377;{{ order.amount|floatformat:2 }}</div>
   </div>
 
+  <div class="divider"></div>
+
   <div class="footer">
-    <div class="divider"></div>
     This is an auto-generated shipping label.
   </div>
 
 </div>
 </body>
 </html>
-
 

@@ -340,10 +340,10 @@ def generate_shipping_invoice(orders):
                     # ADDED: same page settings as the normal invoice
                     prefer_css_page_size=True,
                     margin={
-                        "top": "0",
-                        "bottom": "0",
-                        "left": "0",
-                        "right": "0",
+                        "top": "0.2in",
+                        "bottom": "0.2in",
+                        "left": "0.2in",
+                        "right": "0.2in",
                     },
                 )
             else:
@@ -355,10 +355,10 @@ def generate_shipping_invoice(orders):
                     prefer_css_page_size=True,
                     scale=1,
                     margin={
-                        "top": "0",
-                        "bottom": "0",
-                        "left": "0",
-                        "right": "0",
+                        "top": "0.2in",
+                        "bottom": "0.2in",
+                        "left": "0.2in",
+                        "right": "0.2in",
                     },
                 )
 
