@@ -331,36 +331,27 @@ def generate_shipping_invoice(orders):
 
             page.goto(f"file://{html_path}", wait_until="networkidle")
 
-            if is_thermal:
-                page.pdf(
-                    path=str(pdf_path),
-                    width="6in",
-                    height="4in",
-                    print_background=True,
-                    # ADDED: same page settings as the normal invoice
-                    prefer_css_page_size=True,
-                    margin={
-                        "top": "0.2in",
-                        "bottom": "0.2in",
-                        "left": "0.2in",
-                        "right": "0.2in",
-                    },
-                )
-            else:
-                page.pdf(
-                    path=str(pdf_path),
-                    width="6in",
-                    height="4in",
-                    print_background=True,
-                    prefer_css_page_size=True,
-                    scale=1,
-                    margin={
-                        "top": "0.2in",
-                        "bottom": "0.2in",
-                        "left": "0.2in",
-                        "right": "0.2in",
-                    },
-                )
+            # CHANGED: measure the label and make the PDF page exactly that size,
+            # so there is no empty space on the right/bottom and it is always 1 page
+            size = page.evaluate("""() => {
+                const r = document.body.getBoundingClientRect();
+                return { w: Math.ceil(r.width), h: Math.ceil(r.height) };
+            }""")
+
+            page.pdf(
+                path=str(pdf_path),
+                width=f"{size['w']}px",
+                height=f"{size['h'] + 2}px",
+                print_background=True,
+                prefer_css_page_size=False,
+                page_ranges="1",
+                margin={
+                    "top": "0",
+                    "bottom": "0",
+                    "left": "0",
+                    "right": "0",
+                },
+            )
 
             browser.close()
 
